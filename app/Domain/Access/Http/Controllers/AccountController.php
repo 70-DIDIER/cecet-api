@@ -3,13 +3,13 @@
 namespace App\Domain\Access\Http\Controllers;
 
 use App\Domain\Access\AccountManager;
+use App\Domain\Access\AccountSearch;
 use App\Domain\Access\Exceptions\AccessException;
 use App\Domain\Identity\Enums\PersonType;
 use App\Domain\Identity\Enums\UserKind;
 use App\Domain\Identity\Enums\UserStatus;
 use App\Domain\Identity\Http\Requests\RegisterMemberRequest;
 use App\Domain\Identity\Http\Resources\UserResource;
-use App\Domain\Reporting\ReportingQueries;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,7 +28,7 @@ class AccountController
     /**
      * Paginated list of accounts of the given kind.
      */
-    public function index(Request $request, UserKind $kind, ReportingQueries $reporting): AnonymousResourceCollection
+    public function index(Request $request, UserKind $kind, AccountSearch $search): AnonymousResourceCollection
     {
         $validated = $request->validate([
             'status' => ['nullable', Rule::enum(UserStatus::class)],
@@ -39,34 +39,7 @@ class AccountController
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $users = User::query()
-            ->where('kind', $kind)
-            ->when($validated['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
-            ->when($validated['person_type'] ?? null, fn ($query, string $type) => $query->where('person_type', $type))
-            ->when($kind === UserKind::Staff ? ($validated['role'] ?? null) : null, fn ($query, string $role) => $query->role($role))
-            ->when($validated['search'] ?? null, function ($query, string $search): void {
-                $term = '%'.addcslashes(mb_strtolower($search), '%_\\').'%';
-                $query->where(fn ($inner) => $inner
-                    ->whereRaw('lower(first_name) like ?', [$term])
-                    ->orWhereRaw('lower(last_name) like ?', [$term])
-                    ->orWhere('email', 'like', $term)
-                    ->orWhere('member_number', 'like', mb_strtoupper($term))
-                    ->orWhereHas('organization', fn ($organization) => $organization->whereRaw('lower(legal_name) like ?', [$term]))
-                    ->orWhereHas('pernumIdentities', fn ($pernum) => $pernum->where('pernum', 'like', $term)->where('status', '!=', 'revoked')));
-            })
-            ->when($kind === UserKind::Member ? ($validated['family'] ?? null) : null, fn ($query, string $family) => $query->whereExists(
-                fn ($packs) => $packs->from('user_packs')->whereColumn('user_packs.user_id', 'users.id')->where('status', 'active')->where('family', $family),
-            ))
-            ->when($kind === UserKind::Member, fn ($query) => $query
-                ->select('users.*')
-                ->selectSub($reporting->membershipStatusOf('users.id'), 'membership_status')
-                ->selectSub($reporting->activeFamiliesOf('users.id'), 'active_families')
-                ->selectSub($reporting->balanceOf('users.id'), 'yem_balance')
-                ->with('pernumIdentities'))
-            ->with(['organization', 'roles'])
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->paginate($validated['per_page'] ?? 25);
+        $users = $search->builder($kind, $validated)->paginate($validated['per_page'] ?? 25);
 
         return UserResource::collection($users);
     }

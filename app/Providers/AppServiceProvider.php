@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Domain\Audit\SecurityEventLogger;
 use App\Domain\Catalog\Models\PackPlan;
 use App\Domain\Exchange\Models\ExchangeRequest;
+use App\Domain\Identity\Enums\UserStatus;
 use App\Domain\Identity\Models\PersonalAccessToken;
 use App\Domain\Identity\Otp\EmailOtpChannel;
 use App\Domain\Identity\Otp\OtpChannel;
@@ -74,6 +75,9 @@ class AppServiceProvider extends ServiceProvider
 
         // The Superadmin holds every permission implicitly; business invariants are enforced in the domain.
         Gate::before(fn (mixed $user): ?bool => $user instanceof User && $user->isSuperadmin() ? true : null);
+
+        // Interactive API documentation (Scramble): open in local development, otherwise reserved to authorised staff.
+        Gate::define('viewApiDocs', fn (?User $user): bool => $user !== null && $user->isStaff() && $user->status === UserStatus::Active && $user->can('api_docs.view'));
 
         $this->configureRateLimiting();
     }

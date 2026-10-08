@@ -1,0 +1,6 @@
+Spark Admin (Bootstrap 5 admin template) - Copyright (c) Spark Admin Dev
+Licence MIT. Distribué par ThemeWagon : https://themewagon.com/themes/spark-admin/
+
+Ressources reprises : feuille de style main.css (adaptée : import de police externe retiré),
+Bootstrap 5, Bootstrap Icons, ApexCharts, Flatpickr (chacun sous sa propre licence, voir les fichiers).
+Les pages HTML de démonstration et les photographies d'exemple n'ont pas été reprises.

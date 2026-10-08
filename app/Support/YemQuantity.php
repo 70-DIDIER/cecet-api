@@ -97,7 +97,7 @@ final class YemQuantity
     /**
      * @return numeric-string
      */
-    private static function numeric(string $value): string
+    public static function numeric(string $value): string
     {
         if (! is_numeric($value)) {
             throw new InvalidArgumentException("Not a number: {$value}");

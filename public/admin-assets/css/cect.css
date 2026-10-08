@@ -1,0 +1,186 @@
+/* Compléments CECT au thème Spark Admin (main.css reste inchangé hors import de police). */
+
+/* ---- Connexion ------------------------------------------------------- */
+.login-error {
+    margin-top: .4rem;
+    font-size: .8125rem;
+    color: var(--sys-red);
+}
+
+.login-hint {
+    margin: 1.25rem 0 0;
+    font-size: .8125rem;
+    text-align: center;
+    color: var(--text-muted-green);
+}
+
+.otp-input {
+    letter-spacing: .5em;
+    font-size: 1.35rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.login-secondary-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.25rem;
+}
+
+.btn-link-plain {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: .875rem;
+    font-weight: 600;
+    color: var(--brand-forest-medium);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.login-input.is-invalid {
+    border-color: var(--sys-red);
+}
+
+/* ---- Mise en page ---------------------------------------------------- */
+.flash-area {
+    margin-bottom: 1.25rem;
+}
+
+.navbar-environment {
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.dropdown-menu-profile form .dropdown-item {
+    width: 100%;
+    background: none;
+    border: 0;
+    text-align: left;
+}
+
+
+/* ---- Tableau de bord ------------------------------------------------- */
+.pending-breakdown {
+    margin: .75rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: .8125rem;
+    opacity: .9;
+}
+
+.pending-breakdown li {
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    margin-top: .25rem;
+}
+
+.trend-neutral {
+    color: var(--text-muted-green);
+}
+
+.key-figures div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .5rem 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.key-figures div:last-child {
+    border-bottom: 0;
+}
+
+.key-figures dt {
+    font-weight: 500;
+    color: var(--text-muted-green);
+}
+
+.key-figures dd {
+    margin: 0;
+    font-weight: 700;
+    text-align: right;
+}
+
+.health-list {
+    padding: 0;
+    list-style: none;
+    font-size: .875rem;
+}
+
+.health-list li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+    padding: .35rem 0;
+    text-transform: capitalize;
+}
+
+.health-list .is-ok i {
+    color: var(--sys-green);
+}
+
+.health-list .is-bad i {
+    color: var(--sys-red);
+}
+
+.health-detail {
+    flex-basis: 100%;
+    padding-left: 1.5rem;
+    font-size: .75rem;
+    text-transform: none;
+    color: var(--text-muted-green);
+}
+
+/* ---- Tableaux et badges (écrans de travail) --------------------------- */
+.table-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.table-card .table {
+    margin-bottom: 0;
+}
+
+.table > :not(caption) > * > * {
+    vertical-align: middle;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .2rem .6rem;
+    border-radius: 999px;
+    font-size: .75rem;
+    font-weight: 700;
+}
+
+.status-badge.is-success { background: var(--sys-green-bg); color: #166534; }
+.status-badge.is-danger  { background: var(--sys-red-bg);   color: #991b1b; }
+.status-badge.is-warning { background: var(--sys-orange-bg); color: #9a3412; }
+.status-badge.is-muted   { background: var(--border-light); color: var(--text-muted-green); }
+
+.amount-cell {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.filters-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    align-items: end;
+    margin-bottom: 1.25rem;
+}
+
+.empty-state {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: var(--text-muted-green);
+}

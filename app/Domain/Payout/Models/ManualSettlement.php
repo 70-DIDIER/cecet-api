@@ -3,6 +3,7 @@
 namespace App\Domain\Payout\Models;
 
 use App\Domain\Payout\Enums\ManualSettlementStatus;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $decided_at
  * @property string|null $decision_reason
  * @property-read PayoutBatch $batch
+ * @property-read User $recorder
  */
 #[Fillable(['payout_batch_id', 'amount', 'method', 'reference', 'note', 'paid_at', 'status', 'recorded_by', 'decided_by', 'decided_at', 'decision_reason'])]
 class ManualSettlement extends Model
@@ -38,6 +40,14 @@ class ManualSettlement extends Model
     public function batch(): BelongsTo
     {
         return $this->belongsTo(PayoutBatch::class, 'payout_batch_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function recorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
     }
 
     /**

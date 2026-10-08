@@ -3,9 +3,11 @@
 namespace App\Domain\Exchange\Models;
 
 use App\Domain\Exchange\Enums\ValidationAction;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use LogicException;
 
@@ -20,6 +22,7 @@ use LogicException;
  * @property string|null $comment
  * @property string $actor_id
  * @property Carbon $created_at
+ * @property-read User|null $actor
  */
 #[Fillable(['exchange_request_id', 'action', 'quantity_received', 'external_reference', 'comment', 'actor_id', 'created_at'])]
 class ValidationEvent extends Model
@@ -34,6 +37,14 @@ class ValidationEvent extends Model
     {
         static::updating(fn () => throw new LogicException('Validation events are append-only.'));
         static::deleting(fn () => throw new LogicException('Validation events are append-only.'));
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function actor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'actor_id');
     }
 
     /**

@@ -316,6 +316,81 @@ class ReportingQueries
         ];
     }
 
+    /**
+     * Day-by-day figures of the period (UTC days), for the dashboard charts.
+     *
+     * @return array{days: list<string>, collected_xof: list<int>, new_members: list<int>}
+     */
+    public function dailySeries(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $collected = $this->paidIntents($from, $to)
+            ->selectRaw("to_char(pi.succeeded_at at time zone 'UTC', 'YYYY-MM-DD') AS day, SUM(pi.amount) AS amount")
+            ->groupBy('day')
+            ->pluck('amount', 'day');
+
+        $members = DB::table('memberships')
+            ->where('activated_at', '>=', $from)
+            ->where('activated_at', '<', $to)
+            ->selectRaw("to_char(activated_at at time zone 'UTC', 'YYYY-MM-DD') AS day, COUNT(*) AS count")
+            ->groupBy('day')
+            ->pluck('count', 'day');
+
+        $days = [];
+        $amounts = [];
+        $newMembers = [];
+
+        for ($day = $from->utc()->startOfDay(); $day->lessThan($to); $day = $day->addDay()) {
+            $key = $day->format('Y-m-d');
+            $days[] = $key;
+            $amounts[] = (int) ($collected[$key] ?? 0);
+            $newMembers[] = (int) ($members[$key] ?? 0);
+        }
+
+        return ['days' => $days, 'collected_xof' => $amounts, 'new_members' => $newMembers];
+    }
+
+    /**
+     * The latest confirmed payments, newest first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function recentPayments(int $limit = 6): array
+    {
+        return array_values(DB::table('payment_intents as pi')
+            ->join('users as u', 'u.id', '=', 'pi.user_id')
+            ->leftJoin('organizations as o', 'o.user_id', '=', 'u.id')
+            ->leftJoin('user_packs as up', fn ($join) => $join->on('up.id', '=', 'pi.payable_id')->where('pi.payable_type', '=', 'user_pack'))
+            ->where('pi.status', 'succeeded')
+            ->orderByDesc('pi.succeeded_at')
+            ->limit($limit)
+            ->get(['pi.id', 'pi.purpose', 'pi.amount', 'pi.succeeded_at', 'up.family', 'u.first_name', 'u.last_name', 'o.legal_name'])
+            ->map(fn (object $row): array => [
+                'id' => $row->id,
+                'label' => $this->sourceLabel($this->sourceKey($row->purpose, $row->family)),
+                'member' => $row->legal_name ?? trim("{$row->first_name} {$row->last_name}"),
+                'amount_xof' => (int) $row->amount,
+                'date' => CarbonImmutable::parse($row->succeeded_at),
+            ])
+            ->values()
+            ->all());
+    }
+
+    /**
+     * Items awaiting a decision of the validators.
+     *
+     * @return array{payments: int, yem: int, merchant: int}
+     */
+    public function pendingValidations(): array
+    {
+        return [
+            'payments' => $this->pendingManualPayments()['count'],
+            'yem' => DB::table('exchange_requests')->whereIn('status', ['declared_sent', 'disputed'])->count(),
+            'merchant' => DB::table('merchant_payments')
+                ->where(fn ($query) => $query->where('status', 'disputed')->orWhere(fn ($declared) => $declared->where('status', 'declared_sent')->where('confirmation_mode', 'validator')))
+                ->count(),
+        ];
+    }
+
     private function paidIntents(CarbonImmutable $from, CarbonImmutable $to): Builder
     {
         return DB::table('payment_intents as pi')

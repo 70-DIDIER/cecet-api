@@ -52,6 +52,7 @@ final class PermissionCatalog
             'reports.view' => ['description' => 'Consulter les rapports.'],
             'reports.export' => ['description' => 'Exporter les rapports et snapshots.'],
             'imports.manage' => ['description' => 'Prévisualiser et approuver un import consolidé.'],
+            'api_docs.view' => ['description' => 'Consulter la documentation interactive de l\'API (/docs/api).'],
         ];
     }
 
@@ -68,7 +69,7 @@ final class PermissionCatalog
             self::ADMIN => ['label' => 'Administrateur', 'permissions' => [
                 'members.view', 'members.manage', 'staff.view', 'staff.manage', 'roles.view', 'user_packs.view', 'payments.validate_manual',
                 'settings.view', 'settings.update', 'audit.view', 'packs.view', 'packs.manage',
-                'yem_validations.view', 'payments.view', 'payouts.view', 'reports.view', 'reports.export', 'imports.manage',
+                'yem_validations.view', 'payments.view', 'payouts.view', 'reports.view', 'reports.export', 'imports.manage', 'api_docs.view',
             ]],
             self::VALIDATOR => ['label' => 'Validateur', 'permissions' => [
                 'yem_validations.view', 'yem_validations.confirm', 'yem_validations.dispute', 'payments.validate_manual',

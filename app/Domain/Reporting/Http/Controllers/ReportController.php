@@ -5,6 +5,7 @@ namespace App\Domain\Reporting\Http\Controllers;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Reporting\CsvWriter;
 use App\Domain\Reporting\ReportingQueries;
+use App\Domain\Reporting\ReportPeriod;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,8 +17,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ReportController
 {
-    private const DEFAULT_PERIOD_DAYS = 30;
-
     public function __construct(private readonly ReportingQueries $queries) {}
 
     /**
@@ -100,21 +99,6 @@ class ReportController
      */
     private function period(Request $request): array
     {
-        $validated = $request->validate([
-            'month' => ['nullable', 'date_format:Y-m', 'prohibits:from,to'],
-            'from' => ['nullable', 'date_format:Y-m-d'],
-            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
-        ]);
-
-        if (isset($validated['month'])) {
-            $from = CarbonImmutable::createFromFormat('!Y-m', $validated['month']) ?: CarbonImmutable::now()->startOfMonth();
-
-            return [$from, $from->addMonth()];
-        }
-
-        $to = isset($validated['to']) ? CarbonImmutable::parse($validated['to'])->addDay()->startOfDay() : CarbonImmutable::tomorrow();
-        $from = isset($validated['from']) ? CarbonImmutable::parse($validated['from'])->startOfDay() : $to->subDays(self::DEFAULT_PERIOD_DAYS);
-
-        return [$from, $to];
+        return ReportPeriod::fromRequest($request);
     }
 }
