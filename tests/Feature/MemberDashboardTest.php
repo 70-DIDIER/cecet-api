@@ -1,0 +1,61 @@
+<?php
+
+use App\Domain\Catalog\Enums\PackFamily;
+use App\Domain\Identity\Enums\UserStatus;
+use App\Models\User;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+
+beforeEach(function () {
+    seedCatalogs();
+    Mail::fake();
+});
+
+it('summarises the member area: profile, YEM balance, active packs and latest movements', function () {
+    $member = User::factory()->create(['city' => 'Lomé']);
+    $member->pernumIdentities()->create(['pernum' => '1001043953', 'kind' => 'personal', 'status' => 'declared']);
+
+    $consumer = subscribeAndPay($member, makePlan(PackFamily::Consommateur, 'C1', [
+        'period' => ['unit' => 'month', 'every' => 1, 'cycles' => 12],
+        'cumulative' => true,
+        'end_of_term' => 'expire',
+        'rules' => ['reference_value_xof' => 300000, 'discount_bps' => 1500],
+        'reason' => 'Grille de l\'ancien site',
+    ]));
+
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/dashboard')
+        ->assertOk()
+        ->assertJsonPath('data.profile.pernum', '1001043953')
+        ->assertJsonPath('data.profile.city', 'Lomé')
+        ->assertJsonPath('data.yem.balance', '38.461538')
+        ->assertJsonPath('data.yem.total_credited', '38.461538')
+        ->assertJsonPath('data.yem.total_spent', '0.000000')
+        ->assertJsonPath('data.active_packs.0.id', $consumer->id)
+        ->assertJsonPath('data.active_packs.0.code', 'C1')
+        ->assertJsonPath('data.active_packs.0.price_xof', 255000)
+        ->assertJsonPath('data.active_packs.0.discount_bps', 1500)
+        ->assertJsonPath('data.recent_movements.0.label', 'Crédit période 1 — C1')
+        ->assertJsonPath('data.recent_movements.0.direction', 'credit')
+        ->assertJsonPath('data.recent_movements.0.quantity', '38.461538')
+        ->assertJsonPath('data.payments_awaiting_action', []);
+});
+
+it('shows a membership payment still awaiting validation', function () {
+    $member = User::factory()->status(UserStatus::PendingPayment)->create();
+
+    $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/membership/payments', ['method' => 'CASH'], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated();
+
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/dashboard')
+        ->assertOk()
+        ->assertJsonPath('data.membership.paid', false)
+        ->assertJsonPath('data.active_packs', [])
+        ->assertJsonPath('data.yem.balance', '0.000000')
+        ->assertJsonPath('data.payments_awaiting_action.0.method', 'CASH')
+        ->assertJsonPath('data.payments_awaiting_action.0.mode', 'manual');
+});
+
+it('requires authentication', function () {
+    $this->getJson('/api/v1/me/dashboard')->assertUnauthorized();
+});
