@@ -110,17 +110,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "allOf": [
-                                                    {
-                                                        "$ref": "#/components/schemas/UserResource"
-                                                    },
-                                                    {
-                                                        "type": "object",
-                                                        "required": [
-                                                            "organization"
-                                                        ]
-                                                    }
-                                                ]
+                                                "$ref": "#/components/schemas/UserResource"
                                             }
                                         },
                                         "links": {
@@ -596,17 +586,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "allOf": [
-                                                    {
-                                                        "$ref": "#/components/schemas/UserResource"
-                                                    },
-                                                    {
-                                                        "type": "object",
-                                                        "required": [
-                                                            "organization"
-                                                        ]
-                                                    }
-                                                ]
+                                                "$ref": "#/components/schemas/UserResource"
                                             }
                                         },
                                         "links": {
@@ -1363,6 +1343,587 @@
                 }
             }
         },
+        "/admin/dashboard": {
+            "get": {
+                "operationId": "v1.admin.dashboard",
+                "summary": "Figures of the period (default: the last 30 days), with the change of collected amounts against the\nprevious period of the same length, the daily series, the latest payments and the pending validations",
+                "tags": [
+                    "Dashboard"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "period": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "from": {
+                                                            "type": "string"
+                                                        },
+                                                        "to": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "from",
+                                                        "to"
+                                                    ]
+                                                },
+                                                "summary": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "period": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "from": {
+                                                                    "type": "string"
+                                                                },
+                                                                "to": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "from",
+                                                                "to"
+                                                            ]
+                                                        },
+                                                        "kpis": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "total_collected_xof": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "transaction_fees_xof": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "confirmed_payments": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "average_payment_xof": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "new_members": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "registrations": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "manual_validations": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "manual_rejections": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "rejection_rate_bps": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "pending_payments": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "pending_amount_xof": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "yem_in_circulation": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "total_collected_xof",
+                                                                "transaction_fees_xof",
+                                                                "confirmed_payments",
+                                                                "average_payment_xof",
+                                                                "new_members",
+                                                                "registrations",
+                                                                "manual_validations",
+                                                                "manual_rejections",
+                                                                "rejection_rate_bps",
+                                                                "pending_payments",
+                                                                "pending_amount_xof",
+                                                                "yem_in_circulation"
+                                                            ]
+                                                        },
+                                                        "yem_activity": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "sold_to_cect": {
+                                                                    "type": "string"
+                                                                },
+                                                                "sold_to_cect_xof": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "paid_to_merchants": {
+                                                                    "type": "string"
+                                                                },
+                                                                "merchant_payments": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "merchants_paid": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "redeemed_by_merchants": {
+                                                                    "type": "string"
+                                                                },
+                                                                "redeemed_by_merchants_xof": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "active_merchants": {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "sold_to_cect",
+                                                                "sold_to_cect_xof",
+                                                                "paid_to_merchants",
+                                                                "merchant_payments",
+                                                                "merchants_paid",
+                                                                "redeemed_by_merchants",
+                                                                "redeemed_by_merchants_xof",
+                                                                "active_merchants"
+                                                            ]
+                                                        },
+                                                        "payouts": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "paid_by_provider_xof": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "paid_by_provider_count": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "failed_transfers": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "paid_manually_xof": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "paid_manually_count": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "remaining_due_xof": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "remaining_due_batches": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "batches_needing_action": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "manual_settlements_pending": {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "paid_by_provider_xof",
+                                                                "paid_by_provider_count",
+                                                                "failed_transfers",
+                                                                "paid_manually_xof",
+                                                                "paid_manually_count",
+                                                                "remaining_due_xof",
+                                                                "remaining_due_batches",
+                                                                "batches_needing_action",
+                                                                "manual_settlements_pending"
+                                                            ]
+                                                        },
+                                                        "by_source": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "by_method": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "top_members": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "period",
+                                                        "kpis",
+                                                        "yem_activity",
+                                                        "payouts",
+                                                        "by_source",
+                                                        "by_method",
+                                                        "top_members"
+                                                    ]
+                                                },
+                                                "trend": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "direction": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "up",
+                                                                "down"
+                                                            ]
+                                                        },
+                                                        "percent": {
+                                                            "type": "number"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "direction",
+                                                        "percent"
+                                                    ]
+                                                },
+                                                "series": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "days": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "collected_xof": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "integer"
+                                                            }
+                                                        },
+                                                        "new_members": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "days",
+                                                        "collected_xof",
+                                                        "new_members"
+                                                    ]
+                                                },
+                                                "recent_payments": {
+                                                    "type": [
+                                                        "array",
+                                                        "null"
+                                                    ],
+                                                    "items": {}
+                                                },
+                                                "overview": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "members": {
+                                                            "type": "integer",
+                                                            "minimum": 0
+                                                        },
+                                                        "active_members": {
+                                                            "type": "integer",
+                                                            "minimum": 0
+                                                        },
+                                                        "total_collected_xof": {
+                                                            "type": "integer"
+                                                        },
+                                                        "pending_validations": {
+                                                            "type": "integer"
+                                                        },
+                                                        "yem_in_circulation": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "members",
+                                                        "active_members",
+                                                        "total_collected_xof",
+                                                        "pending_validations",
+                                                        "yem_in_circulation"
+                                                    ]
+                                                },
+                                                "pending_validations": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "payments": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "yem": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ]
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "payments",
+                                                        "yem"
+                                                    ]
+                                                },
+                                                "health": {
+                                                    "type": [
+                                                        "array",
+                                                        "null"
+                                                    ],
+                                                    "prefixItems": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "code": {
+                                                                    "type": "string",
+                                                                    "const": "audit_chain_broken"
+                                                                },
+                                                                "severity": {
+                                                                    "type": "string"
+                                                                },
+                                                                "ok": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "value": {
+                                                                    "type": "integer",
+                                                                    "enum": [
+                                                                        0,
+                                                                        1
+                                                                    ]
+                                                                },
+                                                                "message": {
+                                                                    "type": "string",
+                                                                    "const": "La cha\u00eene d'int\u00e9grit\u00e9 du journal d'audit est rompue : alt\u00e9ration possible."
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "code",
+                                                                "severity",
+                                                                "ok",
+                                                                "value",
+                                                                "message"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "code": {
+                                                                    "type": "string",
+                                                                    "const": "payout_failures"
+                                                                },
+                                                                "severity": {
+                                                                    "type": "string"
+                                                                },
+                                                                "ok": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "value": {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                },
+                                                                "message": {
+                                                                    "type": "string",
+                                                                    "const": "Hausse des virements de contre-valeur en \u00e9chec sur la derni\u00e8re heure."
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "code",
+                                                                "severity",
+                                                                "ok",
+                                                                "value",
+                                                                "message"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "code": {
+                                                                    "type": "string",
+                                                                    "const": "outbox_dead"
+                                                                },
+                                                                "severity": {
+                                                                    "type": "string"
+                                                                },
+                                                                "ok": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "value": {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                },
+                                                                "message": {
+                                                                    "type": "string",
+                                                                    "const": "Message(s) de l'outbox abandonn\u00e9(s) apr\u00e8s plusieurs tentatives : un traitement (payout) ne s'ex\u00e9cutera pas sans intervention."
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "code",
+                                                                "severity",
+                                                                "ok",
+                                                                "value",
+                                                                "message"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "code": {
+                                                                    "type": "string",
+                                                                    "const": "outbox_backlog"
+                                                                },
+                                                                "severity": {
+                                                                    "type": "string"
+                                                                },
+                                                                "ok": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "value": {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                },
+                                                                "message": {
+                                                                    "type": "string",
+                                                                    "const": "Messages de l'outbox en attente depuis plus de 15 minutes : le relais (outbox:relay) ou la file semble bloqu\u00e9."
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "code",
+                                                                "severity",
+                                                                "ok",
+                                                                "value",
+                                                                "message"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "code": {
+                                                                    "type": "string",
+                                                                    "const": "failed_jobs"
+                                                                },
+                                                                "severity": {
+                                                                    "type": "string"
+                                                                },
+                                                                "ok": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "value": {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                },
+                                                                "message": {
+                                                                    "type": "string",
+                                                                    "const": "T\u00e2che(s) d'arri\u00e8re-plan en \u00e9chec sur la derni\u00e8re heure."
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "code",
+                                                                "severity",
+                                                                "ok",
+                                                                "value",
+                                                                "message"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "code": {
+                                                                    "type": "string",
+                                                                    "const": "webhook_rejections"
+                                                                },
+                                                                "severity": {
+                                                                    "type": "string"
+                                                                },
+                                                                "ok": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "value": {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                },
+                                                                "message": {
+                                                                    "type": "string",
+                                                                    "const": "Webhooks de paiement rejet\u00e9s en masse (signature invalide) sur la derni\u00e8re heure."
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "code",
+                                                                "severity",
+                                                                "ok",
+                                                                "value",
+                                                                "message"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "code": {
+                                                                    "type": "string",
+                                                                    "const": "snapshot_failed"
+                                                                },
+                                                                "severity": {
+                                                                    "type": "string"
+                                                                },
+                                                                "ok": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "value": {
+                                                                    "type": "integer",
+                                                                    "enum": [
+                                                                        1,
+                                                                        0
+                                                                    ]
+                                                                },
+                                                                "message": {
+                                                                    "type": "string",
+                                                                    "const": "La derni\u00e8re g\u00e9n\u00e9ration du snapshot consolid\u00e9 a \u00e9chou\u00e9."
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "code",
+                                                                "severity",
+                                                                "ok",
+                                                                "value",
+                                                                "message"
+                                                            ]
+                                                        }
+                                                    ],
+                                                    "minItems": 7,
+                                                    "maxItems": 7
+                                                }
+                                            },
+                                            "required": [
+                                                "period",
+                                                "summary",
+                                                "trend",
+                                                "series",
+                                                "recent_payments",
+                                                "overview",
+                                                "pending_validations",
+                                                "health"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/finance/payouts": {
             "get": {
                 "operationId": "v1.finance.payouts.index",
@@ -1417,6 +1978,17 @@
                                 "string",
                                 "null"
                             ]
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "maxLength": 60
                         }
                     },
                     {
@@ -1561,12 +2133,34 @@
                                                 "to",
                                                 "total"
                                             ]
+                                        },
+                                        "summary": {
+                                            "type": "object",
+                                            "properties": {
+                                                "owed_amount": {
+                                                    "type": "integer"
+                                                },
+                                                "needing_action": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                },
+                                                "pending_settlements": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "owed_amount",
+                                                "needing_action",
+                                                "pending_settlements"
+                                            ]
                                         }
                                     },
                                     "required": [
                                         "data",
                                         "links",
-                                        "meta"
+                                        "meta",
+                                        "summary"
                                     ]
                                 }
                             }
@@ -4485,6 +5079,176 @@
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/admin/members/{user}/overview": {
+            "get": {
+                "operationId": "v1.admin.members.overview",
+                "summary": "Profile, membership and packs of a member, with their ten latest operations of each kind",
+                "tags": [
+                    "MemberOverview"
+                ],
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "required": true,
+                        "description": "The user ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "member": {
+                                                    "allOf": [
+                                                        {
+                                                            "$ref": "#/components/schemas/UserResource"
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "required": [
+                                                                "organization",
+                                                                "pernums"
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                "membership": {
+                                                    "anyOf": [
+                                                        {
+                                                            "$ref": "#/components/schemas/MembershipResource"
+                                                        },
+                                                        {
+                                                            "type": "null"
+                                                        }
+                                                    ]
+                                                },
+                                                "packs": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "merchant_account": {
+                                                                "type": [
+                                                                    "object",
+                                                                    "null"
+                                                                ],
+                                                                "properties": {
+                                                                    "eligible": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "reserved": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "redeemed": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "eligible",
+                                                                    "reserved",
+                                                                    "redeemed"
+                                                                ]
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "merchant_account"
+                                                        ],
+                                                        "additionalProperties": {}
+                                                    }
+                                                },
+                                                "payments": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "exchanges": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "merchant_payments": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "audit_events": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "string"
+                                                            },
+                                                            "action": {
+                                                                "type": "string"
+                                                            },
+                                                            "actor_id": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "result": {
+                                                                "type": "string"
+                                                            },
+                                                            "reason": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "occurred_at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "action",
+                                                            "actor_id",
+                                                            "result",
+                                                            "reason",
+                                                            "occurred_at"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "member",
+                                                "membership",
+                                                "packs",
+                                                "payments",
+                                                "exchanges",
+                                                "merchant_payments",
+                                                "audit_events"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"

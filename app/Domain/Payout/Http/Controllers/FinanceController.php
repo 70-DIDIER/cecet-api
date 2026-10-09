@@ -36,6 +36,7 @@ class FinanceController
             'route' => ['nullable', Rule::enum(PayoutRoute::class)],
             'method' => ['nullable', 'string', 'max:30'],
             'beneficiary_id' => ['nullable', 'string', 'ulid'],
+            'search' => ['nullable', 'string', 'max:60'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -45,11 +46,16 @@ class FinanceController
             ->when($validated['route'] ?? null, fn ($query, string $route) => $query->where('route', $route))
             ->when($validated['method'] ?? null, fn ($query, string $method) => $query->where('method', $method))
             ->when($validated['beneficiary_id'] ?? null, fn ($query, string $id) => $query->where('beneficiary_id', $id))
+            ->when($validated['search'] ?? null, fn ($query, string $search) => $query->where('reference', 'like', '%'.addcslashes(mb_strtoupper($search), '%_\\').'%'))
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate($validated['per_page'] ?? 50);
 
-        return PayoutBatchResource::collection($batches);
+        return PayoutBatchResource::collection($batches)->additional(['summary' => [
+            'owed_amount' => (int) PayoutBatch::query()->where('status', '<>', PayoutBatchStatus::Paid)->sum('remaining_amount'),
+            'needing_action' => PayoutBatch::query()->whereIn('status', [PayoutBatchStatus::Failed, PayoutBatchStatus::ManualRequired])->count(),
+            'pending_settlements' => ManualSettlement::query()->where('status', ManualSettlementStatus::PendingApproval)->count(),
+        ]]);
     }
 
     public function show(PayoutBatch $payout): PayoutBatchResource

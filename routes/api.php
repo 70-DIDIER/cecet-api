@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Access\Http\Controllers\AccountController;
+use App\Domain\Access\Http\Controllers\MemberOverviewController;
 use App\Domain\Access\Http\Controllers\RoleController;
 use App\Domain\Audit\Http\Controllers\AuditEventController;
 use App\Domain\Catalog\Http\Controllers\PackPlanAdminController;
@@ -27,6 +28,7 @@ use App\Domain\Payment\Http\Controllers\PaymentWebhookController;
 use App\Domain\Payment\Http\Controllers\ValidationQueueController;
 use App\Domain\Payout\Http\Controllers\FinanceController;
 use App\Domain\Payout\Http\Controllers\PayoutDestinationController;
+use App\Domain\Reporting\Http\Controllers\DashboardController;
 use App\Domain\Reporting\Http\Controllers\ImportController;
 use App\Domain\Reporting\Http\Controllers\ReportController;
 use App\Domain\Reporting\Http\Controllers\SnapshotController;
@@ -204,6 +206,8 @@ Route::prefix('v1')->name('v1.')->group(function () {
                 });
             }
 
+            Route::get('members/{user}/overview', MemberOverviewController::class)->middleware('can:members.view')->name('members.overview');
+
             Route::middleware(['can:staff.manage', 'step-up'])->group(function () {
                 Route::post('staff', [AccountController::class, 'storeStaff'])->middleware('idempotent')->name('staff.store');
                 Route::put('staff/{user}/roles', [AccountController::class, 'updateRoles'])->name('staff.roles.update');
@@ -231,6 +235,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
             Route::get('user-packs/{userPack}', [UserPackAdminController::class, 'show'])->middleware('can:user_packs.view')->name('user-packs.show');
             Route::post('user-packs/{userPack}/adjustments', [UserPackAdminController::class, 'adjust'])->middleware(['can:quota.adjust', 'step-up', 'idempotent'])->name('user-packs.adjust');
 
+            Route::get('dashboard', DashboardController::class)->name('dashboard');
             Route::get('overview', [ReportController::class, 'overview'])->middleware('can:reports.view')->name('overview');
             Route::get('reports/summary', [ReportController::class, 'summary'])->middleware('can:reports.view')->name('reports.summary');
             Route::get('reports/summary/print', [ReportController::class, 'printable'])->middleware('can:reports.view')->name('reports.summary.print');
