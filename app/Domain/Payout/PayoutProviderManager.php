@@ -18,13 +18,15 @@ class PayoutProviderManager
 
     public function provider(string $name): PayoutProvider
     {
-        return match ($name) {
-            FakePayoutProvider::NAME => $this->app->isProduction()
-                ? throw PayoutException::unknownProvider($name)
-                : $this->app->make(FakePayoutProvider::class),
-            FedaPayPayoutProvider::NAME => $this->app->make(FedaPayPayoutProvider::class),
-            default => throw PayoutException::unknownProvider($name),
-        };
+        if ($name === FakePayoutProvider::NAME && ! $this->app->isProduction()) {
+            return $this->app->make(FakePayoutProvider::class);
+        }
+
+        if ($name === FedaPayPayoutProvider::NAME) {
+            return $this->app->make(FedaPayPayoutProvider::class);
+        }
+
+        throw PayoutException::unknownProvider($name);
     }
 
     public function active(): PayoutProvider

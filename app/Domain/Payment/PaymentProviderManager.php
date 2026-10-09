@@ -22,13 +22,15 @@ class PaymentProviderManager
 
     public function provider(string $name): PaymentProvider
     {
-        return match ($name) {
-            FakePaymentProvider::NAME => $this->container->isProduction()
-                ? throw PaymentException::unknownProvider($name)
-                : $this->container->make(FakePaymentProvider::class),
-            FedaPayProvider::NAME => $this->container->make(FedaPayProvider::class),
-            default => throw PaymentException::unknownProvider($name),
-        };
+        if ($name === FakePaymentProvider::NAME && ! $this->container->isProduction()) {
+            return $this->container->make(FakePaymentProvider::class);
+        }
+
+        if ($name === FedaPayProvider::NAME) {
+            return $this->container->make(FedaPayProvider::class);
+        }
+
+        throw PaymentException::unknownProvider($name);
     }
 
     public function inbound(): PaymentProvider
