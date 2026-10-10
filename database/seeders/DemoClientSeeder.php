@@ -50,10 +50,6 @@ use RuntimeException;
  */
 class DemoClientSeeder extends Seeder
 {
-    private const STAFF_EMAIL = 'superadmin.demo@cect.example';
-
-    private const MERCHANT_EMAIL = 'marchand.demo@cect.example';
-
     private User $admin;
 
     public function run(): void
@@ -148,8 +144,8 @@ class DemoClientSeeder extends Seeder
         $pernum = $client->pernumIdentities()->value('pernum');
         $this->command->table(['Compte', 'Identifiant', 'Mot de passe'], [
             ['Client (membre)', "{$email} ou Pernum {$pernum}", $existing !== null ? '(inchangé)' : $password],
-            ['Marchand (membre)', self::MERCHANT_EMAIL, $password],
-            ['Personnel (Superadmin) : back-office /backoffice', self::STAFF_EMAIL, $password],
+            ['Marchand (membre)', (string) config('demo.merchant_email'), $password],
+            ['Personnel (Superadmin) : back-office /backoffice', (string) config('demo.staff_email'), $password],
         ]);
     }
 
@@ -199,7 +195,7 @@ class DemoClientSeeder extends Seeder
             'kind' => UserKind::Staff,
             'first_name' => 'Superadmin',
             'last_name' => 'Démo',
-            'email' => self::STAFF_EMAIL,
+            'email' => (string) config('demo.staff_email'),
             'phone' => '+22890000001',
             'status' => UserStatus::Active,
             'email_verified_at' => now(),
@@ -342,7 +338,7 @@ class DemoClientSeeder extends Seeder
      */
     private function merchant(string $password): array
     {
-        $existing = User::query()->where('email', self::MERCHANT_EMAIL)->first();
+        $existing = User::query()->where('email', (string) config('demo.merchant_email'))->first();
         $qr = $existing === null ? null : MerchantQrCode::query()->where('user_id', $existing->id)->where('status', MerchantQrCode::ACTIVE)->first();
 
         if ($existing !== null && $qr !== null) {
@@ -350,7 +346,7 @@ class DemoClientSeeder extends Seeder
         }
 
         $registered = app(RegisterMember::class)->handle([
-            'person_type' => 'legal', 'first_name' => 'Awa', 'last_name' => 'Koffi', 'email' => self::MERCHANT_EMAIL, 'phone' => '+22890000077',
+            'person_type' => 'legal', 'first_name' => 'Awa', 'last_name' => 'Koffi', 'email' => (string) config('demo.merchant_email'), 'phone' => '+22890000077',
             'pernum' => '1009000077', 'city' => 'Lomé', 'password' => $password, 'signed_place' => 'Lomé', 'signed_on' => now()->toDateString(),
             'legal_name' => 'Pharmacie Centrale (démo)', 'legal_form' => 'SARL', 'rccm' => 'TG-LOM-2020-B-0001', 'nif' => '1000000001',
         ]);
