@@ -25,8 +25,8 @@ class FakeSettleCommand extends Command
 
     public function handle(Application $app, FakePaymentProvider $fake): int
     {
-        if ($app->isProduction()) {
-            $this->error('Commande indisponible en production.');
+        if (! $app->environment('testing')) {
+            $this->error('Commande réservée aux tests automatisés.');
 
             return self::FAILURE;
         }
@@ -65,3 +65,5 @@ class FakeSettleCommand extends Command
         return self::SUCCESS;
     }
 }
+
+[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
