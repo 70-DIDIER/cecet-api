@@ -22,7 +22,7 @@ class PaymentProviderManager
 
     public function provider(string $name): PaymentProvider
     {
-        if ($name === FakePaymentProvider::NAME && ! $this->container->isProduction()) {
+        if ($name === FakePaymentProvider::NAME && $this->container->environment('testing')) {
             return $this->container->make(FakePaymentProvider::class);
         }
 
@@ -38,3 +38,5 @@ class PaymentProviderManager
         return $this->provider($this->settings->string('payment.inbound_provider') ?? '');
     }
 }
+
+[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
