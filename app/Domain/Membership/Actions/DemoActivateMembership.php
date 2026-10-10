@@ -33,7 +33,7 @@ class DemoActivateMembership
 
     public function handle(User $member): Membership
     {
-        if ($this->app->isProduction() || ! $this->settings->boolean('platform.demo_gateway_bypass')) {
+        if (! $this->app->environment('testing') || ! $this->settings->boolean('platform.demo_gateway_bypass')) {
             throw PaymentException::demoUnavailable();
         }
 
@@ -61,3 +61,5 @@ class DemoActivateMembership
         });
     }
 }
+
+[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
