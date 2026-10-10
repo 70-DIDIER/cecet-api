@@ -61,7 +61,7 @@ class StartMembershipPayment
             $channel['gateway'],
             $member,
             PaymentPurpose::Membership,
-            "Adhésion CECT {$member->member_number} (frais de transaction inclus)",
+            "Frais d'adhésion CECT {$member->member_number}",
             customerPhone: $paymentPhone,
         );
 
