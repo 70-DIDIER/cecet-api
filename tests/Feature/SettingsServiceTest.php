@@ -147,5 +147,3 @@ it('serves the new value immediately after a change despite the cache', function
     expect($this->settings->get('exchange.reservation_ttl_minutes'))->toBe(60)
         ->and(SettingVersion::query()->where('setting_key', 'exchange.reservation_ttl_minutes')->count())->toBe(2);
 });
-
-[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
