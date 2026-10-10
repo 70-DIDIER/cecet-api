@@ -129,10 +129,10 @@ it('ignores a demo bypass value that reaches production', function () {
     expect($this->settings->get('platform.demo_gateway_bypass'))->toBeFalse();
 });
 
-it('refuses a fake payment provider in production when none is configured', function () {
+it('uses FedaPay as the safe fallback when a fake provider reaches production', function () {
     app()->detectEnvironment(fn () => 'production');
 
-    expectSettingError(fn () => $this->settings->get('payment.inbound_provider'), 'SETTING_NOT_CONFIGURED');
+    expect($this->settings->get('payment.inbound_provider'))->toBe('fedapay');
 });
 
 it('keeps setting versions immutable at the database level', function () {
@@ -147,3 +147,5 @@ it('serves the new value immediately after a change despite the cache', function
     expect($this->settings->get('exchange.reservation_ttl_minutes'))->toBe(60)
         ->and(SettingVersion::query()->where('setting_key', 'exchange.reservation_ttl_minutes')->count())->toBe(2);
 });
+
+[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
