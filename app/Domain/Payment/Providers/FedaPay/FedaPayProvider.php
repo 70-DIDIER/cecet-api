@@ -62,9 +62,9 @@ class FedaPayProvider implements PaymentProvider
         $transaction = $this->unwrap($this->send(fn (PendingRequest $http): Response => $http->retry(2, 250, throw: false)->get("/transactions/{$id}")));
 
         $amount = $transaction['amount'] ?? null;
-        $currency = data_get($transaction, 'currency.iso');
+        $currency = $this->transactionCurrency($transaction);
 
-        if (! is_numeric($amount) || ! is_string($currency)) {
+        if (! is_numeric($amount) || $currency === null) {
             throw new PaymentProviderException('FedaPay returned an incomplete transaction.');
         }
 
@@ -207,6 +207,34 @@ class FedaPayProvider implements PaymentProvider
         return $body;
     }
 
+    /**
+     * FedaPay's current transaction response may expose only currency_id instead of currency.iso.
+     * Resolve that identifier through the currencies endpoint rather than guessing the ISO code.
+     *
+     * @param  array<string, mixed>  $transaction
+     */
+    private function transactionCurrency(array $transaction): ?string
+    {
+        $embedded = data_get($transaction, 'currency.iso');
+
+        if (is_string($embedded) && $embedded !== '') {
+            return strtoupper($embedded);
+        }
+
+        $currencyId = $transaction['currency_id'] ?? null;
+
+        if (! is_scalar($currencyId) || (string) $currencyId === '') {
+            return null;
+        }
+
+        $id = rawurlencode((string) $currencyId);
+        $currency = $this->unwrap($this->send(fn (PendingRequest $http): Response => $http->get("/currencies/{$id}")));
+
+        $iso = $currency['iso'] ?? null;
+
+        return is_string($iso) && $iso !== '' ? strtoupper($iso) : null;
+    }
+
     private function identifier(mixed $value): string
     {
         if (! is_scalar($value) || (string) $value === '') {
@@ -222,6 +250,7 @@ class FedaPayProvider implements PaymentProvider
             'approved', 'transferred' => ProviderPaymentStatus::Approved,
             'declined' => ProviderPaymentStatus::Declined,
             'canceled', 'cancelled' => ProviderPaymentStatus::Canceled,
+            'expired' => ProviderPaymentStatus::Expired,
             'refunded' => ProviderPaymentStatus::Refunded,
             'pending' => ProviderPaymentStatus::Pending,
             default => ProviderPaymentStatus::Unknown,
