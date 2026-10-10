@@ -51,6 +51,7 @@ class SettlePayment
             match ($transaction->status) {
                 ProviderPaymentStatus::Declined => $this->close($attempt, PaymentAttemptStatus::Declined),
                 ProviderPaymentStatus::Canceled => $this->close($attempt, PaymentAttemptStatus::Canceled),
+                ProviderPaymentStatus::Expired => $this->close($attempt, PaymentAttemptStatus::Expired),
                 ProviderPaymentStatus::Approved => $this->approve($attempt, $intent, $transaction),
                 ProviderPaymentStatus::Pending, ProviderPaymentStatus::Refunded, ProviderPaymentStatus::Unknown => $attempt->save(),
             };
