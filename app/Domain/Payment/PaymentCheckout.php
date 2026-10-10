@@ -119,7 +119,7 @@ class PaymentCheckout
      *
      * @param  array<string, string>  $metadata
      */
-    public function dispatch(PaymentAttempt $attempt, PaymentProvider $provider, User $payer, PaymentPurpose $purpose, string $description, array $metadata = []): PaymentAttempt
+    public function dispatch(PaymentAttempt $attempt, PaymentProvider $provider, User $payer, PaymentPurpose $purpose, string $description, array $metadata = [], ?string $customerPhone = null): PaymentAttempt
     {
         try {
             $session = $provider->createCheckout(new CheckoutRequest(
@@ -130,7 +130,7 @@ class PaymentCheckout
                 customerEmail: $payer->email,
                 customerFirstName: $payer->first_name,
                 customerLastName: $payer->last_name,
-                customerPhone: $payer->phone,
+                customerPhone: $customerPhone ?? $payer->phone,
                 returnUrl: config('payments.return_url'),
                 metadata: [
                     ...$metadata,

@@ -93,9 +93,16 @@ class MembershipController
      */
     public function startPayment(Request $request, StartMembershipPayment $start): JsonResponse
     {
-        $validated = $request->validate(['method' => ['nullable', 'string', 'max:30']]);
+        $validated = $request->validate([
+            'method' => ['nullable', 'string', 'max:30'],
+            'payment_phone' => ['nullable', 'string', 'regex:/^\\+228[0-9]{8}$/'],
+        ]);
 
-        ['attempt' => $attempt, 'created' => $created] = $start->handle($this->member($request), $validated['method'] ?? null);
+        ['attempt' => $attempt, 'created' => $created] = $start->handle(
+            $this->member($request),
+            $validated['method'] ?? null,
+            $validated['payment_phone'] ?? null,
+        );
 
         return (new PaymentAttemptResource($attempt))->response()->setStatusCode($created ? 201 : 200);
     }

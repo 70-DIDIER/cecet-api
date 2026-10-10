@@ -34,7 +34,7 @@ class StartMembershipPayment
     /**
      * @return array{attempt: PaymentAttempt, created: bool}
      */
-    public function handle(User $member, ?string $method = null): array
+    public function handle(User $member, ?string $method = null, ?string $paymentPhone = null): array
     {
         if (! $member->isMember()) {
             throw PaymentException::notPayable();
@@ -62,6 +62,7 @@ class StartMembershipPayment
             $member,
             PaymentPurpose::Membership,
             "Adhésion CECT {$member->member_number} (frais de transaction inclus)",
+            customerPhone: $paymentPhone,
         );
 
         return ['attempt' => $attempt, 'created' => true];

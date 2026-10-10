@@ -72,6 +72,42 @@ it('opens a hosted checkout for the configured fee and ignores any amount sent b
         ->and($this->member->refresh()->status)->toBe(UserStatus::PendingPayment);
 });
 
+it('uses the payment phone supplied by the member for a hosted FedaPay checkout', function () {
+    config(['services.fedapay.secret_key' => 'sk_sandbox_test']);
+    app(SettingsService::class)->set('payment.inbound_provider', 'fedapay', 'Passage à FedaPay');
+    app(SettingsService::class)->set('payment.customer_bears_fees', false, 'La coopérative absorbe les frais');
+
+    Http::fake([
+        'sandbox-api.fedapay.com/v1/transactions' => Http::response(['v1/transaction' => ['id' => 77, 'reference' => 'trx_77']], 201),
+        'sandbox-api.fedapay.com/v1/transactions/77/token' => Http::response(['token' => 'tok_77', 'url' => 'https://checkout-sandbox.fedapay.com/tok_77']),
+    ]);
+
+    $this->withToken(tokenFor($this->member))
+        ->postJson('/api/v1/me/membership/payments', [
+            'method' => 'TMONEY',
+            'payment_phone' => '+22890112233',
+        ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated()
+        ->assertJsonPath('data.provider', 'fedapay')
+        ->assertJsonPath('data.status', 'pending');
+
+    Http::assertSent(fn (Request $request) => $request->url() === 'https://sandbox-api.fedapay.com/v1/transactions'
+        && $request['customer']['phone_number'] === ['number' => '90112233', 'country' => 'tg']);
+});
+
+it('rejects an invalid payment phone before contacting the provider', function () {
+    Http::fake();
+
+    $this->withToken(tokenFor($this->member))
+        ->postJson('/api/v1/me/membership/payments', [
+            'method' => 'TMONEY',
+            'payment_phone' => '90112233',
+        ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertStatus(422);
+
+    Http::assertNothingSent();
+});
+
 it('returns the checkout already awaiting payment instead of opening a second one', function () {
     $first = startMembershipPayment($this->member)->assertCreated()->json('data.id');
     $second = startMembershipPayment($this->member)->assertOk()->json('data.id');
