@@ -139,5 +139,3 @@ Rôles internes : `superadmin`, `administrateur`, `validateur`, `comptabilite` (
 2. Lancer `php artisan ops:golive` : chaque point bloquant doit disparaître.
 3. Vérifier que la sauvegarde et un test de restauration documenté existent ([procédure](docs/sauvegarde-et-restauration.md)).
 4. Les décisions de gouvernance (taux, remises, packs publiés, durées) relèvent de la coopérative : elles se saisissent dans le back-office, pas dans le code.
-
-[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
