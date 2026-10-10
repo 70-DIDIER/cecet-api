@@ -292,6 +292,21 @@ it('refuses payments for active members, internal accounts and unauthenticated c
     $this->postJson('/api/v1/me/membership/payments')->assertUnauthorized();
 });
 
+it('reports a missing provider key as unavailable without leaving a usable attempt behind', function () {
+    config(['services.fedapay.secret_key' => '']);
+    app(SettingsService::class)->set('payment.inbound_provider', 'fedapay', 'Passage à FedaPay');
+    app(SettingsService::class)->set('payment.customer_bears_fees', false, 'La coopérative absorbe les frais');
+
+    startMembershipPayment($this->member)
+        ->assertStatus(503)
+        ->assertJsonPath('code', 'PAYMENT_PROVIDER_UNAVAILABLE');
+
+    $attempt = PaymentAttempt::query()->sole();
+    expect($attempt->status)->toBe(PaymentAttemptStatus::Failed)
+        ->and($attempt->failure_reason)->toBe('provider_error')
+        ->and($attempt->checkout_url)->toBeNull();
+});
+
 it('reports a provider outage without leaving a usable attempt behind', function () {
     config(['services.fedapay.secret_key' => 'sk_test']);
     app(SettingsService::class)->set('payment.inbound_provider', 'fedapay', 'Passage à FedaPay');
