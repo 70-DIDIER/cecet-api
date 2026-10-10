@@ -34,5 +34,3 @@ class PayoutProviderManager
         return $this->provider($this->settings->string('payment.payout_provider') ?? '');
     }
 }
-
-[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
