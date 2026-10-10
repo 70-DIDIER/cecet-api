@@ -59,3 +59,26 @@ it('shows a membership payment still awaiting validation', function () {
 it('requires authentication', function () {
     $this->getJson('/api/v1/me/dashboard')->assertUnauthorized();
 });
+
+it('gives the periods of each pack, the monthly activity and the open operations in the same call', function () {
+    $member = User::factory()->create();
+    $member->pernumIdentities()->create(['pernum' => '1001043953', 'kind' => 'personal', 'status' => 'declared']);
+
+    subscribeAndPay($member, makePlan(PackFamily::Consommateur, 'C1', [
+        'period' => ['unit' => 'month', 'every' => 1, 'cycles' => 12],
+        'cumulative' => true,
+        'end_of_term' => 'expire',
+        'rules' => ['reference_value_xof' => 300000, 'discount_bps' => 1500],
+        'reason' => 'Grille de l\'ancien site',
+    ]));
+
+    $data = $this->withToken(tokenFor($member))->getJson('/api/v1/me/dashboard')->assertOk()->json('data');
+
+    expect($data['active_packs'][0]['period']['cycles'])->toBe(12)
+        ->and($data['active_packs'][0]['period'])->toHaveKeys(['number', 'starts_at', 'ends_at', 'next_credit_at'])
+        ->and($data['active_packs'][0]['reserved'])->toBe('0.000000')
+        ->and($data['monthly_activity'])->toHaveCount(6)
+        ->and($data['monthly_activity'][5]['month'])->toBe(now()->format('Y-m'))
+        ->and($data['monthly_activity'][5]['credit'])->toBe('38.461538')
+        ->and($data['operations'])->toBe([]);
+});

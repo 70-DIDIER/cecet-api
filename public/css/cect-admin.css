@@ -1,0 +1,258 @@
+/* Habillage CECT du back-office : aplats uniquement, aucun dégradé. */
+:root {
+    --cect-forest-900: #051c12;
+    --cect-forest-700: #072f1f;
+    --cect-forest-500: #1a3e30;
+    --cect-lime: #b4f105;
+    --cect-muted: #879a91;
+    --cect-page: #f4f6f5;
+    --cect-border: #e9efef;
+}
+
+/* Barre latérale forêt, identique à l'espace membre */
+.fi-sidebar,
+.fi-sidebar-header {
+    background-color: var(--cect-forest-900) !important;
+    --tw-ring-color: transparent;
+}
+
+.fi-sidebar {
+    border: 0 !important;
+}
+
+.fi-sidebar-header {
+    box-shadow: none !important;
+}
+
+.fi-sidebar .fi-logo,
+.fi-sidebar .fi-sidebar-header a {
+    color: #fff !important;
+}
+
+.fi-sidebar-group-label {
+    color: var(--cect-muted) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.fi-sidebar-item-btn {
+    position: relative;
+    border-radius: 12px !important;
+    min-height: 44px;
+}
+
+.fi-sidebar-item-btn:hover {
+    background-color: var(--cect-forest-700) !important;
+}
+
+.fi-sidebar-item-btn .fi-sidebar-item-label,
+.fi-sidebar-item-btn svg {
+    color: rgb(255 255 255 / 0.72) !important;
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn {
+    background-color: var(--cect-forest-500) !important;
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn .fi-sidebar-item-label {
+    color: #fff !important;
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn svg {
+    color: var(--cect-lime) !important;
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background-color: var(--cect-lime);
+}
+
+.fi-sidebar .fi-icon-btn {
+    color: rgb(255 255 255 / 0.72) !important;
+}
+
+/* Fond de page et cartes plates */
+html:not(.dark) .fi-body {
+    background-color: var(--cect-page);
+}
+
+.fi-section,
+.fi-wi-stats-overview-stat,
+.fi-ta-ctn,
+.fi-wi-chart {
+    border-radius: 18px !important;
+    box-shadow: none !important;
+    border: 1px solid var(--cect-border);
+    --tw-ring-shadow: 0 0 #0000;
+}
+
+html:not(.dark) .fi-topbar {
+    background-color: var(--cect-page) !important;
+    box-shadow: none !important;
+    border-bottom: 1px solid var(--cect-border);
+}
+
+.fi-header-heading {
+    font-weight: 700 !important;
+    letter-spacing: -0.01em;
+}
+
+.fi-btn {
+    border-radius: 12px !important;
+}
+
+.fi-input-wrp {
+    border-radius: 12px !important;
+}
+
+/* Blocs propres à CECT (la feuille de Filament ne contient que ses propres classes) */
+.cect-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.cect-tile {
+    border: 1px solid var(--cect-border);
+    border-radius: 14px;
+    padding: 16px 18px;
+}
+
+.dark .cect-tile {
+    border-color: rgb(255 255 255 / 0.1);
+}
+
+.cect-tile-label {
+    font-size: 13px;
+    color: #6c7e75;
+}
+
+.cect-tile-value {
+    margin-top: 6px;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.cect-tile-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #6c7e75;
+}
+
+.cect-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.cect-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 0;
+    border-top: 1px solid var(--cect-border);
+}
+
+.cect-list-row:first-child {
+    border-top: 0;
+}
+
+.dark .cect-list-row {
+    border-color: rgb(255 255 255 / 0.1);
+}
+
+.cect-list-title {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.cect-list-hint {
+    margin-top: 2px;
+    font-size: 12px;
+    color: #6c7e75;
+}
+
+.cect-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+    margin-bottom: 8px;
+}
+
+.cect-toolbar-field {
+    min-width: 220px;
+}
+
+.cect-muted {
+    font-size: 13px;
+    color: #6c7e75;
+}
+
+.cect-tiles-3 {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.cect-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 24px;
+}
+
+.cect-bar {
+    margin-bottom: 14px;
+}
+
+.cect-bar-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+
+.cect-bar-head small {
+    margin-left: 6px;
+    font-weight: 500;
+    color: #6c7e75;
+}
+
+.cect-bar-track {
+    height: 8px;
+    border-radius: 999px;
+    background-color: #edf2ef;
+    overflow: hidden;
+}
+
+.dark .cect-bar-track {
+    background-color: rgb(255 255 255 / 0.1);
+}
+
+.cect-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background-color: #0b6b45;
+}
+
+@media print {
+    .fi-sidebar,
+    .fi-topbar,
+    .cect-no-print {
+        display: none !important;
+    }
+}
+
+.cect-columns-2 {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}

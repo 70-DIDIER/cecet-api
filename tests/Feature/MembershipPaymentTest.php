@@ -374,4 +374,25 @@ describe('demo gateway bypass', function () {
             ->and(AuditEvent::query()->where('action', 'memberships.activated')->sole()->after['activation_mode'])->toBe('demo_gateway_bypass')
             ->and(SecurityEvent::query()->where('event_type', 'membership.demo_gateway_bypass')->exists())->toBeTrue();
     });
+
+    it('approves a fake-provider payment on demand and activates the account', function () {
+        app(SettingsService::class)->set('platform.demo_gateway_bypass', true, 'Simulation en attendant le prestataire');
+        $attemptId = startMembershipPayment($this->member)->assertCreated()->json('data.id');
+
+        $this->withToken(tokenFor($this->member))->postJson("/api/v1/me/payments/{$attemptId}/demo-settle")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'approved');
+
+        expect($this->member->refresh()->status)->toBe(UserStatus::Active);
+    });
+
+    it('refuses to settle a payment while the setting is off', function () {
+        $attemptId = startMembershipPayment($this->member)->assertCreated()->json('data.id');
+
+        $this->withToken(tokenFor($this->member))->postJson("/api/v1/me/payments/{$attemptId}/demo-settle")
+            ->assertNotFound()
+            ->assertJsonPath('code', 'DEMO_MODE_UNAVAILABLE');
+
+        expect($this->member->refresh()->status)->toBe(UserStatus::PendingPayment);
+    });
 });

@@ -32,6 +32,7 @@ use App\Domain\Reporting\Http\Controllers\DashboardController;
 use App\Domain\Reporting\Http\Controllers\ImportController;
 use App\Domain\Reporting\Http\Controllers\ReportController;
 use App\Domain\Reporting\Http\Controllers\SnapshotController;
+use App\Domain\Settings\Http\Controllers\PublicConfigController;
 use App\Domain\Settings\Http\Controllers\SettingController;
 use App\Domain\Shared\Http\Controllers\HealthController;
 use App\Domain\Subscription\Http\Controllers\MemberPackController;
@@ -47,6 +48,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
     Route::prefix('auth')->name('auth.')->group(function () {
         Route::middleware('throttle:auth-public')->group(function () {
             Route::post('register', [RegistrationController::class, 'store'])->middleware('idempotent')->name('register');
+            Route::post('register/check', [RegistrationController::class, 'check'])->name('register.check');
             Route::post('login', [LoginController::class, 'store'])->name('login');
             Route::post('staff/activate', StaffActivationController::class)->name('staff.activate');
             Route::post('password/forgot', [PasswordResetController::class, 'forgot'])->name('password.forgot');
@@ -65,6 +67,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
      * Public pack catalog (the price to pay is personalised when a member is signed in).
      */
     Route::middleware('throttle:api-user')->group(function () {
+        Route::get('config', PublicConfigController::class)->name('config');
         Route::get('packs', [MemberPackController::class, 'catalog'])->name('packs.index');
         Route::get('packs/{plan}', [MemberPackController::class, 'showPlan'])->name('packs.show');
         Route::get('merchants', [MerchantDirectoryController::class, 'index'])->middleware('throttle:60,1')->name('merchants.index');
@@ -104,6 +107,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
         // DEMO_GATEWAY_BYPASS does not exist at all in production.
         if (! app()->isProduction()) {
             Route::post('me/membership/demo-activation', [MembershipController::class, 'demoActivate'])->name('me.membership.demo-activation');
+            Route::post('me/payments/{attempt}/demo-settle', [MembershipController::class, 'demoSettle'])->name('me.payments.demo-settle');
         }
 
         /*

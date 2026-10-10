@@ -108,6 +108,16 @@ class LegacyCatalogSeeder extends Seeder
         });
     }
 
+    public static function describe(PackFamily $family): string
+    {
+        return match ($family) {
+            PackFamily::Consommateur => 'Un quota de YEM crédité chaque mois pour payer chez les marchands du réseau.',
+            PackFamily::Personnel => 'Un solde que vous rechargez à la demande, avec une remise sur chaque rechargement.',
+            PackFamily::Vendeur => 'Vendez vos YEM à la CECT et recevez le montant en FCFA.',
+            PackFamily::Marchand => 'Encaissez des YEM auprès de vos clients et faites-les racheter par la CECT.',
+        };
+    }
+
     /**
      * @param  array<string, mixed>  $terms
      */
@@ -119,7 +129,7 @@ class LegacyCatalogSeeder extends Seeder
                 'family' => $family,
                 'name' => $name,
                 'level' => $level === 0 ? null : $level,
-                'description' => self::REASON,
+                'description' => self::describe($family),
                 'status' => PackPlanStatus::Draft,
             ],
         );

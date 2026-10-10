@@ -363,11 +363,22 @@ class ReportingQueries
             ->where('pi.status', 'succeeded')
             ->orderByDesc('pi.succeeded_at')
             ->limit($limit)
-            ->get(['pi.id', 'pi.purpose', 'pi.amount', 'pi.succeeded_at', 'up.family', 'u.first_name', 'u.last_name', 'o.legal_name'])
+            ->select(['pi.id', 'pi.purpose', 'pi.amount', 'pi.succeeded_at', 'up.family', 'u.first_name', 'u.last_name', 'o.legal_name'])
+            ->selectSub(
+                DB::table('payment_attempts as pa')
+                    ->selectRaw('COALESCE(pa.method, pa.provider)')
+                    ->whereColumn('pa.payment_intent_id', 'pi.id')
+                    ->where('pa.status', 'approved')
+                    ->orderByDesc('pa.created_at')
+                    ->limit(1),
+                'method',
+            )
+            ->get()
             ->map(fn (object $row): array => [
                 'id' => $row->id,
                 'label' => $this->sourceLabel($this->sourceKey($row->purpose, $row->family)),
                 'member' => $row->legal_name ?? trim("{$row->first_name} {$row->last_name}"),
+                'method' => $row->method,
                 'amount_xof' => (int) $row->amount,
                 'date' => CarbonImmutable::parse($row->succeeded_at),
             ])

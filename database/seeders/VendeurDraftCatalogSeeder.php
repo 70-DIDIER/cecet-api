@@ -50,7 +50,7 @@ class VendeurDraftCatalogSeeder extends Seeder
                         'family' => PackFamily::Vendeur,
                         'name' => "Vendeur V{$level}",
                         'level' => $level,
-                        'description' => 'Grille héritée du cahier des charges v4.0 : à relire et ratifier avant publication.',
+                        'description' => LegacyCatalogSeeder::describe(PackFamily::Vendeur),
                         'status' => PackPlanStatus::Draft,
                     ],
                 );

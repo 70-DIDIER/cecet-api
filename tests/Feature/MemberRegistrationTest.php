@@ -211,3 +211,21 @@ it('caps the number of codes sent per hour', function () {
         ->assertStatus(429)
         ->assertJsonPath('code', 'OTP_SEND_LIMIT_REACHED');
 });
+
+it('confirms that a free e-mail and Pernum can be used', function () {
+    $this->postJson('/api/v1/auth/register/check', ['email' => 'Libre@Example.com', 'pernum' => '1234567890'])
+        ->assertOk()
+        ->assertJsonPath('data.available', true);
+});
+
+it('reports an e-mail or a Pernum that is already taken before the form goes further', function () {
+    User::factory()->create(['email' => 'pris@example.com']);
+
+    $this->postJson('/api/v1/auth/register/check', ['email' => 'PRIS@example.com', 'pernum' => '1234567890'])
+        ->assertUnprocessable()
+        ->assertJsonStructure(['details' => ['fields' => ['email']]]);
+
+    $this->postJson('/api/v1/auth/register/check', ['email' => 'libre@example.com', 'pernum' => 'x'])
+        ->assertUnprocessable()
+        ->assertJsonStructure(['details' => ['fields' => ['pernum']]]);
+});

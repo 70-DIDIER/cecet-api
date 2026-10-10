@@ -7,6 +7,8 @@ use App\Domain\Payment\Models\PaymentAttempt;
 use App\Domain\Payment\Providers\Fake\FakePaymentProvider;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Request;
 
 /**
  * Development helper: moves a fake-provider payment to a status and prints the signed webhook
@@ -16,7 +18,8 @@ class FakeSettleCommand extends Command
 {
     protected $signature = 'payments:fake-settle
         {attempt : Identifiant de la tentative de paiement}
-        {status=approved : approved, declined ou canceled}';
+        {status=approved : approved, declined ou canceled}
+        {--send : Envoie directement le webhook signé à l’API locale (sans serveur HTTP à lancer)}';
 
     protected $description = 'Simule la réponse du faux prestataire de paiement (hors production) et affiche le webhook signé à envoyer';
 
@@ -45,6 +48,19 @@ class FakeSettleCommand extends Command
         $this->line("  URL     : {$url}");
         $this->line("  En-tête : {$header}: {$webhook['headers'][$header]}");
         $this->line("  Corps   : {$webhook['body']}");
+
+        if ($this->option('send')) {
+            $request = Request::create($url, 'POST', server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_ACCEPT' => 'application/json',
+                'HTTP_'.strtoupper(str_replace('-', '_', $header)) => $webhook['headers'][$header],
+            ], content: $webhook['body']);
+            $response = app(Kernel::class)->handle($request);
+
+            $this->info("Webhook envoyé : HTTP {$response->getStatusCode()}.");
+
+            return $response->isSuccessful() ? self::SUCCESS : self::FAILURE;
+        }
 
         return self::SUCCESS;
     }

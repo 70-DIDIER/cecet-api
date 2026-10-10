@@ -37,9 +37,9 @@ describe('dashboard', function () {
         expect($data['summary']['kpis']['confirmed_payments'])->toBe(2)
             ->and($data['series']['days'])->toHaveCount(30)
             ->and($data['recent_payments'])->not->toBeEmpty()
-            ->and($data['recent_payments'][0])->toHaveKeys(['id', 'label', 'member', 'amount_xof', 'date'])
+            ->and($data['recent_payments'][0])->toHaveKeys(['id', 'label', 'member', 'method', 'amount_xof', 'date'])
             ->and($data['overview'])->not->toBeNull()
-            ->and($data['pending_validations'])->toHaveKeys(['payments', 'yem'])
+            ->and($data['pending_validations'])->toHaveKeys(['payments', 'yem', 'merchant'])
             ->and($data['period'])->toHaveKeys(['from', 'to']);
     });
 

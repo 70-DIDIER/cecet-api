@@ -52,7 +52,8 @@ class DashboardController
             'overview' => $canReport ? $this->queries->overview() : null,
             'pending_validations' => [
                 'payments' => $user->can('payments.validate_manual') ? $pending['payments'] : null,
-                'yem' => $user->can('yem_validations.view') ? $pending['yem'] + $pending['merchant'] : null,
+                'yem' => $user->can('yem_validations.view') ? $pending['yem'] : null,
+                'merchant' => $user->can('yem_validations.view') ? $pending['merchant'] : null,
             ],
             'health' => $user->can('security_events.view') ? $this->monitor->check() : null,
         ]]);

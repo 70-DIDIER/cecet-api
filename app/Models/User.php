@@ -8,6 +8,9 @@ use App\Domain\Identity\Enums\UserStatus;
 use App\Domain\Identity\Models\Organization;
 use App\Domain\Identity\Models\PernumIdentity;
 use Database\Factories\UserFactory;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasName;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -49,7 +52,7 @@ use Spatie\Permission\Traits\HasRoles;
  */
 #[Fillable(['kind', 'person_type', 'member_number', 'first_name', 'last_name', 'email', 'phone', 'city', 'preferred_payment_method', 'commitment_accepted_at', 'commitment_version', 'signed_place', 'signed_on', 'status', 'email_verified_at', 'password', 'last_login_at', 'suspended_at'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser, HasName
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, HasUlids, Notifiable;
@@ -73,6 +76,16 @@ class User extends Authenticatable
     public function pernumIdentities(): HasMany
     {
         return $this->hasMany(PernumIdentity::class);
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->isStaff() && $this->status === UserStatus::Active;
+    }
+
+    public function getFilamentName(): string
+    {
+        return $this->full_name;
     }
 
     public function isStaff(): bool

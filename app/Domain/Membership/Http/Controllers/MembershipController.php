@@ -11,10 +11,12 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Payment\Actions\ManualPaymentDesk;
 use App\Domain\Payment\Actions\RefreshPaymentAttempt;
 use App\Domain\Payment\Actions\StartMembershipPayment;
+use App\Domain\Payment\Enums\ProviderPaymentStatus;
 use App\Domain\Payment\Exceptions\PaymentException;
 use App\Domain\Payment\Http\Resources\PaymentAttemptResource;
 use App\Domain\Payment\Models\PaymentAttempt;
 use App\Domain\Payment\PaymentFeeCalculator;
+use App\Domain\Payment\Providers\Fake\FakePaymentProvider;
 use App\Domain\Settings\SettingsService;
 use App\Domain\Shared\Exceptions\ApiException;
 use App\Models\User;
@@ -131,6 +133,27 @@ class MembershipController
             'membership' => new MembershipResource($membership),
             'account_status' => UserStatus::Active->value,
         ]]);
+    }
+
+    /**
+     * DEMO_GATEWAY_BYPASS: approve a payment attempt made with the fake provider, as its webhook would.
+     * Not available in production.
+     */
+    public function demoSettle(Request $request, string $attempt, RefreshPaymentAttempt $refresh, FakePaymentProvider $fake, SettingsService $settings): PaymentAttemptResource
+    {
+        $paymentAttempt = $this->ownedAttempt($request, $attempt);
+
+        if (app()->isProduction() || ! $settings->boolean('platform.demo_gateway_bypass')) {
+            throw PaymentException::demoUnavailable();
+        }
+
+        if ($paymentAttempt->provider !== FakePaymentProvider::NAME || $paymentAttempt->provider_transaction_id === null) {
+            throw PaymentException::notPayable();
+        }
+
+        $fake->simulate($paymentAttempt->provider_transaction_id, ProviderPaymentStatus::Approved);
+
+        return new PaymentAttemptResource($refresh->handle($paymentAttempt));
     }
 
     private function ownedAttempt(Request $request, string $id): PaymentAttempt

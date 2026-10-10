@@ -1664,12 +1664,21 @@
                                                             "type": [
                                                                 "integer",
                                                                 "null"
-                                                            ]
+                                                            ],
+                                                            "minimum": 0
+                                                        },
+                                                        "merchant": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ],
+                                                            "minimum": 0
                                                         }
                                                     },
                                                     "required": [
                                                         "payments",
-                                                        "yem"
+                                                        "yem",
+                                                        "merchant"
                                                     ]
                                                 },
                                                 "health": {
@@ -4155,6 +4164,49 @@
                                                                     "null"
                                                                 ]
                                                             },
+                                                            "reserved": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "consumed": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "period": {
+                                                                "type": [
+                                                                    "object",
+                                                                    "null"
+                                                                ],
+                                                                "properties": {
+                                                                    "number": {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    "cycles": {
+                                                                        "type": "integer",
+                                                                        "minimum": 0
+                                                                    },
+                                                                    "starts_at": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "ends_at": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "next_credit_at": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "number",
+                                                                    "cycles",
+                                                                    "starts_at",
+                                                                    "ends_at",
+                                                                    "next_credit_at"
+                                                                ]
+                                                            },
                                                             "activated_at": {
                                                                 "type": [
                                                                     "string",
@@ -4177,6 +4229,9 @@
                                                             "quota_per_period",
                                                             "discount_bps",
                                                             "available",
+                                                            "reserved",
+                                                            "consumed",
+                                                            "period",
                                                             "activated_at",
                                                             "expires_at"
                                                         ]
@@ -4225,6 +4280,14 @@
                                                         ]
                                                     }
                                                 },
+                                                "monthly_activity": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "operations": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
                                                 "payments_awaiting_action": {
                                                     "type": "array",
                                                     "items": {}
@@ -4236,6 +4299,8 @@
                                                 "yem",
                                                 "active_packs",
                                                 "recent_movements",
+                                                "monthly_activity",
+                                                "operations",
                                                 "payments_awaiting_action"
                                             ]
                                         }
@@ -9348,6 +9413,116 @@
                 }
             }
         },
+        "/config": {
+            "get": {
+                "operationId": "v1.config",
+                "summary": "Public configuration used by the website: membership fees, indicative rates, legal forms and payment methods",
+                "tags": [
+                    "PublicConfig"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "currency": {
+                                                    "type": "string",
+                                                    "const": "XOF"
+                                                },
+                                                "membership_fees": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "natural_person": {
+                                                            "type": "integer"
+                                                        },
+                                                        "legal_person": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "natural_person",
+                                                        "legal_person"
+                                                    ]
+                                                },
+                                                "rates_xof_per_yem": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "purchase": {
+                                                            "type": "integer"
+                                                        },
+                                                        "sale": {
+                                                            "type": "integer"
+                                                        },
+                                                        "transfer": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "purchase",
+                                                        "sale",
+                                                        "transfer"
+                                                    ]
+                                                },
+                                                "legal_forms": {
+                                                    "type": "object",
+                                                    "additionalProperties": {}
+                                                },
+                                                "rccm_required": {
+                                                    "type": "boolean"
+                                                },
+                                                "nif_required": {
+                                                    "type": "boolean"
+                                                },
+                                                "payment_methods": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "code": {
+                                                                "type": "string"
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "channel": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "code",
+                                                            "label",
+                                                            "channel"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "currency",
+                                                "membership_fees",
+                                                "rates_xof_per_yem",
+                                                "legal_forms",
+                                                "rccm_required",
+                                                "nif_required",
+                                                "payment_methods"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/auth/register": {
             "post": {
                 "operationId": "v1.auth.register",
@@ -9419,6 +9594,72 @@
                                                 "user",
                                                 "verification",
                                                 "membership_fee"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/auth/register/check": {
+            "post": {
+                "operationId": "v1.auth.register.check",
+                "description": "Same rules and same validation errors as the registration itself, so the form can stop on the first step.",
+                "summary": "Check that an e-mail and a Pernum are still free, before the rest of the registration form is filled in",
+                "tags": [
+                    "Registration"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 255
+                                    },
+                                    "pernum": {
+                                        "type": "string",
+                                        "pattern": "^[A-Za-z0-9._-]{3,64}$"
+                                    }
+                                },
+                                "required": [
+                                    "email",
+                                    "pernum"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "available": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "available"
                                             ]
                                         }
                                     },

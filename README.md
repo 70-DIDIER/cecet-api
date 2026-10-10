@@ -45,6 +45,25 @@ php artisan serve
 
 La grille de packs est chargée en **brouillon** : rien n'est proposé aux membres tant que la coopérative n'a pas relu et publié chaque pack depuis le back-office.
 
+### Comptes de démonstration (développement et recette uniquement)
+
+```bash
+php artisan db:seed --class=DemoClientSeeder   # refuse de s'exécuter en production
+```
+
+Le seeder crée un historique complet (adhésion, packs, ventes, paiements marchands, rechargement). Le mot de passe commun vient de `DEMO_PASSWORD` et l'e-mail du client de `DEMO_CLIENT_EMAIL` (`config/demo.php`).
+
+| Compte | Identifiant | Mot de passe |
+|---|---|---|
+| Client (membre, personne physique) | `tandemodon55@gmail.com` ou Pernum `1009000055` | `Demo2026cect` |
+| Marchand (personne morale, Pernum `1009000077`) | `marchand.demo@cect.example` | `Demo2026cect` |
+| Personnel (Superadmin), back-office `/backoffice` | `superadmin.demo@cect.example` | `Demo2026cect` |
+
+- Pernum de réception de la CECT (démonstration) : `1000000001`.
+- La connexion du personnel demande un code OTP envoyé par e-mail : avec `MAIL_MAILER=log`, le code se lit dans `storage/logs/laravel.log`.
+- Si le compte client existe déjà, son mot de passe n'est pas modifié.
+- Ces identifiants ne doivent jamais exister en production.
+
 ### Variables d'environnement utiles
 
 | Variable | Rôle |
