@@ -51,7 +51,7 @@ La grille de packs est chargée en **brouillon** : rien n'est proposé aux membr
 php artisan db:seed --class=DemoClientSeeder   # refuse de s'exécuter en production
 ```
 
-Le seeder crée un historique complet (adhésion, packs, ventes, paiements marchands, rechargement). Le mot de passe commun vient de `DEMO_PASSWORD` et l'e-mail du client de `DEMO_CLIENT_EMAIL` (`config/demo.php`).
+Le seeder crée un historique complet (adhésion, packs, ventes, paiements marchands, rechargement). Le mot de passe commun vient de `DEMO_PASSWORD`. Les e-mails peuvent être surchargés avec `DEMO_CLIENT_EMAIL`, `DEMO_MERCHANT_EMAIL` et `DEMO_STAFF_EMAIL` (`config/demo.php`). En recette, `DEMO_STAFF_EMAIL` doit pointer vers une boîte réellement accessible afin de recevoir l'OTP du back-office.
 
 | Compte | Identifiant | Mot de passe |
 |---|---|---|
