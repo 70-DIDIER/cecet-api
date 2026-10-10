@@ -103,9 +103,26 @@ it('maps provider statuses and normalizes the amount', function (string $fedapay
     'pending' => ['pending', ProviderPaymentStatus::Pending],
     'declined' => ['declined', ProviderPaymentStatus::Declined],
     'canceled' => ['canceled', ProviderPaymentStatus::Canceled],
+    'expired' => ['expired', ProviderPaymentStatus::Expired],
     'refunded' => ['refunded', ProviderPaymentStatus::Refunded],
     'something new' => ['frozen', ProviderPaymentStatus::Unknown],
 ]);
+
+it('resolves the currency when current FedaPay responses expose only currency_id', function () {
+    Http::fake([
+        'sandbox-api.fedapay.com/v1/transactions/55' => Http::response([
+            'v1/transaction' => ['id' => 55, 'status' => 'declined', 'amount' => 25000, 'currency_id' => 1, 'reference' => 'trx_55'],
+        ]),
+        'sandbox-api.fedapay.com/v1/currencies/1' => Http::response([
+            'v1/currency' => ['id' => 1, 'iso' => 'XOF'],
+        ]),
+    ]);
+
+    $transaction = $this->provider->fetchTransaction('55');
+
+    expect($transaction->status)->toBe(ProviderPaymentStatus::Declined)
+        ->and($transaction->currency)->toBe('XOF');
+});
 
 it('fails closed on provider errors, timeouts and incomplete data', function (callable $fake) {
     $fake();
