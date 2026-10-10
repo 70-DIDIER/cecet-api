@@ -75,7 +75,7 @@ Le seeder crée un historique complet (adhésion, packs, ventes, paiements march
 | `PAYMENT_RETURN_URL` | page de retour du site après un paiement hébergé |
 | `FEDAPAY_ENVIRONMENT`, `FEDAPAY_SECRET_KEY`, `FEDAPAY_WEBHOOK_SECRET` | prestataire de paiement (l'adaptateur n'a pas encore été éprouvé contre le sandbox réel) |
 
-Le prestataire de paiement et celui des versements se choisissent dans les paramètres (`payment.inbound_provider`, `payment.payout_provider`). Le prestataire factice `fake` est interdit en production.
+Le prestataire de paiement et celui des versements se choisissent dans les paramètres (`payment.inbound_provider`, `payment.payout_provider`). **FedaPay est le prestataire par défaut hors tests.** Le prestataire `fake` est strictement réservé aux tests automatisés : il n'est résolu ni en recette/staging ni en production, et les routes de démonstration ne sont pas exposées dans ces environnements.
 
 ## Exécution
 
@@ -98,7 +98,7 @@ Tâches planifiées (`routes/console.php`) : crédit des périodes de packs, ann
 | `php artisan snapshots:generate [--force]` | snapshot consolidé (ZIP de CSV + manifeste et empreinte) |
 | `php artisan payouts:refresh` | réconcilie les versements en cours avec le prestataire |
 | `php artisan outbox:relay` | délivre les messages en attente de la boîte d'envoi transactionnelle |
-| `php artisan payments:fake-settle <tentative>` | simule le prestataire factice (hors production) |
+| `php artisan payments:fake-settle <tentative>` | simulation réservée aux tests automatisés ; indisponible en recette/staging et en production |
 
 Une divergence signalée par `ledger:verify` ou `audit:verify` est un incident critique : geler les versements jusqu'à explication.
 
@@ -139,3 +139,5 @@ Rôles internes : `superadmin`, `administrateur`, `validateur`, `comptabilite` (
 2. Lancer `php artisan ops:golive` : chaque point bloquant doit disparaître.
 3. Vérifier que la sauvegarde et un test de restauration documenté existent ([procédure](docs/sauvegarde-et-restauration.md)).
 4. Les décisions de gouvernance (taux, remises, packs publiés, durées) relèvent de la coopérative : elles se saisissent dans le back-office, pas dans le code.
+
+[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
