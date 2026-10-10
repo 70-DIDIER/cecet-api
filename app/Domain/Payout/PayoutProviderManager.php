@@ -18,7 +18,7 @@ class PayoutProviderManager
 
     public function provider(string $name): PayoutProvider
     {
-        if ($name === FakePayoutProvider::NAME && ! $this->app->isProduction()) {
+        if ($name === FakePayoutProvider::NAME && $this->app->environment('testing')) {
             return $this->app->make(FakePayoutProvider::class);
         }
 
@@ -34,3 +34,5 @@ class PayoutProviderManager
         return $this->provider($this->settings->string('payment.payout_provider') ?? '');
     }
 }
+
+[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
