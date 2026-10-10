@@ -80,6 +80,19 @@ it('returns the checkout already awaiting payment instead of opening a second on
         ->and(PaymentAttempt::query()->count())->toBe(1);
 });
 
+it('expires a stale hosted checkout when the membership page is loaded', function () {
+    $attemptId = startMembershipPayment($this->member)->assertCreated()->json('data.id');
+
+    $this->travel(61)->minutes();
+
+    $this->withToken(tokenFor($this->member))->getJson('/api/v1/me/membership')
+        ->assertOk()
+        ->assertJsonPath('data.payment_attempts.0.id', $attemptId)
+        ->assertJsonPath('data.payment_attempts.0.status', 'expired');
+
+    expect(PaymentAttempt::query()->findOrFail($attemptId)->status)->toBe(PaymentAttemptStatus::Expired);
+});
+
 it('activates the account only when a signed webhook is confirmed by the provider', function () {
     $attemptId = startMembershipPayment($this->member)->json('data.id');
 
@@ -337,6 +350,12 @@ it('records a payment received while the account is suspended without reactivati
         ->and($membership->refresh()->status->value)->toBe('active');
 });
 
+it('does not resolve the fake provider in staging', function () {
+    app()->detectEnvironment(fn () => 'staging');
+
+    expect(fn () => app(PaymentProviderManager::class)->provider('fake'))->toThrow(PaymentException::class);
+});
+
 it('exposes neither the fake provider nor the demo bypass in production', function () {
     app()->detectEnvironment(fn () => 'production');
 
@@ -396,3 +415,5 @@ describe('demo gateway bypass', function () {
         expect($this->member->refresh()->status)->toBe(UserStatus::PendingPayment);
     });
 });
+
+[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
