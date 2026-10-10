@@ -229,6 +229,10 @@ final class SettingsCatalog
      */
     private function payouts(): array
     {
+        $providerFeesDefault = app()->environment('testing')
+            ? ['fake' => ['rate_bps' => 0, 'fixed_xof' => 0]]
+            : [];
+
         return [
             new SettingDefinition('payout.auto_enabled', 'payout', SettingType::Boolean, false,
                 'Envoi automatique des payouts au PSP après confirmation du Validateur.', SettingEditLevel::Superadmin),
@@ -242,7 +246,7 @@ final class SettingsCatalog
                 'Qui supporte les frais de décaissement (PO-09) : « cooperative » (le bénéficiaire reçoit le montant dû) ou « beneficiary » (le montant envoyé est réduit des frais).',
                 SettingEditLevel::Superadmin, rules: ['value' => ['required', 'in:cooperative,beneficiary']]),
             new SettingDefinition('payout.provider_fees', 'payout', SettingType::Json,
-                ['fake' => ['rate_bps' => 0, 'fixed_xof' => 0]],
+                $providerFeesDefault,
                 'Barème des frais de décaissement par prestataire : rate_bps (centièmes de %), fixed_xof (part fixe par envoi).',
                 SettingEditLevel::Superadmin, rules: [
                     'value' => ['required'],
@@ -262,18 +266,25 @@ final class SettingsCatalog
      */
     private function payments(): array
     {
+        $testEnvironment = app()->environment('testing');
+        $providerDefault = $testEnvironment ? 'fake' : 'fedapay';
+        $customerBearsFeesDefault = $testEnvironment;
+        $feeRulesDefault = $testEnvironment
+            ? ['fake' => ['rate_bps' => 0, 'fixed_xof' => 0, 'rounding_xof' => 1], 'manual' => ['rate_bps' => 0, 'fixed_xof' => 0, 'rounding_xof' => 1]]
+            : ['manual' => ['rate_bps' => 0, 'fixed_xof' => 0, 'rounding_xof' => 1]];
+
         return [
-            new SettingDefinition('payment.inbound_provider', 'payment', SettingType::String, 'fake',
+            new SettingDefinition('payment.inbound_provider', 'payment', SettingType::String, $providerDefault,
                 'Prestataire des paiements entrants (adhésions, packs).', SettingEditLevel::Superadmin,
                 rules: ['value' => ['required', 'in:fake,fedapay']], productionForbiddenValues: ['fake']),
-            new SettingDefinition('payment.payout_provider', 'payment', SettingType::String, 'fake',
+            new SettingDefinition('payment.payout_provider', 'payment', SettingType::String, $providerDefault,
                 'Prestataire des décaissements (payouts).', SettingEditLevel::Superadmin,
                 rules: ['value' => ['required', 'in:fake,fedapay']], productionForbiddenValues: ['fake']),
-            new SettingDefinition('payment.customer_bears_fees', 'payment', SettingType::Boolean, true,
+            new SettingDefinition('payment.customer_bears_fees', 'payment', SettingType::Boolean, $customerBearsFeesDefault,
                 'Les frais de transaction du prestataire sont ajoutés au montant payé par le client, pour que la CECT reçoive le montant dû net.',
                 SettingEditLevel::Superadmin),
             new SettingDefinition('payment.customer_fees', 'payment', SettingType::Json,
-                ['fake' => ['rate_bps' => 0, 'fixed_xof' => 0, 'rounding_xof' => 1], 'manual' => ['rate_bps' => 0, 'fixed_xof' => 0, 'rounding_xof' => 1]],
+                $feeRulesDefault,
                 'Barème des frais par prestataire, d\'après le contrat : rate_bps (pourcentage en centièmes de %, 300 = 3 %), fixed_xof (part fixe, XOF), rounding_xof (arrondi du total au multiple supérieur). Un prestataire sans entrée est refusé.',
                 SettingEditLevel::Superadmin, rules: [
                     'value' => ['required'],
@@ -370,3 +381,5 @@ final class SettingsCatalog
         ];
     }
 }
+
+[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
