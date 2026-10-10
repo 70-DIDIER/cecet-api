@@ -263,5 +263,3 @@ Route::prefix('v1')->name('v1.')->group(function () {
         });
     });
 });
-
-[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
