@@ -15,6 +15,7 @@ use App\Domain\Payment\Enums\ProviderPaymentStatus;
 use App\Domain\Payment\Exceptions\PaymentException;
 use App\Domain\Payment\Http\Resources\PaymentAttemptResource;
 use App\Domain\Payment\Models\PaymentAttempt;
+use App\Domain\Payment\PaymentCheckout;
 use App\Domain\Payment\PaymentFeeCalculator;
 use App\Domain\Payment\Providers\Fake\FakePaymentProvider;
 use App\Domain\Settings\SettingsService;
@@ -35,10 +36,14 @@ class MembershipController
      * borne by the member, to give the total charged. Everything is computed by the server; the membership row
      * only exists once a payment has been started.
      */
-    public function show(Request $request, MembershipFee $fees, PaymentFeeCalculator $feeCalculator, SettingsService $settings): JsonResponse
+    public function show(Request $request, MembershipFee $fees, PaymentFeeCalculator $feeCalculator, PaymentCheckout $checkout, SettingsService $settings): JsonResponse
     {
         $member = $this->member($request);
         $membership = Membership::query()->where('user_id', $member->id)->first();
+
+        if ($membership !== null) {
+            $checkout->expireStale($membership);
+        }
         $fee = $fees->for($member);
 
         $attempts = $membership === null ? collect() : PaymentAttempt::query()
@@ -143,7 +148,7 @@ class MembershipController
     {
         $paymentAttempt = $this->ownedAttempt($request, $attempt);
 
-        if (app()->isProduction() || ! $settings->boolean('platform.demo_gateway_bypass')) {
+        if (! app()->environment('testing') || ! $settings->boolean('platform.demo_gateway_bypass')) {
             throw PaymentException::demoUnavailable();
         }
 
@@ -177,3 +182,5 @@ class MembershipController
         return $user;
     }
 }
+
+[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
