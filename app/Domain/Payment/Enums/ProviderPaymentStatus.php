@@ -11,6 +11,7 @@ enum ProviderPaymentStatus: string
     case Approved = 'approved';
     case Declined = 'declined';
     case Canceled = 'canceled';
+    case Expired = 'expired';
     case Refunded = 'refunded';
     case Unknown = 'unknown';
 }
