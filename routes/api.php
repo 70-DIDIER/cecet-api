@@ -104,8 +104,8 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::post('me/membership/payments/{attempt}/refresh', [MembershipController::class, 'refreshAttempt'])->middleware('throttle:10,1')->name('me.membership.payments.refresh');
         Route::post('me/payments/{attempt}/declare', [MembershipController::class, 'declarePayment'])->name('me.payments.declare');
 
-        // DEMO_GATEWAY_BYPASS does not exist at all in production.
-        if (! app()->isProduction()) {
+        // Demo-only endpoints are never exposed outside automated tests.
+        if (app()->environment('testing')) {
             Route::post('me/membership/demo-activation', [MembershipController::class, 'demoActivate'])->name('me.membership.demo-activation');
             Route::post('me/payments/{attempt}/demo-settle', [MembershipController::class, 'demoSettle'])->name('me.payments.demo-settle');
         }
@@ -263,3 +263,5 @@ Route::prefix('v1')->name('v1.')->group(function () {
         });
     });
 });
+
+[executed on device: ip-172-31-20-3 (266007aa-ed81-449a-969b-4ac5ea49fe76)]
