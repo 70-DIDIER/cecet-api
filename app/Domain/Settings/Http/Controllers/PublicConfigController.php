@@ -20,7 +20,7 @@ class PublicConfigController
                 'code' => $method['code'],
                 'label' => $method['label'],
                 'channel' => $method['channel'],
-                'countries' => array_values(array_map(fn (mixed $country): string => strtoupper((string) $country), $method['countries'] ?? ['TG'])),
+                'countries' => array_values(array_map(fn (mixed $country): string => strtoupper((string) $country), $method['countries'] ?? [])),
             ])
             ->values()
             ->all();

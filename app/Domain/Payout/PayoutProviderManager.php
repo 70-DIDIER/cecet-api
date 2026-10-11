@@ -18,11 +18,11 @@ class PayoutProviderManager
 
     public function provider(string $name): PayoutProvider
     {
-        if ($name === FakePayoutProvider::NAME && $this->app->environment('testing')) {
+        if ($name === FakePayoutProvider::NAME && $this->app->environment(['testing', 'staging'])) {
             return $this->app->make(FakePayoutProvider::class);
         }
 
-        if ($name === FedaPayPayoutProvider::NAME) {
+        if ($name === FedaPayPayoutProvider::NAME && $this->app->environment(['testing', 'production'])) {
             return $this->app->make(FedaPayPayoutProvider::class);
         }
 

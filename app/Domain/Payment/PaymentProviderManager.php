@@ -10,8 +10,8 @@ use App\Domain\Settings\SettingsService;
 use Illuminate\Contracts\Foundation\Application;
 
 /**
- * Resolves providers by name. The active inbound provider is a Superadmin setting; late webhooks of a
- * previously active provider can still be authenticated by resolving it by name.
+ * Resolves providers by name. Staging is simulation-only: the real provider adapter cannot run there.
+ * Production keeps the provider boundary for a future contractually approved integration.
  */
 class PaymentProviderManager
 {
@@ -22,11 +22,11 @@ class PaymentProviderManager
 
     public function provider(string $name): PaymentProvider
     {
-        if ($name === FakePaymentProvider::NAME && $this->container->environment('testing')) {
+        if ($name === FakePaymentProvider::NAME && $this->container->environment(['testing', 'staging'])) {
             return $this->container->make(FakePaymentProvider::class);
         }
 
-        if ($name === FedaPayProvider::NAME) {
+        if ($name === FedaPayProvider::NAME && $this->container->environment(['testing', 'production'])) {
             return $this->container->make(FedaPayProvider::class);
         }
 

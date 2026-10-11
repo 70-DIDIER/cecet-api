@@ -100,7 +100,7 @@ class MembershipController
 
         $member = $this->member($request);
 
-        if (app()->environment('staging') && $settings->boolean('platform.demo_gateway_bypass')) {
+        if (app()->environment('testing') && $settings->boolean('platform.demo_gateway_bypass')) {
             $membership = $demo->handle($member);
 
             return response()->json(['data' => [
@@ -160,14 +160,14 @@ class MembershipController
     }
 
     /**
-     * DEMO_GATEWAY_BYPASS: approve a payment attempt made with the fake provider, as its webhook would.
-     * Not available in production.
+     * Staging/testing payment simulator. It exercises the normal payment workflow without an external rail.
+     * This endpoint is never registered in production.
      */
     public function demoSettle(Request $request, string $attempt, RefreshPaymentAttempt $refresh, FakePaymentProvider $fake, SettingsService $settings): PaymentAttemptResource
     {
         $paymentAttempt = $this->ownedAttempt($request, $attempt);
 
-        if (! app()->environment('testing') || ! $settings->boolean('platform.demo_gateway_bypass')) {
+        if (! app()->environment(['testing', 'staging'])) {
             throw PaymentException::demoUnavailable();
         }
 
@@ -175,7 +175,12 @@ class MembershipController
             throw PaymentException::notPayable();
         }
 
-        $fake->simulate($paymentAttempt->provider_transaction_id, ProviderPaymentStatus::Approved);
+        $validated = $request->validate([
+            'status' => ['nullable', 'string', 'in:approved,declined,canceled'],
+        ]);
+        $status = ProviderPaymentStatus::from($validated['status'] ?? ProviderPaymentStatus::Approved->value);
+
+        $fake->simulate($paymentAttempt->provider_transaction_id, $status);
 
         return new PaymentAttemptResource($refresh->handle($paymentAttempt));
     }

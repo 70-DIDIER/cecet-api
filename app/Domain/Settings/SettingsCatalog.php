@@ -364,64 +364,65 @@ final class SettingsCatalog
      */
     private function payments(): array
     {
-        $testEnvironment = app()->environment('testing');
-        $providerDefault = $testEnvironment ? 'fake' : 'fedapay';
-        $customerBearsFeesDefault = $testEnvironment;
-        $feeRulesDefault = $testEnvironment
-            ? ['fake' => ['rate_bps' => 0, 'fixed_xof' => 0, 'rounding_xof' => 1], 'manual' => ['rate_bps' => 0, 'fixed_xof' => 0, 'rounding_xof' => 1]]
-            : ['manual' => ['rate_bps' => 0, 'fixed_xof' => 0, 'rounding_xof' => 1]];
+        $simulationEnvironment = app()->environment(['local', 'testing', 'staging']);
+        $providerDefault = $simulationEnvironment ? 'fake' : 'fedapay';
+        $methodSuffix = $simulationEnvironment ? ' (simulation)' : '';
 
         return [
             new SettingDefinition('payment.inbound_provider', 'payment', SettingType::String, $providerDefault,
-                'Prestataire des paiements entrants (adhésions, packs).', SettingEditLevel::Superadmin,
+                'Moteur technique des encaissements. En staging, seul le simulateur interne est utilisable.', SettingEditLevel::Superadmin,
                 rules: ['value' => ['required', 'in:fake,fedapay']], productionForbiddenValues: ['fake']),
             new SettingDefinition('payment.payout_provider', 'payment', SettingType::String, $providerDefault,
-                'Prestataire des décaissements (payouts).', SettingEditLevel::Superadmin,
+                'Moteur technique des décaissements. En staging, seul le simulateur interne est utilisable.', SettingEditLevel::Superadmin,
                 rules: ['value' => ['required', 'in:fake,fedapay']], productionForbiddenValues: ['fake']),
-            new SettingDefinition('payment.customer_bears_fees', 'payment', SettingType::Boolean, $customerBearsFeesDefault,
-                'Les frais de transaction du prestataire sont ajoutés au montant payé par le client, pour que la CECT reçoive le montant dû net.',
+            new SettingDefinition('payment.customer_bears_fees', 'payment', SettingType::Boolean, false,
+                'Frais techniques du provider. Ils restent désactivés en recette tant qu’aucun contrat réel n’est activé.',
                 SettingEditLevel::Superadmin),
-            new SettingDefinition('payment.customer_fees', 'payment', SettingType::Json,
-                $feeRulesDefault,
-                'Barème des frais par prestataire, d\'après le contrat : rate_bps (pourcentage en centièmes de %, 300 = 3 %), fixed_xof (part fixe, XOF), rounding_xof (arrondi du total au multiple supérieur). Un prestataire sans entrée est refusé.',
+            new SettingDefinition('payment.customer_fees', 'payment', SettingType::Json, [
+                'fake' => ['rate_bps' => 0, 'fixed_xof' => 0, 'rounding_xof' => 1],
+                'manual' => ['rate_bps' => 0, 'fixed_xof' => 0, 'rounding_xof' => 1],
+            ], 'Barème technique par provider. Aucun frais réel n’est appliqué par défaut en recette.',
                 SettingEditLevel::Superadmin, rules: [
                     'value' => ['required'],
                     'value.*.rate_bps' => ['required', 'integer', 'min:0', 'max:5000'],
                     'value.*.fixed_xof' => ['required', 'integer', 'min:0'],
                     'value.*.rounding_xof' => ['sometimes', 'integer', 'min:1', 'max:1000'],
                 ]),
-            new SettingDefinition('payment.collection_modes', 'payment', SettingType::Json,
-                ['TMONEY' => 'psp', 'FLOOZ' => 'psp', 'CASH' => 'manual', 'BANK_TRANSFER' => 'manual'],
-                'Mode d\'encaissement de chaque moyen de paiement : « psp » (page de paiement du prestataire, confirmation automatique) ou « manual » (paiement déclaré puis validé à la main, comme sur l\'ancien site).',
+            new SettingDefinition('payment.collection_modes', 'payment', SettingType::Json, [
+                'TMONEY' => 'psp',
+                'FLOOZ' => 'psp',
+                'BANK_TRANSFER' => 'manual',
+                'CASH' => 'manual',
+            ], 'Routage métier : Mobile Money via provider/simulateur ; banque et espèces via workflow manuel contrôlé.',
                 rules: ['value' => ['required'], 'value.*' => ['in:psp,manual']]),
-            new SettingDefinition('payment.manual_instructions', 'payment', SettingType::Json, [
-                'CASH' => 'Remettez {amount} FCFA en espèces à la CECT en indiquant la référence {reference}.',
-                'TMONEY' => 'Envoyez {amount} FCFA par T-Money au numéro de la CECT, puis déclarez l\'identifiant de la transaction (référence {reference}).',
-                'FLOOZ' => 'Envoyez {amount} FCFA par Flooz au numéro de la CECT, puis déclarez l\'identifiant de la transaction (référence {reference}).',
-                'BANK_TRANSFER' => 'Virez {amount} FCFA sur le compte bancaire de la CECT avec le libellé {reference}, puis déclarez la référence du virement.',
-            ], 'Instructions affichées au membre pour un paiement validé à la main ({amount} et {reference} sont remplacés).',
-                rules: ['value' => ['required'], 'value.*' => ['string', 'max:500']]),
+            new SettingDefinition('payment.manual_instructions', 'payment', SettingType::Json,
+                $simulationEnvironment ? [
+                    'BANK_TRANSFER' => 'SIMULATION UNIQUEMENT — aucun virement réel. Saisissez une référence de test pour transmettre cette tentative à Comptabilité.',
+                    'CASH' => 'SIMULATION UNIQUEMENT — aucun encaissement réel. Saisissez une référence de test pour transmettre cette tentative à Comptabilité.',
+                ] : [],
+                'Instructions du workflow manuel. Elles doivent être configurées et ratifiées avant tout usage réel.',
+                rules: ['value' => ['present', 'array'], 'value.*' => ['string', 'max:500']]),
             new SettingDefinition('payment.manual_declaration_ttl_days', 'payment', SettingType::Integer, 7,
-                'Au-delà de ce délai, un paiement manuel ni déclaré ni validé expire et une nouvelle tentative peut être ouverte (jours).',
+                'Délai d’expiration d’une tentative manuelle non déclarée/non validée (jours).',
                 rules: ['value' => ['required', 'min:1', 'max:90']]),
             new SettingDefinition('payment.attempt_expiry_minutes', 'payment', SettingType::Integer, 60,
-                'Au-delà de ce délai, une tentative de paiement non terminée est considérée comme expirée et une nouvelle peut être ouverte (minutes).',
+                'Durée maximale d’une tentative provider/simulateur non terminée (minutes).',
                 SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:5', 'max:1440']]),
             new SettingDefinition('payment.webhook_tolerance_seconds', 'payment', SettingType::Integer, 300,
-                'Écart maximal toléré entre l\'horodatage signé d\'un webhook et l\'heure du serveur (secondes) ; 0 désactive le contrôle.',
+                'Écart maximal toléré entre l’horodatage signé d’un webhook et l’heure serveur (secondes).',
                 SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:0', 'max:3600']]),
             new SettingDefinition('payment.methods', 'payment', SettingType::Json, [
-                ['code' => 'TMONEY', 'label' => 'T-Money', 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
-                ['code' => 'FLOOZ', 'label' => 'Flooz', 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
-                ['code' => 'BANK_TRANSFER', 'label' => 'Virement bancaire', 'channel' => 'manual', 'countries' => ['TG'], 'enabled' => true],
-                ['code' => 'CASH', 'label' => 'Espèces', 'channel' => 'manual', 'countries' => ['TG'], 'enabled' => true],
-            ], 'Moyens de paiement des contre-valeurs.', rules: [
+                ['code' => 'TMONEY', 'label' => 'T-Money'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
+                ['code' => 'FLOOZ', 'label' => 'Flooz'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
+                ['code' => 'BANK_TRANSFER', 'label' => 'Virement bancaire'.$methodSuffix, 'channel' => 'manual', 'countries' => [], 'enabled' => true],
+                ['code' => 'CASH', 'label' => 'Espèces'.$methodSuffix, 'channel' => 'manual', 'countries' => [], 'enabled' => true],
+            ], 'Moyens métier. Une liste de pays vide signifie disponibilité globale ; le routage réel reste soumis à la gouvernance provider.', rules: [
                 'value' => ['required', 'min:1'],
                 'value.*.code' => ['required', 'string', 'alpha_dash:ascii', 'distinct'],
-                'value.*.label' => ['required', 'string', 'max:60'],
+                'value.*.label' => ['required', 'string', 'max:80'],
                 'value.*.channel' => ['required', 'in:mobile_money,manual'],
-                'value.*.countries' => ['sometimes', 'array', 'min:1'],
-                'value.*.countries.*' => ['required', 'string', 'size:2', 'alpha:ascii', 'distinct'],
+                'value.*.countries' => ['sometimes', 'array', 'max:250'],
+                'value.*.countries.*' => ['required', 'string', 'size:2', 'alpha:ascii'],
                 'value.*.enabled' => ['required', 'boolean'],
             ]),
         ];

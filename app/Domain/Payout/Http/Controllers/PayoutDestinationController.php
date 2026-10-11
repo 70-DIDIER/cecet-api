@@ -45,9 +45,9 @@ class PayoutDestinationController
         $methodConfig = $methods->get($validated['method']);
         $channel = (string) data_get($methodConfig, 'channel', 'manual');
         $country = strtoupper($validated['country']);
-        $allowedCountries = collect(data_get($methodConfig, 'countries', ['TG']))->map(fn (mixed $value): string => strtoupper((string) $value))->all();
+        $allowedCountries = collect(data_get($methodConfig, 'countries', []))->map(fn (mixed $value): string => strtoupper((string) $value))->all();
 
-        if (! in_array($country, $allowedCountries, true)) {
+        if ($allowedCountries !== [] && ! in_array($country, $allowedCountries, true)) {
             throw ValidationException::withMessages(['country' => 'Ce moyen de versement n’est pas disponible dans le pays sélectionné.']);
         }
 
