@@ -27,8 +27,8 @@ Statuts :
 | Pack Marchand | PARTIEL | QR, ledger marchand, encaissement et rééchange présents. Catalogue M1–M10 non ratifié. |
 | Validateur | PARTIEL | Workflow de confirmation/rejet/litige présent ; UI et preuves exactes à recetter. |
 | Comptabilité | PARTIEL | Payouts, retries et maker-checker présents ; parcours complet à recetter. |
-| Notifications in-app | PROUVÉ CODE | Centre persistant ajouté ; tests et déploiement staging à exécuter. |
-| Documents membre | MANQUANT | Pas encore de centre de documents/reçus/relevés personnels conforme au v4.0. |
+| Notifications in-app | PROUVÉ CODE | Centre persistant + ownership + état lu/non-lu + tests ajoutés ; déploiement staging à exécuter. |
+| Documents membre | PROUVÉ CODE | Centre privé ajouté : reçu d’adhésion, fiche d’adhésion, relevé de packs et relevé d’activité ; téléchargement audité. Déploiement staging à exécuter. |
 | Rapports PDF/XLSX/CSV | PARTIEL | Génération présente ; volumétrie/asynchrone et UAT à vérifier. |
 | Snapshots / imports | PARTIEL | Endpoints présents ; tests de conflits et restauration opérationnelle à rejouer. |
 | Audit métier | PARTIEL | Journal présent ; immutabilité/tamper evidence à revalider sur DB réelle. |
@@ -70,12 +70,7 @@ Les **moyens métier** restent T-Money, Flooz, virement bancaire et espèces. En
 
 ### P1 — Documents membre
 
-Créer le domaine Documents :
-- reçu d'adhésion ;
-- reçu de pack / top-up ;
-- relevé d'opérations ;
-- rapport personnel exportable ;
-- stockage privé, ownership backend, téléchargement audité.
+Socle ajouté : reçu d'adhésion, fiche d'adhésion, relevé de packs et relevé d'activité avec ownership backend et téléchargement audité. À compléter ensuite par les reçus de pack/top-up unitaires et la politique de rétention/stockage des pièces justificatives.
 
 ### P1 — Notifications
 
