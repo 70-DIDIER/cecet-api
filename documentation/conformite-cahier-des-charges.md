@@ -82,6 +82,20 @@ Légende :
 | Contenus publics | OK | `/admin/contenus` |
 | Annuaire marchands | OK+ | Modération back-office et annuaire public séparé |
 
+
+## 5 bis. Acteurs et représentation d'accès
+
+| Acteur du cahier des charges | Représentation technique | État |
+| --- | --- | --- |
+| Utilisateur | Compte membre, personne physique ou morale | OK |
+| Administrateur | Rôle staff administrateur | OK |
+| Superadmin | Rôle staff superadmin protég�� | OK+ |
+| Validateur | Rôle staff validateur | OK+ |
+| Comptabilité | Rôle staff comptabilite, séparé du Validateur | OK+ |
+| Yempay / prestataire | Intégration externe par API/webhook, sans session staff implicite | OK+ |
+
+Cette représentation évite de donner à un prestataire externe un compte humain privilégié uniquement pour satisfaire une liste de rôles métier.
+
 ## 6. Site public et espace membre
 
 - Site public React séparé de l'espace membre et du back-office.

@@ -89,10 +89,19 @@ class FedaPayPayoutProvider implements PayoutProvider
             'email' => $request->email,
         ]);
 
-        if (preg_match('/^\+228([0-9]{8})$/', $request->phone, $matches) === 1) {
-            $customer['phone_number'] = ['number' => $matches[1], 'country' => 'tg'];
+        $country = strtoupper($request->country);
+        $dialingCodes = ['TG' => '228'];
+        $dialingCode = $dialingCodes[$country] ?? null;
+
+        if ($dialingCode === null) {
+            throw new PayoutProviderException("FedaPay payout country {$country} is not configured by CECT.");
+        }
+
+        $pattern = '/^\\+'.preg_quote($dialingCode, '/').'([0-9]{8,12})$/';
+        if (preg_match($pattern, $request->phone, $matches) === 1) {
+            $customer['phone_number'] = ['number' => $matches[1], 'country' => strtolower($country)];
         } else {
-            throw new PayoutProviderException('Only Togolese Mobile Money numbers (+228) are supported for payouts.');
+            throw new PayoutProviderException("The payout phone number does not match country {$country}.");
         }
 
         return [

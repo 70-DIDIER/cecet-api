@@ -15,12 +15,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $user_id
  * @property string $method
  * @property string $channel
+ * @property string $country
  * @property string|null $phone
  * @property string|null $bank_name
  * @property string|null $account_holder
  * @property string|null $account_number
  */
-#[Fillable(['user_id', 'method', 'channel', 'phone', 'bank_name', 'account_holder', 'account_number'])]
+#[Fillable(['user_id', 'method', 'channel', 'country', 'phone', 'bank_name', 'account_holder', 'account_number'])]
 class PayoutDestination extends Model
 {
     use HasUlids;
@@ -43,6 +44,7 @@ class PayoutDestination extends Model
         return [
             'method' => $this->method,
             'channel' => $this->channel,
+            'country' => $this->country,
             'phone' => $this->phone,
             'bank_name' => $this->bank_name,
             'account_holder' => $this->account_holder,

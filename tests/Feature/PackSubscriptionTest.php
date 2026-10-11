@@ -32,19 +32,39 @@ function subscribeTo(User $member, string $planId): TestResponse
 }
 
 describe('catalog as seen by a member', function () {
-    it('lists only published packs with the price to pay and eligibility', function () {
+    it('shows members only the published packs allowed for their person type', function () {
         setFeeRules(['fake' => ['rate_bps' => 300, 'fixed_xof' => 0, 'rounding_xof' => 1]]);
         makePlan(code: 'V1');
-        makePlan(PackFamily::Marchand, 'M1');
+        $merchant = makePlan(PackFamily::Marchand, 'M1');
         makePlan(code: 'V9', publish: false);
 
-        $response = $this->withToken(tokenFor($this->member))->getJson('/api/v1/packs')->assertOk()->assertJsonCount(2, 'data');
+        $response = $this->withToken(tokenFor($this->member))->getJson('/api/v1/packs')->assertOk()->assertJsonCount(1, 'data');
         $byCode = collect($response->json('data'))->keyBy('code');
 
-        expect($byCode->keys()->all())->toEqualCanonicalizing(['V1', 'M1'])
+        expect($byCode->keys()->all())->toEqualCanonicalizing(['V1'])
             ->and($byCode['V1']['eligible'])->toBeTrue()
-            ->and($byCode['V1']['payment_quote'])->toBe(['net_amount' => 100000, 'fee_amount' => 3093, 'total_amount' => 103093])
-            ->and($byCode['M1']['eligible'])->toBeFalse();
+            ->and($byCode['V1']['payment_quote'])->toBe(['net_amount' => 100000, 'fee_amount' => 3093, 'total_amount' => 103093]);
+
+        $this->withToken(tokenFor($this->member))->getJson("/api/v1/packs/{$merchant->id}")->assertNotFound();
+
+        $legal = User::factory()->legalPerson()->create();
+        $legalResponse = $this->withToken(tokenFor($legal))->getJson('/api/v1/packs')->assertOk()->assertJsonCount(2, 'data');
+        expect(collect($legalResponse->json('data'))->pluck('code')->all())->toEqualCanonicalizing(['V1', 'M1']);
+        $this->withToken(tokenFor($legal))->getJson("/api/v1/packs/{$merchant->id}")->assertOk();
+    });
+
+    it('provides an authenticated catalog that never exposes ineligible packs', function () {
+        makePlan(code: 'V1');
+        makePlan(PackFamily::Marchand, 'M1');
+
+        $this->getJson('/api/v1/me/catalog-packs')->assertUnauthorized();
+
+        $natural = $this->withToken(tokenFor($this->member))->getJson('/api/v1/me/catalog-packs')->assertOk();
+        expect(collect($natural->json('data'))->pluck('code')->all())->toEqualCanonicalizing(['V1']);
+
+        $legal = User::factory()->legalPerson()->create();
+        $legalCatalog = $this->withToken(tokenFor($legal))->getJson('/api/v1/me/catalog-packs')->assertOk();
+        expect(collect($legalCatalog->json('data'))->pluck('code')->all())->toEqualCanonicalizing(['V1', 'M1']);
     });
 
     it('hides unpublished plans', function () {

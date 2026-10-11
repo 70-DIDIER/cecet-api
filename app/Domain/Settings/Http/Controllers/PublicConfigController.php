@@ -20,12 +20,14 @@ class PublicConfigController
                 'code' => $method['code'],
                 'label' => $method['label'],
                 'channel' => $method['channel'],
+                'countries' => array_values(array_map(fn (mixed $country): string => strtoupper((string) $country), $method['countries'] ?? ['TG'])),
             ])
             ->values()
             ->all();
 
         return response()->json(['data' => [
             'currency' => 'XOF',
+            'test_mode' => app()->environment(['local', 'testing', 'staging']),
             'membership_fees' => [
                 'natural_person' => $this->settings->integer('membership.fee.natural_person'),
                 'legal_person' => $this->settings->integer('membership.fee.legal_person'),
@@ -39,6 +41,12 @@ class PublicConfigController
             'rccm_required' => $this->settings->boolean('organization.rccm_required'),
             'nif_required' => $this->settings->boolean('organization.nif_required'),
             'payment_methods' => $methods,
+            'content' => [
+                'key_figures' => $this->settings->array('content.key_figures'),
+                'faq' => collect($this->settings->array('content.faq'))->filter(fn (mixed $item): bool => is_array($item) && ($item['published'] ?? false) === true)->values()->all(),
+                'news' => collect($this->settings->array('content.news'))->filter(fn (mixed $item): bool => is_array($item) && ($item['published'] ?? false) === true)->sortByDesc('date')->values()->all(),
+                'partners' => collect($this->settings->array('content.partners'))->filter(fn (mixed $item): bool => is_array($item) && ($item['published'] ?? false) === true)->values()->all(),
+            ],
         ]]);
     }
 }

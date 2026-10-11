@@ -35,12 +35,31 @@ class MemberPackController
     {
         $viewer = $request->user('sanctum');
         $user = $viewer instanceof User && $viewer->isMember() ? $viewer : null;
+
+        return $this->catalogResponse($user, $fees, $settings);
+    }
+
+    /**
+     * Member-specific catalog. Unlike the public catalog, this endpoint is behind auth:sanctum and only
+     * returns packs whose published version explicitly allows the member's person type.
+     */
+    public function memberCatalog(Request $request, PaymentFeeCalculator $fees, SettingsService $settings): JsonResponse
+    {
+        return $this->catalogResponse($this->user($request), $fees, $settings);
+    }
+
+    private function catalogResponse(?User $user, PaymentFeeCalculator $fees, SettingsService $settings): JsonResponse
+    {
         $providerName = $settings->string('payment.inbound_provider') ?? '';
 
         $plans = PackPlan::query()
             ->with('currentVersion')
             ->where('status', PackPlanStatus::Published)
             ->whereHas('currentVersion')
+            ->when($user?->person_type !== null, fn ($query) => $query->whereHas(
+                'currentVersion',
+                fn ($versionQuery) => $versionQuery->whereJsonContains('eligible_person_types', $user->person_type->value),
+            ))
             ->orderBy('family')
             ->orderBy('level')
             ->orderBy('code')
@@ -69,11 +88,18 @@ class MemberPackController
         return response()->json(['data' => $data]);
     }
 
-    public function showPlan(PackPlan $plan): PackPlanResource
+    public function showPlan(Request $request, PackPlan $plan): PackPlanResource
     {
         abort_unless($plan->status === PackPlanStatus::Published, 404);
+        $plan->load('currentVersion');
 
-        return new PackPlanResource($plan->load('currentVersion'));
+        $viewer = $request->user('sanctum');
+        if ($viewer instanceof User && $viewer->isMember()) {
+            $version = $plan->currentVersion;
+            abort_unless($version !== null && in_array($viewer->person_type?->value, $version->eligible_person_types, true), 404);
+        }
+
+        return new PackPlanResource($plan);
     }
 
     /**

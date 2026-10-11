@@ -121,6 +121,7 @@ class SendPayoutBatch implements OutboxHandler
                 lastName: $beneficiary->last_name,
                 email: $beneficiary->email,
                 method: $batch->method,
+                country: is_string($batch->destination['country'] ?? null) ? (string) $batch->destination['country'] : 'TG',
             ));
 
             $this->apply($claimed, $result);

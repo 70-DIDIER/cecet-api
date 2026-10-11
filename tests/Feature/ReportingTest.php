@@ -111,7 +111,13 @@ it('exports members, payments and subscriptions as CSV, audited and with a step-
     $subscriptions = $this->withToken(tokenFor($this->admin, withStepUp: true))->get('/api/v1/admin/exports/subscriptions')->streamedContent();
     expect($subscriptions)->toContain(';C1;255000;');
 
-    expect(AuditEvent::query()->where('action', 'reports.exported')->count())->toBe(3);
+    $audit = $this->withToken(tokenFor($this->admin, withStepUp: true))->get('/api/v1/admin/exports/audit')->assertOk()->streamedContent();
+    expect($audit)->toContain('reports.exported');
+
+    $this->withToken(tokenFor($this->admin, withStepUp: true))->get('/api/v1/admin/exports/exchanges')->assertOk();
+    $this->withToken(tokenFor($this->admin, withStepUp: true))->get('/api/v1/admin/exports/payouts')->assertOk();
+
+    expect(AuditEvent::query()->where('action', 'reports.exported')->count())->toBe(6);
     $this->withToken(tokenFor($this->admin, withStepUp: true))->get('/api/v1/admin/exports/secrets')->assertNotFound();
 });
 
@@ -148,4 +154,14 @@ it('gives the standard monthly report and a printable version with the same filt
         ->toContain('380 000 FCFA')
         ->toContain('Yendoukoa NAKORE')
         ->toContain('Reste dû à ce jour');
+
+    $pdf = $this->withToken(tokenFor($this->admin, withStepUp: true))->get("/api/v1/admin/reports/summary.pdf?month={$month}")
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf');
+    expect($pdf->getContent())->toStartWith('%PDF-1.4');
+
+    $xlsx = $this->withToken(tokenFor($this->admin, withStepUp: true))->get("/api/v1/admin/reports/summary.xlsx?month={$month}")
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    $xlsx->assertDownload();
 });

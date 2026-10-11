@@ -215,6 +215,109 @@ class ReportingQueries
             ]);
     }
 
+    /**
+     * Exchange requests created in the selected period.
+     *
+     * @return iterable<int, array<string, mixed>>
+     */
+    public function exchangesRows(CarbonImmutable $from, CarbonImmutable $to): iterable
+    {
+        return DB::table('exchange_requests as e')
+            ->join('users as u', 'u.id', '=', 'e.user_id')
+            ->leftJoin('organizations as o', 'o.user_id', '=', 'u.id')
+            ->where('e.created_at', '>=', $from)
+            ->where('e.created_at', '<', $to)
+            ->select([
+                'e.reference', 'e.kind', 'e.status', 'e.quantity_requested', 'e.quantity_received',
+                'e.rate_xof_per_yem', 'e.amount_due_xof', 'e.source_pernum', 'e.cect_pernum',
+                'e.member_transfer_reference', 'e.declared_at', 'e.validated_at', 'e.closed_at',
+                'e.created_at', 'u.member_number', 'u.first_name', 'u.last_name', 'o.legal_name',
+            ])
+            ->orderBy('e.created_at')
+            ->orderBy('e.id')
+            ->lazy()
+            ->map(fn (object $row): array => [
+                'Référence' => $row->reference,
+                'Date' => $row->created_at,
+                'Type' => $row->kind,
+                'Membre' => $row->legal_name ?? trim("{$row->first_name} {$row->last_name}"),
+                'Numéro membre' => $row->member_number,
+                'Pernum source' => $row->source_pernum,
+                'Pernum CECT' => $row->cect_pernum,
+                'YEM demandés' => $row->quantity_requested,
+                'YEM reçus' => $row->quantity_received,
+                'Cours FCFA/YEM' => $row->rate_xof_per_yem,
+                'Montant dû (FCFA)' => $row->amount_due_xof,
+                'Statut' => $row->status,
+                'Référence transfert membre' => $row->member_transfer_reference,
+                'Déclaré le' => $row->declared_at,
+                'Validé le' => $row->validated_at,
+                'Clôturé le' => $row->closed_at,
+            ]);
+    }
+
+    /**
+     * Payout batches and their routing state for the selected period.
+     *
+     * @return iterable<int, array<string, mixed>>
+     */
+    public function payoutsRows(CarbonImmutable $from, CarbonImmutable $to): iterable
+    {
+        return DB::table('payout_batches as b')
+            ->join('users as u', 'u.id', '=', 'b.beneficiary_id')
+            ->leftJoin('organizations as o', 'o.user_id', '=', 'u.id')
+            ->where('b.created_at', '>=', $from)
+            ->where('b.created_at', '<', $to)
+            ->select([
+                'b.reference', 'b.total_amount', 'b.paid_amount', 'b.remaining_amount', 'b.route',
+                'b.method', 'b.status', 'b.created_at', 'b.updated_at', 'u.member_number',
+                'u.first_name', 'u.last_name', 'o.legal_name',
+            ])
+            ->orderBy('b.created_at')
+            ->orderBy('b.id')
+            ->lazy()
+            ->map(fn (object $row): array => [
+                'Référence' => $row->reference,
+                'Date' => $row->created_at,
+                'Bénéficiaire' => $row->legal_name ?? trim("{$row->first_name} {$row->last_name}"),
+                'Numéro membre' => $row->member_number,
+                'Montant total (FCFA)' => (int) $row->total_amount,
+                'Montant payé (FCFA)' => (int) $row->paid_amount,
+                'Reste dû (FCFA)' => (int) $row->remaining_amount,
+                'Route' => $row->route,
+                'Moyen' => $row->method,
+                'Statut' => $row->status,
+                'Dernière mise à jour' => $row->updated_at,
+            ]);
+    }
+
+    /**
+     * Authorised business audit export for the selected period.
+     *
+     * @return iterable<int, array<string, mixed>>
+     */
+    public function auditRows(CarbonImmutable $from, CarbonImmutable $to): iterable
+    {
+        return DB::table('audit_events')
+            ->where('occurred_at', '>=', $from)
+            ->where('occurred_at', '<', $to)
+            ->select(['position', 'occurred_at', 'actor_type', 'actor_id', 'action', 'subject_type', 'subject_id', 'result', 'correlation_id', 'hash'])
+            ->orderBy('position')
+            ->lazy()
+            ->map(fn (object $row): array => [
+                'Position' => $row->position,
+                'Date' => $row->occurred_at,
+                'Type acteur' => $row->actor_type,
+                'Acteur' => $row->actor_id,
+                'Action' => $row->action,
+                'Type objet' => $row->subject_type,
+                'Objet' => $row->subject_id,
+                'Résultat' => $row->result,
+                'Corrélation' => $row->correlation_id,
+                'Empreinte' => $row->hash,
+            ]);
+    }
+
     public function pernumOf(string $userColumn): Builder
     {
         return DB::table('pernum_identities')->whereColumn('user_id', $userColumn)->where('status', '!=', 'revoked')->orderBy('created_at')->limit(1)->select('pernum');

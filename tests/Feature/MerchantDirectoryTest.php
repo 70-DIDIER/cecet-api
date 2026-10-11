@@ -1,5 +1,7 @@
 <?php
 
+use App\Domain\Access\PermissionCatalog;
+use App\Domain\Audit\Models\AuditEvent;
 use App\Domain\Catalog\Enums\PackFamily;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
@@ -50,4 +52,36 @@ it('reserves the directory profile to merchants', function () {
     $this->withToken(tokenFor(User::factory()->create()))->putJson('/api/v1/merchant/directory-profile', profile())
         ->assertForbidden()
         ->assertJsonPath('code', 'MERCHANT_PACK_REQUIRED');
+});
+
+it('lets an administrator moderate the public merchant directory with step-up and an audit trail', function () {
+    $this->withToken(tokenFor($this->merchant))->putJson('/api/v1/merchant/directory-profile', profile())->assertOk();
+
+    $admin = User::factory()->staff(PermissionCatalog::ADMIN)->create();
+
+    $this->withToken(tokenFor($admin))
+        ->getJson('/api/v1/admin/merchant-directory')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.display_name', 'Pharmacie Centrale');
+
+    $payload = [
+        ...profile(['listed' => false, 'display_name' => 'Pharmacie Centrale — vérifiée']),
+        'reason' => 'Correction de la fiche publique',
+    ];
+
+    $this->withToken(tokenFor($admin))
+        ->putJson("/api/v1/admin/merchant-directory/{$this->merchant->id}", $payload)
+        ->assertForbidden()
+        ->assertJsonPath('code', 'STEP_UP_REQUIRED');
+
+    $this->withToken(tokenFor($admin, withStepUp: true))
+        ->putJson("/api/v1/admin/merchant-directory/{$this->merchant->id}", $payload)
+        ->assertOk()
+        ->assertJsonPath('data.listed', false)
+        ->assertJsonPath('data.display_name', 'Pharmacie Centrale — vérifiée');
+
+    $this->getJson('/api/v1/merchants')->assertOk()->assertJsonCount(0, 'data');
+
+    expect(AuditEvent::query()->where('action', 'merchant_directory.admin_updated')->where('actor_id', $admin->id)->exists())->toBeTrue();
 });

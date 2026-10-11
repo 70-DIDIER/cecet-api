@@ -16,5 +16,6 @@ final readonly class PayoutRequest
         public string $lastName,
         public ?string $email,
         public ?string $method = null,
+        public string $country = 'TG',
     ) {}
 }

@@ -5,7 +5,6 @@ namespace App\Domain\Payout\Http\Controllers;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Audit\Enums\SecuritySeverity;
 use App\Domain\Audit\SecurityEventLogger;
-use App\Domain\Identity\Http\Requests\RegisterMemberRequest;
 use App\Domain\Payout\Models\PayoutDestination;
 use App\Domain\Settings\SettingsService;
 use App\Models\User;
@@ -36,13 +35,21 @@ class PayoutDestinationController
 
         $validated = $request->validate([
             'method' => ['required', 'string', Rule::in($methods->keys()->all())],
-            'phone' => ['nullable', 'string', 'regex:'.RegisterMemberRequest::PHONE_FORMAT],
+            'country' => ['required', 'string', 'size:2', 'alpha:ascii'],
+            'phone' => ['nullable', 'string', 'regex:/^\\+[1-9][0-9]{7,14}$/'],
             'bank_name' => ['nullable', 'string', 'max:120'],
             'account_holder' => ['nullable', 'string', 'max:160'],
             'account_number' => ['nullable', 'string', 'max:60'],
         ]);
 
-        $channel = (string) data_get($methods->get($validated['method']), 'channel', 'manual');
+        $methodConfig = $methods->get($validated['method']);
+        $channel = (string) data_get($methodConfig, 'channel', 'manual');
+        $country = strtoupper($validated['country']);
+        $allowedCountries = collect(data_get($methodConfig, 'countries', ['TG']))->map(fn (mixed $value): string => strtoupper((string) $value))->all();
+
+        if (! in_array($country, $allowedCountries, true)) {
+            throw ValidationException::withMessages(['country' => 'Ce moyen de versement n’est pas disponible dans le pays sélectionné.']);
+        }
 
         if ($channel === 'mobile_money' && empty($validated['phone'])) {
             throw ValidationException::withMessages(['phone' => 'Un numéro Mobile Money est obligatoire pour ce moyen de paiement.']);
@@ -50,13 +57,14 @@ class PayoutDestinationController
 
         $member = $this->member($request);
 
-        $destination = DB::transaction(function () use ($member, $validated, $channel, $auditLogger): PayoutDestination {
+        $destination = DB::transaction(function () use ($member, $validated, $channel, $country, $auditLogger): PayoutDestination {
             $existing = PayoutDestination::query()->where('user_id', $member->id)->lockForUpdate()->first();
             $before = $existing?->snapshot();
 
             $destination = PayoutDestination::query()->updateOrCreate(['user_id' => $member->id], [
                 'method' => $validated['method'],
                 'channel' => $channel,
+                'country' => $country,
                 'phone' => $validated['phone'] ?? null,
                 'bank_name' => $validated['bank_name'] ?? null,
                 'account_holder' => $validated['account_holder'] ?? null,

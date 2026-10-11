@@ -13,6 +13,7 @@ Ce dossier est la documentation opérationnelle et technique de la plateforme CE
 - [Sécurité et garde-fous](./security.md)
 - [Matrice de conformité au cahier des charges](./conformite-cahier-des-charges.md)
 - [Historique des travaux](./changelog.md)
+- [Recette complète du 11 octobre 2026](./recette-2026-10-11.md)
 
 ## Dépôts actifs
 

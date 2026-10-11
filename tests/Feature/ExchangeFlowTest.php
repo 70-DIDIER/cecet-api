@@ -45,6 +45,28 @@ function sellerBalance(UserPack $pack): array
 }
 
 describe('member request', function () {
+    it('stores the selected country, network and payout number and enforces the configured network countries', function () {
+        $token = tokenFor($this->member, withStepUp: true);
+
+        $this->withToken($token)->putJson('/api/v1/me/payout-destination', [
+            'method' => 'TMONEY',
+            'country' => 'TG',
+            'phone' => '+22890123456',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.method', 'TMONEY')
+            ->assertJsonPath('data.country', 'TG')
+            ->assertJsonPath('data.phone', '+22890123456');
+
+        $this->withToken($token)->putJson('/api/v1/me/payout-destination', [
+            'method' => 'TMONEY',
+            'country' => 'BJ',
+            'phone' => '+22966000001',
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('details.fields.country.0', 'Ce moyen de versement n’est pas disponible dans le pays sélectionné.');
+    });
+
     it('reserves the quantity and gives the CECT Pernum to send the YEM to (AC-09)', function () {
         sell($this->member, $this->pack)
             ->assertCreated()

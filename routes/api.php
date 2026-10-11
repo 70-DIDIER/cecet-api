@@ -20,6 +20,7 @@ use App\Domain\Membership\Http\Controllers\MembershipController;
 use App\Domain\Merchant\Http\Controllers\MemberMerchantPaymentController;
 use App\Domain\Merchant\Http\Controllers\MerchantAdminController;
 use App\Domain\Merchant\Http\Controllers\MerchantController;
+use App\Domain\Merchant\Http\Controllers\MerchantDirectoryAdminController;
 use App\Domain\Merchant\Http\Controllers\MerchantDirectoryController;
 use App\Domain\Merchant\Http\Controllers\MerchantPaymentValidationController;
 use App\Domain\Ops\Http\Controllers\OpsHealthController;
@@ -112,7 +113,9 @@ Route::prefix('v1')->name('v1.')->group(function () {
 
         /*
          * Pack catalog and the packs held by the member.
+         * The authenticated catalog hides plans that are not eligible for the member's person type.
          */
+        Route::get('me/catalog-packs', [MemberPackController::class, 'memberCatalog'])->name('me.packs.catalog');
         Route::get('me/packs', [MemberPackController::class, 'index'])->name('me.packs.index');
         Route::post('me/packs', [MemberPackController::class, 'subscribe'])->middleware('idempotent')->name('me.packs.store');
         Route::get('me/packs/{userPack}', [MemberPackController::class, 'show'])->name('me.packs.show');
@@ -243,6 +246,8 @@ Route::prefix('v1')->name('v1.')->group(function () {
             Route::get('overview', [ReportController::class, 'overview'])->middleware('can:reports.view')->name('overview');
             Route::get('reports/summary', [ReportController::class, 'summary'])->middleware('can:reports.view')->name('reports.summary');
             Route::get('reports/summary/print', [ReportController::class, 'printable'])->middleware('can:reports.view')->name('reports.summary.print');
+            Route::get('reports/summary.pdf', [ReportController::class, 'pdf'])->middleware(['can:reports.export', 'step-up'])->name('reports.summary.pdf');
+            Route::get('reports/summary.xlsx', [ReportController::class, 'xlsx'])->middleware(['can:reports.export', 'step-up'])->name('reports.summary.xlsx');
             Route::get('snapshots', [SnapshotController::class, 'index'])->middleware('can:reports.view')->name('snapshots.index');
             Route::post('snapshots', [SnapshotController::class, 'store'])->middleware(['can:reports.export', 'throttle:5,1'])->name('snapshots.store');
             Route::get('snapshots/{snapshot}/download', [SnapshotController::class, 'download'])->middleware(['can:reports.export', 'step-up'])->name('snapshots.download');
@@ -252,6 +257,9 @@ Route::prefix('v1')->name('v1.')->group(function () {
             Route::post('imports/{import}/approve', [ImportController::class, 'approve'])->middleware(['can:imports.manage', 'step-up', 'idempotent'])->name('imports.approve');
             Route::post('imports/{import}/cancel', [ImportController::class, 'cancel'])->middleware('can:imports.manage')->name('imports.cancel');
             Route::get('exports/{type}', [ReportController::class, 'export'])->middleware(['can:reports.export', 'step-up'])->name('exports.show');
+
+            Route::get('merchant-directory', [MerchantDirectoryAdminController::class, 'index'])->middleware('can:settings.view')->name('merchant-directory.index');
+            Route::put('merchant-directory/{user}', [MerchantDirectoryAdminController::class, 'update'])->middleware(['can:settings.update', 'step-up'])->name('merchant-directory.update');
 
             Route::get('merchant-payments', [MerchantAdminController::class, 'payments'])->middleware('can:user_packs.view')->name('merchant-payments.index');
             Route::get('merchant-accounts/{userPack}', [MerchantAdminController::class, 'account'])->middleware('can:user_packs.view')->name('merchant-accounts.show');

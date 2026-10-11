@@ -33,6 +33,7 @@ final class SettingsCatalog
             ...$this->otp(),
             ...$this->platform(),
             ...$this->notifications(),
+            ...$this->publicContent(),
             ...$this->reporting(),
             ...$this->ops(),
         ];
@@ -164,6 +165,103 @@ final class SettingsCatalog
             new SettingDefinition('ops.webhook_rejection_threshold', 'ops', SettingType::Integer, 20,
                 'Nombre de webhooks rejetés (signature invalide) sur une heure à partir duquel une alerte est levée.',
                 SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:1']]),
+        ];
+    }
+
+    /**
+     * Public website content managed by the cooperative from the back-office.
+     *
+     * @return list<SettingDefinition>
+     */
+    private function publicContent(): array
+    {
+        return [
+            new SettingDefinition('content.key_figures', 'content', SettingType::Json, [
+                ['key' => 'members', 'value' => '100+', 'label_fr' => 'membres actifs', 'label_en' => 'active members'],
+                ['key' => 'years', 'value' => '1', 'label_fr' => "année d'existence", 'label_en' => 'year of existence'],
+                ['key' => 'packs', 'value' => '6', 'label_fr' => 'packs disponibles', 'label_en' => 'packs available'],
+                ['key' => 'solidarity', 'value' => '100 %', 'label_fr' => 'engagement solidaire', 'label_en' => 'solidarity commitment'],
+            ], 'Chiffres clés affichés sur le site public.', rules: [
+                'value' => ['present', 'array', 'max:20'],
+                'value.*.key' => ['required', 'string', 'max:40', 'distinct'],
+                'value.*.value' => ['required', 'string', 'max:40'],
+                'value.*.label_fr' => ['required', 'string', 'max:120'],
+                'value.*.label_en' => ['required', 'string', 'max:120'],
+            ]),
+            new SettingDefinition('content.faq', 'content', SettingType::Json, [
+                [
+                    'id' => 'faq-cect',
+                    'question_fr' => "Qu'est-ce que la CECT ?",
+                    'answer_fr' => "La Coopérative d'Entraide Communautaire du Togo (CECT) est une coopérative qui organise l'entraide, les échanges et les services de ses membres autour du YEM.",
+                    'question_en' => 'What is CECT?',
+                    'answer_en' => 'CECT is a Togolese community mutual-aid cooperative organising member services and exchanges around YEM.',
+                    'published' => true,
+                ],
+                [
+                    'id' => 'faq-join',
+                    'question_fr' => 'Qui peut adhérer à la CECT ?',
+                    'answer_fr' => "Les personnes physiques et morales peuvent adhérer selon les conditions et frais d'adhésion en vigueur.",
+                    'question_en' => 'Who can join CECT?',
+                    'answer_en' => 'Natural persons and legal entities may join under the current membership conditions and fees.',
+                    'published' => true,
+                ],
+                [
+                    'id' => 'faq-yem',
+                    'question_fr' => "Qu'est-ce que le YEM ?",
+                    'answer_fr' => 'Le YEM circule dans un système externe à la plateforme CECT. La plateforme assure le suivi, le contrôle et la traçabilité des opérations déclarées par les membres.',
+                    'question_en' => 'What is YEM?',
+                    'answer_en' => 'YEM circulates in a system external to the CECT platform. The platform tracks, controls and records member operations.',
+                    'published' => true,
+                ],
+            ], 'Questions fréquentes publiées sur le site public.', rules: [
+                'value' => ['present', 'array', 'max:100'],
+                'value.*.id' => ['required', 'string', 'max:80', 'distinct'],
+                'value.*.question_fr' => ['required', 'string', 'max:240'],
+                'value.*.answer_fr' => ['required', 'string', 'max:3000'],
+                'value.*.question_en' => ['nullable', 'string', 'max:240'],
+                'value.*.answer_en' => ['nullable', 'string', 'max:3000'],
+                'value.*.published' => ['required', 'boolean'],
+            ]),
+            new SettingDefinition('content.news', 'content', SettingType::Json, [
+                [
+                    'id' => 'a1',
+                    'slug' => 'lancement-site-refonte',
+                    'title_fr' => 'Lancement du nouveau site CECT',
+                    'title_en' => 'Launch of the new CECT website',
+                    'excerpt_fr' => 'La CECT annonce le lancement de sa nouvelle plateforme web.',
+                    'excerpt_en' => 'CECT announces the launch of its new web platform.',
+                    'content_fr' => "La nouvelle plateforme CECT centralise l'adhésion, les packs, les opérations et leur traçabilité.",
+                    'content_en' => 'The new CECT platform centralises membership, packs, operations and traceability.',
+                    'date' => '2026-10-04',
+                    'category' => 'announcement',
+                    'published' => true,
+                ],
+            ], 'Actualités du site public.', rules: [
+                'value' => ['present', 'array', 'max:200'],
+                'value.*.id' => ['required', 'string', 'max:80', 'distinct'],
+                'value.*.slug' => ['required', 'string', 'max:120', 'distinct'],
+                'value.*.title_fr' => ['required', 'string', 'max:240'],
+                'value.*.title_en' => ['nullable', 'string', 'max:240'],
+                'value.*.excerpt_fr' => ['required', 'string', 'max:1000'],
+                'value.*.excerpt_en' => ['nullable', 'string', 'max:1000'],
+                'value.*.content_fr' => ['required', 'string', 'max:10000'],
+                'value.*.content_en' => ['nullable', 'string', 'max:10000'],
+                'value.*.date' => ['required', 'date'],
+                'value.*.category' => ['required', 'string', 'max:60'],
+                'value.*.published' => ['required', 'boolean'],
+            ]),
+            new SettingDefinition('content.partners', 'content', SettingType::Json, [], 'Partenaires institutionnels/commerciaux affichés sur le site public.', rules: [
+                'value' => ['present', 'array', 'max:300'],
+                'value.*.id' => ['required', 'string', 'max:80', 'distinct'],
+                'value.*.name' => ['required', 'string', 'max:180'],
+                'value.*.category' => ['required', 'string', 'max:60'],
+                'value.*.city' => ['required', 'string', 'max:100'],
+                'value.*.address' => ['nullable', 'string', 'max:300'],
+                'value.*.phone' => ['nullable', 'string', 'max:40'],
+                'value.*.description_fr' => ['nullable', 'string', 'max:1200'],
+                'value.*.description_en' => ['nullable', 'string', 'max:1200'],
+                'value.*.published' => ['required', 'boolean'],
+            ]),
         ];
     }
 
@@ -313,15 +411,17 @@ final class SettingsCatalog
                 'Écart maximal toléré entre l\'horodatage signé d\'un webhook et l\'heure du serveur (secondes) ; 0 désactive le contrôle.',
                 SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:0', 'max:3600']]),
             new SettingDefinition('payment.methods', 'payment', SettingType::Json, [
-                ['code' => 'TMONEY', 'label' => 'T-Money', 'channel' => 'mobile_money', 'enabled' => true],
-                ['code' => 'FLOOZ', 'label' => 'Flooz', 'channel' => 'mobile_money', 'enabled' => true],
-                ['code' => 'BANK_TRANSFER', 'label' => 'Virement bancaire', 'channel' => 'manual', 'enabled' => true],
-                ['code' => 'CASH', 'label' => 'Espèces', 'channel' => 'manual', 'enabled' => true],
+                ['code' => 'TMONEY', 'label' => 'T-Money', 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
+                ['code' => 'FLOOZ', 'label' => 'Flooz', 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
+                ['code' => 'BANK_TRANSFER', 'label' => 'Virement bancaire', 'channel' => 'manual', 'countries' => ['TG'], 'enabled' => true],
+                ['code' => 'CASH', 'label' => 'Espèces', 'channel' => 'manual', 'countries' => ['TG'], 'enabled' => true],
             ], 'Moyens de paiement des contre-valeurs.', rules: [
                 'value' => ['required', 'min:1'],
                 'value.*.code' => ['required', 'string', 'alpha_dash:ascii', 'distinct'],
                 'value.*.label' => ['required', 'string', 'max:60'],
                 'value.*.channel' => ['required', 'in:mobile_money,manual'],
+                'value.*.countries' => ['sometimes', 'array', 'min:1'],
+                'value.*.countries.*' => ['required', 'string', 'size:2', 'alpha:ascii', 'distinct'],
                 'value.*.enabled' => ['required', 'boolean'],
             ]),
         ];

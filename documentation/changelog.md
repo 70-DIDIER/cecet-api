@@ -2,6 +2,23 @@
 
 ## 2026-10-11
 
+
+### Recette transverse et durcissement
+
+- Revue complète frontend/backend/RBAC/paiements/sécurité sur la recette publique.
+- Suite backend complète validée : 534 tests, 5 997 assertions, y compris les scénarios de concurrence.
+- Build TypeScript/Vite validé ; lint restauré sous ESLint 9 avec 0 erreur.
+- Audit Composer : aucune vulnérabilité connue dans les dépendances PHP.
+- Audit npm des dépendances de production : aucune vulnérabilité connue après mise à jour de React Router.
+- Ajout d'un écran d'activation des comptes internes par OTP + définition du mot de passe.
+- Ajout d'un indicateur visuel Mode recette piloté par le backend.
+- Alignement UX/RBAC : seul un Superadmin peut proposer/attribuer le rôle Superadmin.
+- Les six acteurs métier sont rendus explicites : Utilisateur, Administrateur, Superadmin, Validateur, Comptabilité, Yempay/prestataire externe.
+- FedaPay reste en sandbox et les payouts automatiques restent désactivés sur la recette.
+- Le compte Superadmin de recette demandé a été créé en attente d'activation OTP ; l'ancien compte membre portant la même adresse a été préservé via un alias Gmail.
+- Voir recette-2026-10-11.md pour les preuves, limites et points résiduels.
+
+
 ### Back-office packs
 
 - Audit du frontend admin : absence d'une vraie page CRUD/versioning des packs.

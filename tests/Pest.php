@@ -197,6 +197,7 @@ function readySeller(array $terms = [], string $method = 'TMONEY'): array
         'user_id' => $member->id,
         'method' => $method,
         'channel' => in_array($method, ['TMONEY', 'FLOOZ'], true) ? 'mobile_money' : 'manual',
+        'country' => 'TG',
         'phone' => '+22890'.str_pad((string) $counter, 6, '0', STR_PAD_LEFT),
     ]);
 
