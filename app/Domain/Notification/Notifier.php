@@ -3,6 +3,7 @@
 namespace App\Domain\Notification;
 
 use App\Domain\Notification\Mail\MemberNoticeMail;
+use App\Domain\Notification\Models\MemberNotification;
 use App\Domain\Settings\SettingsService;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
@@ -41,6 +42,14 @@ class Notifier
         }
 
         [$subject, $lines] = $this->message($event, $data);
+
+        MemberNotification::query()->create([
+            'user_id' => $recipient->id,
+            'event' => $event,
+            'title' => $subject,
+            'message' => implode("\n", $lines),
+            'data' => $data,
+        ]);
 
         try {
             Mail::to($recipient->email)->queue(new MemberNoticeMail($event, $subject, $recipient->organization->legal_name ?? $recipient->full_name, $lines));
