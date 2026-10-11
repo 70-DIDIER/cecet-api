@@ -91,15 +91,27 @@ class MembershipController
      * and validated by the CECT. An attempt already awaiting payment with the same method is returned as is (200).
      * The account becomes ACTIVE only when the provider confirms the payment server-side.
      */
-    public function startPayment(Request $request, StartMembershipPayment $start): JsonResponse
+    public function startPayment(Request $request, StartMembershipPayment $start, DemoActivateMembership $demo, SettingsService $settings): JsonResponse
     {
         $validated = $request->validate([
             'method' => ['nullable', 'string', 'max:30'],
             'payment_phone' => ['nullable', 'string', 'regex:/^\\+228[0-9]{8}$/'],
         ]);
 
+        $member = $this->member($request);
+
+        if (app()->environment('staging') && $settings->boolean('platform.demo_gateway_bypass')) {
+            $membership = $demo->handle($member);
+
+            return response()->json(['data' => [
+                'membership' => new MembershipResource($membership),
+                'account_status' => UserStatus::Active->value,
+                'presentation_mode' => true,
+            ]], 201);
+        }
+
         ['attempt' => $attempt, 'created' => $created] = $start->handle(
-            $this->member($request),
+            $member,
             $validated['method'] ?? null,
             $validated['payment_phone'] ?? null,
         );
