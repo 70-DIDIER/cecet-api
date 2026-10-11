@@ -17,6 +17,7 @@
 - FedaPay reste en sandbox et les payouts automatiques restent désactivés sur la recette.
 - Le compte Superadmin de recette demandé a été créé en attente d'activation OTP ; l'ancien compte membre portant la même adresse a été préservé via un alias Gmail.
 - Voir recette-2026-10-11.md pour les preuves, limites et points résiduels.
+- Version de santé alignée sur le commit API déployé et HSTS ajouté au frontend HTTPS.
 
 
 ### Back-office packs
