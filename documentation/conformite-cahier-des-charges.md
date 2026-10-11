@@ -89,7 +89,7 @@ Légende :
 | --- | --- | --- |
 | Utilisateur | Compte membre, personne physique ou morale | OK |
 | Administrateur | Rôle staff administrateur | OK |
-| Superadmin | Rôle staff superadmin protég�� | OK+ |
+| Superadmin | Rôle staff superadmin protégé | OK+ |
 | Validateur | Rôle staff validateur | OK+ |
 | Comptabilité | Rôle staff comptabilite, séparé du Validateur | OK+ |
 | Yempay / prestataire | Intégration externe par API/webhook, sans session staff implicite | OK+ |
