@@ -16,6 +16,7 @@ use App\Domain\Identity\Http\Controllers\SessionController;
 use App\Domain\Identity\Http\Controllers\StaffActivationController;
 use App\Domain\Identity\Http\Controllers\StepUpController;
 use App\Domain\Membership\Http\Controllers\MemberDashboardController;
+use App\Domain\Membership\Http\Controllers\MemberDocumentController;
 use App\Domain\Membership\Http\Controllers\MembershipController;
 use App\Domain\Merchant\Http\Controllers\MemberMerchantPaymentController;
 use App\Domain\Merchant\Http\Controllers\MerchantAdminController;
@@ -104,6 +105,8 @@ Route::prefix('v1')->name('v1.')->group(function () {
          * Membership of the authenticated member.
          */
         Route::get('me/dashboard', MemberDashboardController::class)->name('me.dashboard');
+        Route::get('me/documents', [MemberDocumentController::class, 'index'])->name('me.documents.index');
+        Route::get('me/documents/{type}.pdf', [MemberDocumentController::class, 'download'])->middleware('throttle:20,1')->name('me.documents.download');
         Route::get('me/membership', [MembershipController::class, 'show'])->name('me.membership.show');
         Route::post('me/membership/payments', [MembershipController::class, 'startPayment'])->middleware('idempotent')->name('me.membership.payments.store');
         Route::get('me/membership/payments/{attempt}', [MembershipController::class, 'showAttempt'])->name('me.membership.payments.show');
