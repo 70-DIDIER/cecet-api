@@ -104,8 +104,8 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::post('me/membership/payments/{attempt}/refresh', [MembershipController::class, 'refreshAttempt'])->middleware('throttle:10,1')->name('me.membership.payments.refresh');
         Route::post('me/payments/{attempt}/declare', [MembershipController::class, 'declarePayment'])->name('me.payments.declare');
 
-        // Demo-only endpoints are never exposed outside automated tests.
-        if (app()->environment('testing')) {
+        // Presentation-only endpoints exist in automated tests and staging, never in production.
+        if (app()->environment(['testing', 'staging'])) {
             Route::post('me/membership/demo-activation', [MembershipController::class, 'demoActivate'])->name('me.membership.demo-activation');
             Route::post('me/payments/{attempt}/demo-settle', [MembershipController::class, 'demoSettle'])->name('me.payments.demo-settle');
         }
