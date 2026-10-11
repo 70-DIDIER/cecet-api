@@ -32,6 +32,9 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login(Login::class)
             ->brandName('CECT')
+            ->brandLogo(asset('admin-assets/img/cect-logo.png'))
+            ->brandLogoHeight('2.5rem')
+            ->favicon(asset('admin-assets/img/cect-logo.png'))
             ->defaultThemeMode(ThemeMode::Light)
             ->colors([
                 'primary' => [
