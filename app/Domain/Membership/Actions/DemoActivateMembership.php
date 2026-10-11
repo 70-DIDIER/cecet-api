@@ -33,7 +33,7 @@ class DemoActivateMembership
 
     public function handle(User $member): Membership
     {
-        if (! $this->app->environment('testing') || ! $this->settings->boolean('platform.demo_gateway_bypass')) {
+        if (! $this->app->environment(['testing', 'staging']) || ! $this->settings->boolean('platform.demo_gateway_bypass')) {
             throw PaymentException::demoUnavailable();
         }
 
