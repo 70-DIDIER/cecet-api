@@ -23,6 +23,7 @@ use App\Domain\Merchant\Http\Controllers\MerchantController;
 use App\Domain\Merchant\Http\Controllers\MerchantDirectoryAdminController;
 use App\Domain\Merchant\Http\Controllers\MerchantDirectoryController;
 use App\Domain\Merchant\Http\Controllers\MerchantPaymentValidationController;
+use App\Domain\Notification\Http\Controllers\NotificationController;
 use App\Domain\Ops\Http\Controllers\OpsHealthController;
 use App\Domain\Payment\Http\Controllers\AdminPaymentController;
 use App\Domain\Payment\Http\Controllers\PaymentWebhookController;
@@ -94,6 +95,10 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::get('me/sessions', [SessionController::class, 'index'])->name('me.sessions.index');
         Route::post('me/sessions/revoke-others', [SessionController::class, 'destroyOthers'])->name('me.sessions.revoke-others');
         Route::delete('me/sessions/{session}', [SessionController::class, 'destroy'])->whereNumber('session')->name('me.sessions.destroy');
+
+        Route::get('me/notifications', [NotificationController::class, 'index'])->name('me.notifications.index');
+        Route::patch('me/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('me.notifications.read-all');
+        Route::patch('me/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('me.notifications.read');
 
         /*
          * Membership of the authenticated member.
