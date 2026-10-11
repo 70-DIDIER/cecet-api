@@ -37,7 +37,8 @@ class AuthenticateUser
         $identifier = mb_strtolower(trim($identifier));
         $throttleKey = 'login:'.hash('sha256', $identifier.'|'.$this->request->ip());
 
-        if (RateLimiter::tooManyAttempts($throttleKey, $this->settings->integer('auth.login_max_attempts'))) {
+        if ($this->loginLockoutEnabled()
+            && RateLimiter::tooManyAttempts($throttleKey, $this->settings->integer('auth.login_max_attempts'))) {
             $this->securityLogger->record('auth.login_locked', SecuritySeverity::Warning, identifier: $identifier);
 
             throw IdentityException::tooManyLoginAttempts(RateLimiter::availableIn($throttleKey));
@@ -48,7 +49,10 @@ class AuthenticateUser
         $passwordMatches = $this->passwordMatches($user, $password);
 
         if ($user === null || ! $passwordMatches) {
-            RateLimiter::hit($throttleKey, $this->settings->integer('auth.login_lockout_seconds'));
+            if ($this->loginLockoutEnabled()) {
+                RateLimiter::hit($throttleKey, $this->settings->integer('auth.login_lockout_seconds'));
+            }
+
             $this->securityLogger->record('auth.login_failed', userId: $user?->id, identifier: $identifier);
 
             throw IdentityException::invalidCredentials();
@@ -92,6 +96,17 @@ class AuthenticateUser
         }
 
         return Hash::check($password, $user->password);
+    }
+
+
+    /**
+     * Lockouts are deliberately disabled outside production so test/staging accounts
+     * cannot block operators during functional recette. Production keeps brute-force
+     * protection regardless of staging behaviour.
+     */
+    private function loginLockoutEnabled(): bool
+    {
+        return app()->environment('production');
     }
 
     private function ensureCanAuthenticate(User $user): void
