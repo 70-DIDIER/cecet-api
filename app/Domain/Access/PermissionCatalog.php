@@ -29,7 +29,7 @@ final class PermissionCatalog
             'staff.view' => ['description' => 'Consulter les comptes internes.'],
             'staff.manage' => ['description' => 'Créer, suspendre et attribuer des rôles aux comptes internes (jamais Superadmin).'],
             'roles.view' => ['description' => 'Consulter les rôles et permissions.'],
-            'roles.manage' => ['description' => 'Créer des rôles et modifier leurs permissions.', 'reserved' => true],
+            'roles.manage' => ['description' => 'Modifier les permissions des rôles internes système.', 'reserved' => true],
             'settings.view' => ['description' => 'Consulter le paramétrage.'],
             'settings.update' => ['description' => 'Modifier les paramètres de niveau Administrateur.'],
             'settings.update_critical' => ['description' => 'Modifier les paramètres critiques (niveau Superadmin).', 'reserved' => true],
@@ -48,7 +48,7 @@ final class PermissionCatalog
             'payouts.view' => ['description' => 'Consulter les payouts et le rapprochement.'],
             'payouts.retry' => ['description' => 'Relancer les items de payout en échec.'],
             'payouts.settle_manual' => ['description' => 'Enregistrer un règlement manuel (banque/espèces).'],
-            'payouts.approve_manual' => ['description' => 'Approuver un règlement manuel au-delà du seuil (maker-checker).'],
+            'payouts.approve_manual' => ['description' => 'Approuver un règlement manuel au-delà du seuil (maker-checker).', 'reserved' => true],
             'reports.view' => ['description' => 'Consulter les rapports.'],
             'reports.export' => ['description' => 'Exporter les rapports et snapshots.'],
             'imports.manage' => ['description' => 'Prévisualiser et approuver un import consolidé.'],
@@ -67,16 +67,16 @@ final class PermissionCatalog
         return [
             self::SUPERADMIN => ['label' => 'Superadmin', 'permissions' => []],
             self::ADMIN => ['label' => 'Administrateur', 'permissions' => [
-                'members.view', 'members.manage', 'staff.view', 'staff.manage', 'roles.view', 'user_packs.view', 'payments.validate_manual',
+                'members.view', 'members.manage', 'staff.view', 'staff.manage', 'roles.view', 'user_packs.view',
                 'settings.view', 'settings.update', 'audit.view', 'packs.view', 'packs.manage',
                 'yem_validations.view', 'payments.view', 'payouts.view', 'reports.view', 'reports.export', 'imports.manage', 'api_docs.view',
             ]],
             self::VALIDATOR => ['label' => 'Validateur', 'permissions' => [
-                'yem_validations.view', 'yem_validations.confirm', 'yem_validations.dispute', 'payments.validate_manual',
+                'yem_validations.view', 'yem_validations.confirm', 'yem_validations.dispute',
             ]],
             self::ACCOUNTING => ['label' => 'Comptabilité', 'permissions' => [
-                'yem_validations.view', 'payments.view', 'user_packs.view', 'payouts.view', 'payouts.retry', 'payouts.settle_manual',
-                'payouts.approve_manual', 'reports.view', 'reports.export',
+                'yem_validations.view', 'payments.validate_manual', 'payments.view', 'user_packs.view',
+                'payouts.view', 'payouts.retry', 'payouts.settle_manual', 'reports.view', 'reports.export',
             ]],
         ];
     }
@@ -89,6 +89,7 @@ final class PermissionCatalog
     public function incompatiblePairs(): array
     {
         return [
+            ['yem_validations.confirm', 'payments.validate_manual'],
             ['yem_validations.confirm', 'payouts.settle_manual'],
             ['yem_validations.confirm', 'payouts.retry'],
             ['yem_validations.confirm', 'payouts.approve_manual'],

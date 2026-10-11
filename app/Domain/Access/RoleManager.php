@@ -31,6 +31,8 @@ class RoleManager
      */
     public function create(User $actor, string $name, string $label, array $permissions): Role
     {
+        throw AccessException::customRolesDisabled();
+
         $this->assertAssignable($permissions);
 
         if (Role::query()->where('name', $name)->where('guard_name', SyncAccessCatalog::GUARD)->exists()) {
@@ -58,6 +60,10 @@ class RoleManager
      */
     public function syncPermissions(User $actor, Role $role, array $permissions, string $reason): Role
     {
+        if (! $this->catalog->isSystemRole($role->name)) {
+            throw AccessException::customRolesDisabled();
+        }
+
         if ($role->name === PermissionCatalog::SUPERADMIN) {
             throw AccessException::roleProtected($role->name);
         }
@@ -110,6 +116,10 @@ class RoleManager
      */
     public function resolveAssignableRoles(array $roleNames, ?string $userId = null): array
     {
+        if (collect($roleNames)->contains(fn (string $role): bool => ! $this->catalog->isSystemRole($role))) {
+            throw AccessException::customRolesDisabled();
+        }
+
         $roles = Role::query()->with('permissions')->whereIn('name', $roleNames)->where('guard_name', SyncAccessCatalog::GUARD)->get();
         $missing = array_values(array_diff($roleNames, $roles->pluck('name')->all()));
 

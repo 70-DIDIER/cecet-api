@@ -41,7 +41,7 @@ class RoleController
      */
     public function index(): JsonResponse
     {
-        $roles = Role::query()->with('permissions')->orderBy('name')->get();
+        $roles = Role::query()->with('permissions')->where('is_system', true)->orderBy('name')->get();
         $holders = DB::table(config()->string('permission.table_names.model_has_roles'))
             ->selectRaw('role_id, count(*) as holders')
             ->groupBy('role_id')

@@ -11,6 +11,11 @@ final class AccessException extends ApiException
         return new self('ROLE_PROTECTED', "Le rôle {$role} est protégé et ne peut pas être modifié ainsi.", 422, ['role' => $role]);
     }
 
+    public static function customRolesDisabled(): self
+    {
+        return new self('CUSTOM_ROLES_DISABLED', 'Les rôles internes CECT sont fixes ; configurez leurs permissions au lieu de créer un nouveau rôle.', 422);
+    }
+
     public static function roleInUse(string $role): self
     {
         return new self('ROLE_IN_USE', "Le rôle {$role} est encore attribué à des comptes.", 409, ['role' => $role]);

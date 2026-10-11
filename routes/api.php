@@ -196,11 +196,9 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::prefix('admin')->name('admin.')->middleware('staff')->group(function () {
             Route::get('permissions', [RoleController::class, 'permissions'])->middleware('can:roles.view')->name('permissions.index');
             Route::get('roles', [RoleController::class, 'index'])->middleware('can:roles.view')->name('roles.index');
-            Route::middleware(['can:roles.manage', 'step-up'])->group(function () {
-                Route::post('roles', [RoleController::class, 'store'])->middleware('idempotent')->name('roles.store');
-                Route::put('roles/{role}/permissions', [RoleController::class, 'updatePermissions'])->name('roles.permissions.update');
-                Route::delete('roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
-            });
+            Route::put('roles/{role}/permissions', [RoleController::class, 'updatePermissions'])
+                ->middleware(['can:roles.manage', 'step-up'])
+                ->name('roles.permissions.update');
 
             foreach ([UserKind::Staff->value => 'staff', UserKind::Member->value => 'members'] as $kind => $segment) {
                 Route::prefix($segment)->name("{$segment}.")->group(function () use ($kind, $segment) {
