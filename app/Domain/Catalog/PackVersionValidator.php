@@ -21,8 +21,6 @@ use Illuminate\Validation\ValidationException;
  */
 class PackVersionValidator
 {
-    private const BASIS_POINTS = 10000;
-
     private const DEFAULT_SALE_RATE_KEY = 'rates.sale_xof_per_yem';
 
     public function __construct(private readonly SettingsService $settings) {}
@@ -107,9 +105,9 @@ class PackVersionValidator
     }
 
     /**
-     * A Consommateur pack can be described as on the former site: a reference value and a discount. The member then
-     * pays the reference value minus the discount, and receives the reference value in YEM at the sale rate, spread
-     * evenly over the periods (C1: 300 000 F at 15 % = 255 000 F paid, 300 000 / 650 / 12 = 38.461538 YEM a month).
+     * A Consommateur pack can be described by a reference value. The member pays it in full and receives it in YEM at
+     * the sale rate, spread evenly over the periods (C1: 300 000 F paid, 300 000 / 650 / 12 = 38.461538 YEM a month).
+     * The cashback, if any, is added when the pack is bought, not here: it never changes the price.
      * The rate used is snapshotted in the rules; explicit price or quota values still take precedence.
      *
      * @param  array<string, mixed>  $input
@@ -119,14 +117,13 @@ class PackVersionValidator
     {
         $rules = is_array($input['rules'] ?? null) ? $input['rules'] : [];
         $reference = $rules['reference_value_xof'] ?? null;
-        $discount = $rules['discount_bps'] ?? 0;
 
-        if ($family !== PackFamily::Consommateur || ! is_int($reference) || $reference < 1 || ! is_int($discount) || $discount < 0 || $discount >= self::BASIS_POINTS) {
+        if ($family !== PackFamily::Consommateur || ! is_int($reference) || $reference < 1) {
             return $input;
         }
 
         if (! isset($input['price_xof'])) {
-            $input['price_xof'] = intdiv($reference * (self::BASIS_POINTS - $discount) + self::BASIS_POINTS / 2, self::BASIS_POINTS);
+            $input['price_xof'] = $reference;
         }
 
         $cycles = $input['period']['cycles'] ?? null;

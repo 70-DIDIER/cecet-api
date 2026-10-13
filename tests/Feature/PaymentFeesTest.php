@@ -22,6 +22,7 @@ beforeEach(function () {
     Mail::fake();
     $this->settings = app(SettingsService::class);
     $this->calculator = app(PaymentFeeCalculator::class);
+    $this->settings->set('payment.customer_bears_fees', true, 'Frais à la charge du client pour ces scénarios');
 });
 
 function pendingMemberToken(): array

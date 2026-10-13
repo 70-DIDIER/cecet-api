@@ -59,6 +59,17 @@ class SettingsService
         return $value;
     }
 
+    /**
+     * Instant from which the version of a setting effective at the given instant applies (to trace which rule was used).
+     */
+    public function effectiveFrom(string $key, ?DateTimeInterface $at = null): ?string
+    {
+        $instant = CarbonImmutable::instance($at ?? now());
+
+        return collect($this->cachedVersions($key))
+            ->first(fn (array $version) => CarbonImmutable::parse($version['effective_from'])->lessThanOrEqualTo($instant))['effective_from'] ?? null;
+    }
+
     public function integer(string $key, ?DateTimeInterface $at = null): int
     {
         $value = $this->get($key, $at);

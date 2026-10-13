@@ -40,7 +40,7 @@ class LegacyCatalogSeeder extends Seeder
     ];
 
     /**
-     * Reference values; the member pays them minus the discount and receives them in YEM at the sale rate.
+     * Reference values; the member pays them in full and receives them in YEM at the sale rate, plus the cashback if the Superadmin enabled one.
      *
      * @var array<string, int>
      */
@@ -52,8 +52,6 @@ class LegacyCatalogSeeder extends Seeder
         'C5' => 3000000,
         'C6' => 6000000,
     ];
-
-    private const CONSUMER_DISCOUNT_BPS = 1500;
 
     /**
      * @var array<string, array{name: string, price: int, total: int}>
@@ -84,7 +82,7 @@ class LegacyCatalogSeeder extends Seeder
 
             $this->seedPlan($auditLogger, $validator, PackFamily::Personnel, 'PERSO', 'Perso', 0, [
                 'price_xof' => 0,
-                'rules' => ['discount_bps' => self::CONSUMER_DISCOUNT_BPS, 'min_topup_xof' => 5000, 'rate_setting_key' => 'rates.sale_xof_per_yem'],
+                'rules' => ['min_topup_xof' => 5000, 'rate_setting_key' => 'rates.sale_xof_per_yem'],
             ]);
 
             $level = 0;
@@ -92,7 +90,7 @@ class LegacyCatalogSeeder extends Seeder
             foreach (self::CONSOMMATEUR as $code => $reference) {
                 $this->seedPlan($auditLogger, $validator, PackFamily::Consommateur, $code, "Consommateur {$code}", ++$level, [
                     'period' => ['unit' => 'month', 'every' => 1, 'cycles' => 12],
-                    'rules' => ['reference_value_xof' => $reference, 'discount_bps' => self::CONSUMER_DISCOUNT_BPS],
+                    'rules' => ['reference_value_xof' => $reference],
                 ]);
             }
 

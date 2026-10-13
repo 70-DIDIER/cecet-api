@@ -23,7 +23,7 @@ beforeEach(function () {
     $attemptId = $this->withToken(tokenFor($this->member))
         ->postJson('/api/v1/me/membership/payments', ['method' => 'CASH'], ['Idempotency-Key' => (string) Str::ulid()])
         ->json('data.id');
-    $this->withToken(tokenFor($this->validator, withStepUp: true))
+    $this->withToken(tokenFor($this->accounting, withStepUp: true))
         ->postJson("/api/v1/validations/payments/{$attemptId}/approve", ['received_amount' => 25000, 'reference' => 'Reçu 1'], ['Idempotency-Key' => (string) Str::ulid()])
         ->assertOk();
 
@@ -58,7 +58,8 @@ describe('dashboard', function () {
         expect($data['summary'])->toBeNull()
             ->and($data['series'])->toBeNull()
             ->and($data['recent_payments'])->toBeNull()
-            ->and($data['pending_validations']['payments'])->toBeInt();
+            ->and($data['pending_validations']['payments'])->toBeNull()
+            ->and($data['pending_validations']['yem'])->toBeInt();
     });
 
     it('is closed to members and to anonymous callers', function () {

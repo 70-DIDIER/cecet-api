@@ -3,9 +3,11 @@
 namespace App\Domain\Subscription\Actions;
 
 use App\Domain\Audit\AuditLogger;
+use App\Domain\Catalog\Enums\PackFamily;
 use App\Domain\Notification\Notifier;
 use App\Domain\Payment\Models\PaymentIntent;
 use App\Domain\Quota\Models\QuotaAccount;
+use App\Domain\Subscription\CashbackCalculator;
 use App\Domain\Subscription\Enums\UserPackStatus;
 use App\Domain\Subscription\Models\PackPeriod;
 use App\Domain\Subscription\Models\UserPack;
@@ -22,9 +24,25 @@ class ActivateUserPack
 {
     public function __construct(
         private readonly PeriodRoller $roller,
+        private readonly CashbackCalculator $cashback,
         private readonly AuditLogger $auditLogger,
         private readonly Notifier $notifier,
     ) {}
+
+    /**
+     * Number of periods to wait before the first allowance is credited. A Vendeur pack only lets its holder sell after
+     * the first month from the subscription, unless the version says otherwise ("first_credit_delay_periods").
+     */
+    private function firstCreditDelay(UserPack $pack): int
+    {
+        $configured = $pack->version->rules['first_credit_delay_periods'] ?? null;
+
+        if (is_int($configured) && $configured >= 0) {
+            return $configured;
+        }
+
+        return $pack->family === PackFamily::Vendeur ? 1 : 0;
+    }
 
     public function handle(UserPack $pack, ?PaymentIntent $intent = null): UserPack
     {
@@ -46,13 +64,19 @@ class ActivateUserPack
         ]);
 
         if ($version->period_unit !== null && $version->period_every !== null && $version->period_cycles !== null && $version->quota_per_period !== null) {
+            $delay = $this->firstCreditDelay($pack);
+            $cashbackShares = $this->cashback->spread($pack->yem_cashback, $version->period_cycles);
+
             for ($number = 1; $number <= $version->period_cycles; $number++) {
+                $cashbackShare = $cashbackShares[$number - 1];
+
                 $period = PackPeriod::query()->create([
                     'user_pack_id' => $pack->id,
                     'number' => $number,
-                    'starts_at' => $version->period_unit->addTo($now, ($number - 1) * $version->period_every),
-                    'ends_at' => $version->period_unit->addTo($now, $number * $version->period_every),
-                    'quota' => $version->quota_per_period,
+                    'starts_at' => $version->period_unit->addTo($now, ($number - 1 + $delay) * $version->period_every),
+                    'ends_at' => $version->period_unit->addTo($now, ($number + $delay) * $version->period_every),
+                    'quota' => YemQuantity::add($version->quota_per_period, $cashbackShare),
+                    'cashback_quota' => $cashbackShare,
                 ]);
 
                 $expiresAt = $period->ends_at;

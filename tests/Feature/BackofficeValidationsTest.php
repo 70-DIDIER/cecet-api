@@ -16,6 +16,7 @@ beforeEach(function () {
     configureCectPernum();
 
     $this->validator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
+    $this->accounting = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
     $this->member = User::factory()->status(UserStatus::PendingPayment)->create(['first_name' => 'Yendoukoa', 'last_name' => 'NAKORE']);
     $this->member->pernumIdentities()->create(['pernum' => '1001043953', 'kind' => 'personal', 'status' => 'declared']);
 
@@ -32,7 +33,7 @@ function stepUp(): array
 }
 
 it('lists what awaits a decision with the member, the amount and the declared reference', function () {
-    $this->actingAs($this->validator, 'web')->get('/backoffice/validations')
+    $this->actingAs($this->accounting, 'web')->get('/backoffice/validations')
         ->assertOk()
         ->assertSee('Adhésion')
         ->assertSee('Yendoukoa NAKORE')
@@ -43,7 +44,7 @@ it('lists what awaits a decision with the member, the amount and the declared re
 });
 
 it('asks for a step-up before a decision and does not decide', function () {
-    $this->actingAs($this->validator, 'web')
+    $this->actingAs($this->accounting, 'web')
         ->from('/backoffice/validations')
         ->post("/backoffice/validations/paiements/{$this->attemptId}/valider", ['received_amount' => 25000, 'reference' => 'Reçu 1'])
         ->assertRedirect(route('backoffice.step-up', ['return' => '/backoffice/validations']));
@@ -52,19 +53,19 @@ it('asks for a step-up before a decision and does not decide', function () {
 });
 
 it('validates a payment once the identity is confirmed, audits it and informs the member', function () {
-    $this->actingAs($this->validator, 'web')->withSession(stepUp())
+    $this->actingAs($this->accounting, 'web')->withSession(stepUp())
         ->post("/backoffice/validations/paiements/{$this->attemptId}/valider", ['received_amount' => 25000, 'reference' => 'Reçu 1', 'comment' => 'Espèces comptées'])
         ->assertRedirect(route('backoffice.validations'))
         ->assertSessionHas('status');
 
     expect($this->member->refresh()->status)->toBe(UserStatus::Active)
-        ->and(AuditEvent::query()->where('action', 'payments.manual_validated')->sole()->actor_id)->toBe($this->validator->id);
+        ->and(AuditEvent::query()->where('action', 'payments.manual_validated')->sole()->actor_id)->toBe($this->accounting->id);
 
     $this->get('/backoffice/validations?statut=historique')->assertOk()->assertSee('Validé');
 });
 
 it('refuses a wrong amount with a message and leaves the payment waiting', function () {
-    $this->actingAs($this->validator, 'web')->withSession(stepUp())
+    $this->actingAs($this->accounting, 'web')->withSession(stepUp())
         ->from('/backoffice/validations')
         ->post("/backoffice/validations/paiements/{$this->attemptId}/valider", ['received_amount' => 20000, 'reference' => 'Reçu 1'])
         ->assertRedirect('/backoffice/validations')
@@ -74,7 +75,7 @@ it('refuses a wrong amount with a message and leaves the payment waiting', funct
 });
 
 it('rejects a payment with a mandatory reason', function () {
-    $this->actingAs($this->validator, 'web')->withSession(stepUp())
+    $this->actingAs($this->accounting, 'web')->withSession(stepUp())
         ->post("/backoffice/validations/paiements/{$this->attemptId}/rejeter", ['reason' => 'ok'])
         ->assertSessionHasErrors('reason');
 
@@ -85,7 +86,7 @@ it('rejects a payment with a mandatory reason', function () {
 });
 
 it('keeps the decisions to the roles that hold the permission', function () {
-    $accounting = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
+    $accounting = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
 
     $this->actingAs($accounting, 'web')->withSession(stepUp())
         ->post("/backoffice/validations/paiements/{$this->attemptId}/valider", ['received_amount' => 25000, 'reference' => 'x'])

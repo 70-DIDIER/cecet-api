@@ -401,10 +401,11 @@ it('records a payment received while the account is suspended without reactivati
         ->and($membership->refresh()->status->value)->toBe('active');
 });
 
-it('does not resolve the fake provider in staging', function () {
+it('resolves only the simulator in staging, never the real provider', function () {
     app()->detectEnvironment(fn () => 'staging');
 
-    expect(fn () => app(PaymentProviderManager::class)->provider('fake'))->toThrow(PaymentException::class);
+    expect(app(PaymentProviderManager::class)->provider('fake'))->toBeInstanceOf(FakePaymentProvider::class)
+        ->and(fn () => app(PaymentProviderManager::class)->provider('fedapay'))->toThrow(PaymentException::class);
 });
 
 it('exposes neither the fake provider nor the demo bypass in production', function () {
@@ -446,20 +447,20 @@ describe('demo gateway bypass', function () {
     });
 
     it('approves a fake-provider payment on demand and activates the account', function () {
-        app(SettingsService::class)->set('platform.demo_gateway_bypass', true, 'Simulation en attendant le prestataire');
         $attemptId = startMembershipPayment($this->member)->assertCreated()->json('data.id');
 
-        $this->withToken(tokenFor($this->member))->postJson("/api/v1/me/payments/{$attemptId}/demo-settle")
+        $this->withToken(tokenFor($this->member))->postJson("/api/v1/me/payments/{$attemptId}/simulate")
             ->assertOk()
             ->assertJsonPath('data.status', 'approved');
 
         expect($this->member->refresh()->status)->toBe(UserStatus::Active);
     });
 
-    it('refuses to settle a payment while the setting is off', function () {
+    it('refuses to simulate a payment outside testing and staging', function () {
         $attemptId = startMembershipPayment($this->member)->assertCreated()->json('data.id');
+        app()->detectEnvironment(fn () => 'production');
 
-        $this->withToken(tokenFor($this->member))->postJson("/api/v1/me/payments/{$attemptId}/demo-settle")
+        $this->withToken(tokenFor($this->member))->postJson("/api/v1/me/payments/{$attemptId}/simulate")
             ->assertNotFound()
             ->assertJsonPath('code', 'DEMO_MODE_UNAVAILABLE');
 

@@ -204,18 +204,19 @@ describe('manual settlements', function () {
 
     it('requires a second person above the threshold (maker-checker)', function () {
         $batch = confirmedSale('3200');
-        $settlementId = financePost($this->accounting, "payouts/{$batch->id}/manual-settlements", ['method' => 'BANK_TRANSFER', 'amount' => 1600000, 'reference' => 'VIR-2026-001', 'paid_at' => now()->toIso8601String()])
+        $maker = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
+        $settlementId = financePost($maker, "payouts/{$batch->id}/manual-settlements", ['method' => 'BANK_TRANSFER', 'amount' => 1600000, 'reference' => 'VIR-2026-001', 'paid_at' => now()->toIso8601String()])
             ->assertCreated()
             ->assertJsonPath('data.status', 'pending_approval')
             ->assertJsonPath('data.payout.status', 'manual_required')
             ->json('data.settlement_id');
 
-        financePost($this->accounting, "manual-settlements/{$settlementId}/approve")->assertForbidden()->assertJsonPath('code', 'MAKER_CHECKER_VIOLATION');
+        financePost($maker, "manual-settlements/{$settlementId}/approve")->assertForbidden()->assertJsonPath('code', 'MAKER_CHECKER_VIOLATION');
         expect(SecurityEvent::query()->where('event_type', 'finance.maker_checker_violation')->exists())->toBeTrue();
 
-        $this->withToken(tokenFor($this->accounting))->getJson('/api/v1/finance/manual-settlements')->assertJsonCount(1, 'data');
+        $this->withToken(tokenFor($maker))->getJson('/api/v1/finance/manual-settlements')->assertJsonCount(1, 'data');
 
-        $checker = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
+        $checker = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
         financePost($checker, "manual-settlements/{$settlementId}/approve")->assertOk()->assertJsonPath('data.status', 'applied');
 
         expect($batch->refresh()->status->value)->toBe('paid');
@@ -236,7 +237,7 @@ describe('manual settlements', function () {
         $batch = confirmedSale('3200');
         $first = financePost($this->accounting, "payouts/{$batch->id}/manual-settlements", ['method' => 'BANK_TRANSFER', 'amount' => 1600000, 'reference' => 'VIR-ERR', 'paid_at' => now()->toIso8601String()])->json('data.settlement_id');
 
-        financePost(User::factory()->staff(PermissionCatalog::ACCOUNTING)->create(), "manual-settlements/{$first}/reject", ['reason' => 'Référence de virement erronée'])->assertJsonPath('data.status', 'rejected');
+        financePost(User::factory()->staff(PermissionCatalog::SUPERADMIN)->create(), "manual-settlements/{$first}/reject", ['reason' => 'Référence de virement erronée'])->assertJsonPath('data.status', 'rejected');
         financePost($this->accounting, "payouts/{$batch->id}/manual-settlements", ['method' => 'BANK_TRANSFER', 'amount' => 1600000, 'reference' => 'VIR-OK', 'paid_at' => now()->toIso8601String()])->assertJsonPath('data.status', 'pending_approval');
     });
 });

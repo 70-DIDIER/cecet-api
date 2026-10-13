@@ -44,6 +44,7 @@ it('answers identically for a wrong password and an unknown account', function (
 });
 
 it('locks the login temporarily after the configured number of failures', function () {
+    app()->detectEnvironment(fn () => 'production');
     $member = User::factory()->create();
     app(SettingsService::class)->set('auth.login_max_attempts', 3, 'Durcissement');
 

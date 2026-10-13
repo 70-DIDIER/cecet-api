@@ -16,12 +16,13 @@ use Illuminate\Support\Carbon;
  * @property int $number
  * @property Carbon $starts_at
  * @property Carbon $ends_at
- * @property string $quota
+ * @property string $quota total granted by the period (bought + cashback)
+ * @property string $cashback_quota part of the quota offered as cashback
  * @property Carbon|null $credited_at
  * @property Carbon|null $closed_at
  * @property-read UserPack $userPack
  */
-#[Fillable(['user_pack_id', 'number', 'starts_at', 'ends_at', 'quota', 'credited_at', 'closed_at'])]
+#[Fillable(['user_pack_id', 'number', 'starts_at', 'ends_at', 'quota', 'cashback_quota', 'credited_at', 'closed_at'])]
 class PackPeriod extends Model
 {
     use HasUlids;

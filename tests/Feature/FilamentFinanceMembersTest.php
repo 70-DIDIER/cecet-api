@@ -27,7 +27,7 @@ beforeEach(function () {
     $this->admin = User::factory()->staff(PermissionCatalog::ADMIN)->create();
     $this->validator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
     $this->accounting = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
-    $this->checker = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
+    $this->checker = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
 });
 
 function stepUpSession(): array
@@ -145,7 +145,7 @@ describe('payouts', function () {
 
     it('refuses that the same person approves their own settlement', function () {
         $batch = payoutFor('4000', 'CASH');
-        $this->actingAs($this->accounting, 'web')->withSession(stepUpSession());
+        $this->actingAs($this->checker, 'web')->withSession(stepUpSession());
 
         Livewire::test(ViewPayout::class, ['record' => $batch->getKey()])
             ->callAction('settle', ['method' => 'CASH', 'amount' => $batch->remaining_amount, 'reference' => 'Reçu 13', 'paid_at' => now()->toDateTimeString()]);

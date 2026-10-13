@@ -13,6 +13,7 @@ use App\Domain\Payment\Models\PaymentAttempt;
 use App\Domain\Payment\PaymentCheckout;
 use App\Domain\Quota\Exceptions\QuotaException;
 use App\Domain\Settings\SettingsService;
+use App\Domain\Subscription\CashbackCalculator;
 use App\Domain\Subscription\Enums\PackTopupStatus;
 use App\Domain\Subscription\Enums\UserPackStatus;
 use App\Domain\Subscription\Exceptions\SubscriptionException;
@@ -26,18 +27,17 @@ use Illuminate\Support\Facades\DB;
  * A member tops up their Personnel pack ("rechargement Perso"): they choose the amount, at least the minimum of the
  * pack's version, and receive the YEM it buys once the payment is confirmed or validated.
  *
- * The amount paid is the discounted price: 5 000 F at 15 % buy 5 000 / 0.85 = 5 882 F worth of YEM, i.e. 9.049773 YEM
- * at 650 F. The discount and the rate are snapshotted on the top-up. One top-up at a time is awaiting payment per
+ * The amount paid is never reduced: 5 000 F at 650 F buy 7.692307 YEM, and the cashback rule (Superadmin setting) adds
+ * its bonus in YEM on top. The rate and the cashback calculation are snapshotted on the top-up. One top-up at a time is awaiting payment per
  * pack: asking again with the same amount resumes it, a different amount replaces it if nothing was paid or declared.
  */
 class RequestPackTopup
 {
-    private const BASIS_POINTS = 10000;
-
     private const DEFAULT_RATE_KEY = 'rates.sale_xof_per_yem';
 
     public function __construct(
         private readonly SettingsService $settings,
+        private readonly CashbackCalculator $cashback,
         private readonly CollectionRouter $router,
         private readonly PaymentCheckout $checkout,
         private readonly AuditLogger $auditLogger,
@@ -101,12 +101,11 @@ class RequestPackTopup
         }
 
         if ($topup === null) {
-            $discount = is_int($rules['discount_bps'] ?? null) ? $rules['discount_bps'] : 0;
             $rateKey = is_string($rules['rate_setting_key'] ?? null) ? $rules['rate_setting_key'] : self::DEFAULT_RATE_KEY;
             $rate = $this->settings->integer($rateKey);
-            $quantity = bcdiv((string) ($amount * self::BASIS_POINTS), (string) ((self::BASIS_POINTS - $discount) * $rate), YemQuantity::SCALE);
+            $quote = $this->cashback->quote($pack->family, bcdiv((string) $amount, (string) $rate, YemQuantity::SCALE));
 
-            if (! YemQuantity::isPositive($quantity)) {
+            if (! YemQuantity::isPositive($quote->yemBase)) {
                 throw QuotaException::invalidQuantity();
             }
 
@@ -115,16 +114,23 @@ class RequestPackTopup
                 'user_pack_id' => $pack->id,
                 'status' => PackTopupStatus::PendingPayment,
                 'amount_xof' => $amount,
-                'discount_bps' => $discount,
+                'cashback_bps' => $quote->rateBps,
+                'yem_base' => $quote->yemBase,
+                'yem_cashback' => $quote->yemCashback,
+                'cashback_rounding' => $quote->rounding,
+                'cashback_rule_effective_from' => $quote->ruleEffectiveFrom,
+                'calculated_at' => $quote->calculatedAt,
                 'rate_setting_key' => $rateKey,
                 'rate_xof_per_yem' => $rate,
-                'quantity' => $quantity,
+                'quantity' => $quote->yemTotal,
             ]);
 
             $this->auditLogger->record('packs.topup_requested', $topup, after: [
                 'amount_xof' => $amount,
-                'discount_bps' => $discount,
+                'cashback_bps' => $quote->rateBps,
                 'rate_xof_per_yem' => $rate,
+                'yem_base' => $quote->yemBase,
+                'yem_cashback' => $quote->yemCashback,
                 'quantity' => $topup->quantity,
             ], actor: $member);
         }

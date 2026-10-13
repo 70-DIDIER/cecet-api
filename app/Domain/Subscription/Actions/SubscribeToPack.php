@@ -4,6 +4,7 @@ namespace App\Domain\Subscription\Actions;
 
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Catalog\Models\PackPlan;
+use App\Domain\Catalog\Models\PackVersion;
 use App\Domain\Identity\Enums\UserStatus;
 use App\Domain\Payment\CollectionRouter;
 use App\Domain\Payment\Enums\PaymentAttemptStatus;
@@ -11,10 +12,12 @@ use App\Domain\Payment\Enums\PaymentPurpose;
 use App\Domain\Payment\Models\PaymentAttempt;
 use App\Domain\Payment\PaymentCheckout;
 use App\Domain\Settings\SettingsService;
+use App\Domain\Subscription\CashbackCalculator;
 use App\Domain\Subscription\Enums\UserPackStatus;
 use App\Domain\Subscription\Exceptions\SubscriptionException;
 use App\Domain\Subscription\Models\UserPack;
 use App\Models\User;
+use App\Support\YemQuantity;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -28,6 +31,7 @@ class SubscribeToPack
 {
     public function __construct(
         private readonly SettingsService $settings,
+        private readonly CashbackCalculator $cashback,
         private readonly CollectionRouter $router,
         private readonly PaymentCheckout $checkout,
         private readonly ActivateUserPack $activate,
@@ -99,14 +103,20 @@ class SubscribeToPack
                 'price_xof' => $version->price_xof,
             ]);
 
+            $this->freezeCashback($pack, $version);
+
             $this->auditLogger->record('packs.subscribed', $pack, after: [
                 'plan_code' => $plan->code,
                 'version' => $version->version,
                 'price_xof' => $version->price_xof,
+                'cashback_bps' => $pack->cashback_bps,
+                'yem_base' => $pack->yem_base,
+                'yem_cashback' => $pack->yem_cashback,
             ], actor: $member);
         } elseif ($pack->pack_version_id !== $version->id && ! $this->hasInFlightAttempt($pack)) {
             // Still unpaid and nothing awaiting payment: the member buys what is currently published.
             $pack->forceFill(['pack_version_id' => $version->id, 'price_xof' => $version->price_xof])->save();
+            $this->freezeCashback($pack, $version);
         }
 
         $pack->setRelation('plan', $plan);
@@ -127,6 +137,28 @@ class SubscribeToPack
         );
 
         return ['user_pack' => $pack, 'attempt' => $prepared['attempt'], 'reused' => $prepared['reused']];
+    }
+
+    /**
+     * The YEM the pack grants over its whole term and the cashback offered on top are frozen with the purchase:
+     * later changes of the rule never recalculate it. The price paid is untouched.
+     */
+    private function freezeCashback(UserPack $pack, PackVersion $version): void
+    {
+        if ($version->quota_per_period === null || $version->period_cycles === null) {
+            return;
+        }
+
+        $quote = $this->cashback->quote($pack->family, YemQuantity::times($version->quota_per_period, $version->period_cycles));
+
+        $pack->forceFill([
+            'cashback_bps' => $quote->rateBps,
+            'yem_base' => $quote->yemBase,
+            'yem_cashback' => $quote->yemCashback,
+            'cashback_rounding' => $quote->rounding,
+            'cashback_rule_effective_from' => $quote->ruleEffectiveFrom,
+            'calculated_at' => $quote->calculatedAt,
+        ])->save();
     }
 
     private function assertWithinStructuredLimit(User $member, PackPlan $plan): void

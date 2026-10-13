@@ -38,6 +38,14 @@ class QuotaLedger
     }
 
     /**
+     * Grants the YEM offered as cashback, on its own entry so that it is never mixed with the YEM bought.
+     */
+    public function creditCashback(UserPack $pack, string $quantity, string $idempotencyKey, ?PackPeriod $period = null, ?string $reason = null): QuotaLedgerEntry
+    {
+        return $this->apply($pack, LedgerEntryType::CashbackCredit, $quantity, $idempotencyKey, period: $period, reason: $reason);
+    }
+
+    /**
      * Sets quota aside for an open operation. available -= quantity, reserved += quantity.
      */
     public function reserve(UserPack $pack, string $quantity, string $idempotencyKey, ?Model $source = null): QuotaLedgerEntry
@@ -175,7 +183,7 @@ class QuotaLedger
         $negative = YemQuantity::negate($quantity);
 
         return match ($type) {
-            LedgerEntryType::Credit => ['available' => $quantity, 'reserved' => $zero, 'consumed' => $zero],
+            LedgerEntryType::Credit, LedgerEntryType::CashbackCredit => ['available' => $quantity, 'reserved' => $zero, 'consumed' => $zero],
             LedgerEntryType::Reserve => ['available' => $negative, 'reserved' => $quantity, 'consumed' => $zero],
             LedgerEntryType::Release => ['available' => $quantity, 'reserved' => $negative, 'consumed' => $zero],
             LedgerEntryType::Consume => ['available' => $zero, 'reserved' => $negative, 'consumed' => $quantity],

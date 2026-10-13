@@ -13,6 +13,7 @@ beforeEach(function () {
     Mail::fake();
     $this->admin = User::factory()->staff(PermissionCatalog::ADMIN)->create();
     $this->validator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
+    $this->accounting = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
 
     // A member pays the membership in cash (validated), then a Vendeur pack and a Consommateur pack through the provider.
     $this->member = User::factory()->status(UserStatus::PendingPayment)->create(['first_name' => 'Yendoukoa', 'last_name' => 'NAKORE']);
@@ -21,7 +22,7 @@ beforeEach(function () {
     $attemptId = $this->withToken(tokenFor($this->member))
         ->postJson('/api/v1/me/membership/payments', ['method' => 'CASH'], ['Idempotency-Key' => (string) Str::ulid()])
         ->json('data.id');
-    $this->withToken(tokenFor($this->validator, withStepUp: true))
+    $this->withToken(tokenFor($this->accounting, withStepUp: true))
         ->postJson("/api/v1/validations/payments/{$attemptId}/approve", ['received_amount' => 25000, 'reference' => 'Reçu 1'], ['Idempotency-Key' => (string) Str::ulid()])
         ->assertOk();
 
@@ -30,7 +31,7 @@ beforeEach(function () {
         'period' => ['unit' => 'month', 'every' => 1, 'cycles' => 12],
         'cumulative' => true,
         'end_of_term' => 'expire',
-        'rules' => ['reference_value_xof' => 300000, 'discount_bps' => 1500],
+        'rules' => ['reference_value_xof' => 300000],
         'reason' => 'Grille de l\'ancien site',
     ]));
 
@@ -43,9 +44,9 @@ it('summarises the period: collected amounts net of fees, sources, methods and t
     $response = $this->withToken(tokenFor($this->admin))->getJson('/api/v1/admin/reports/summary')->assertOk();
 
     expect($response->json('data.kpis'))->toMatchArray([
-        'total_collected_xof' => 380000,
+        'total_collected_xof' => 425000,
         'confirmed_payments' => 3,
-        'average_payment_xof' => 126666,
+        'average_payment_xof' => 141666,
         'new_members' => 1,
         'manual_validations' => 1,
         'manual_rejections' => 0,
@@ -55,11 +56,11 @@ it('summarises the period: collected amounts net of fees, sources, methods and t
     ]);
 
     expect(collect($response->json('data.by_source'))->pluck('amount_xof', 'key')->all())
-        ->toBe(['pack_consommateur' => 255000, 'pack_vendeur' => 100000, 'membership' => 25000]);
+        ->toBe(['pack_consommateur' => 300000, 'pack_vendeur' => 100000, 'membership' => 25000]);
     expect(collect($response->json('data.by_method'))->firstWhere('method', 'CASH')['amount_xof'])->toBe(25000);
 
     $response->assertJsonPath('data.top_members.0.pernum', '1001043953')
-        ->assertJsonPath('data.top_members.0.amount_xof', 380000)
+        ->assertJsonPath('data.top_members.0.amount_xof', 425000)
         ->assertJsonPath('data.top_members.0.share_bps', 10000);
 });
 
@@ -76,7 +77,7 @@ it('gives the back-office home figures', function () {
     $this->withToken(tokenFor($this->admin))->getJson('/api/v1/admin/overview')
         ->assertOk()
         ->assertJsonPath('data.members', 2)
-        ->assertJsonPath('data.total_collected_xof', 380000)
+        ->assertJsonPath('data.total_collected_xof', 425000)
         ->assertJsonPath('data.pending_validations', 1)
         ->assertJsonPath('data.yem_in_circulation', '163.461538');
 });
@@ -109,7 +110,7 @@ it('exports members, payments and subscriptions as CSV, audited and with a step-
         ->and($payments)->toContain('Adhésions')->toContain('CASH');
 
     $subscriptions = $this->withToken(tokenFor($this->admin, withStepUp: true))->get('/api/v1/admin/exports/subscriptions')->streamedContent();
-    expect($subscriptions)->toContain(';C1;255000;');
+    expect($subscriptions)->toContain(';C1;300000;');
 
     $audit = $this->withToken(tokenFor($this->admin, withStepUp: true))->get('/api/v1/admin/exports/audit')->assertOk()->streamedContent();
     expect($audit)->toContain('reports.exported');
@@ -140,7 +141,7 @@ it('gives the standard monthly report and a printable version with the same filt
     $this->withToken(tokenFor($this->admin))->getJson("/api/v1/admin/reports/summary?month={$month}")
         ->assertOk()
         ->assertJsonPath('data.period.from', now()->startOfMonth()->toIso8601ZuluString())
-        ->assertJsonPath('data.kpis.total_collected_xof', 380000);
+        ->assertJsonPath('data.kpis.total_collected_xof', 425000);
 
     $this->withToken(tokenFor($this->admin))->getJson('/api/v1/admin/reports/summary?month=2026-09&from=2026-09-01')->assertStatus(422);
 
@@ -151,7 +152,7 @@ it('gives the standard monthly report and a printable version with the same filt
         ->getContent();
 
     expect($html)->toContain('Rapport d\'activité de la CECT')
-        ->toContain('380 000 FCFA')
+        ->toContain('425 000 FCFA')
         ->toContain('Yendoukoa NAKORE')
         ->toContain('Reste dû à ce jour');
 

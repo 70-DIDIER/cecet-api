@@ -16,7 +16,7 @@ beforeEach(function () {
 
     $this->validator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
     $this->accounting = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
-    $this->checker = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
+    $this->checker = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
 });
 
 /**
@@ -88,7 +88,7 @@ it('requires a second person to approve a large manual settlement', function () 
     $batch = uiPayout('3200');
     app('auth')->forgetGuards();
 
-    $this->actingAs($this->accounting, 'web')->withSession(uiStepUp())
+    $this->actingAs($this->checker, 'web')->withSession(uiStepUp())
         ->post("/backoffice/finance/versements/{$batch->id}/reglement", [
             'method' => 'BANK_TRANSFER', 'amount' => 1600000, 'reference' => 'VIR-2026-77', 'paid_at' => now()->subHour()->format('Y-m-d\TH:i'),
         ])
@@ -103,7 +103,7 @@ it('requires a second person to approve a large manual settlement', function () 
     $this->from('/backoffice/finance/reglements')->post("/backoffice/finance/reglements/{$settlement->id}/approuver")->assertSessionHasErrors('decision');
     expect($settlement->refresh()->status->value)->toBe('pending_approval');
 
-    $this->actingAs($this->checker, 'web')->withSession(uiStepUp())
+    $this->actingAs(User::factory()->staff(PermissionCatalog::SUPERADMIN)->create(), 'web')->withSession(uiStepUp())
         ->post("/backoffice/finance/reglements/{$settlement->id}/approuver")
         ->assertRedirect(route('backoffice.finance.settlements'));
 

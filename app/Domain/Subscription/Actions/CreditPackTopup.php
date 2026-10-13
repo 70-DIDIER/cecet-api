@@ -8,6 +8,7 @@ use App\Domain\Payment\Models\PaymentIntent;
 use App\Domain\Quota\QuotaLedger;
 use App\Domain\Subscription\Enums\PackTopupStatus;
 use App\Domain\Subscription\Models\PackTopup;
+use App\Support\YemQuantity;
 
 /**
  * Credits the Personnel pack with the YEM bought by a top-up once its payment is settled. Must run inside the
@@ -29,7 +30,11 @@ class CreditPackTopup
             return $topup;
         }
 
-        $this->ledger->credit($topup->userPack, $topup->quantity, "topup:{$topup->id}", reason: 'Rechargement Perso');
+        $this->ledger->credit($topup->userPack, $topup->yem_base, "topup:{$topup->id}", reason: 'Rechargement Perso');
+
+        if (YemQuantity::isPositive($topup->yem_cashback)) {
+            $this->ledger->creditCashback($topup->userPack, $topup->yem_cashback, "topup:{$topup->id}:cashback", reason: 'Cashback rechargement Perso');
+        }
 
         $topup->forceFill(['status' => PackTopupStatus::Credited, 'credited_at' => now()])->save();
 
@@ -37,7 +42,7 @@ class CreditPackTopup
             action: 'packs.topup_credited',
             subject: $topup,
             before: ['status' => PackTopupStatus::PendingPayment->value],
-            after: ['status' => PackTopupStatus::Credited->value, 'quantity' => $topup->quantity],
+            after: ['status' => PackTopupStatus::Credited->value, 'quantity' => $topup->quantity, 'yem_base' => $topup->yem_base, 'yem_cashback' => $topup->yem_cashback],
             metadata: [
                 'user_pack_id' => $topup->user_pack_id,
                 'amount_xof' => $topup->amount_xof,

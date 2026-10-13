@@ -146,13 +146,20 @@ function personnelTerms(array $overrides = []): array
  *
  * @param  array<string, mixed>|null  $terms
  */
-function makePlan(PackFamily $family = PackFamily::Vendeur, string $code = 'V1', ?array $terms = null, bool $publish = true): PackPlan
+function makePlan(PackFamily $family = PackFamily::Vendeur, string $code = 'V1', ?array $terms = null, bool $publish = true, bool $sellableImmediately = true): PackPlan
 {
     $catalog = app(CatalogManager::class);
     $actor = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
 
     $plan = $catalog->createPlan($actor, $family, $code, "Pack {$code}", null, null);
-    $version = $catalog->createVersion($actor, $plan, $terms ?? ($family === PackFamily::Personnel ? personnelTerms() : periodicTerms()));
+    $terms ??= $family === PackFamily::Personnel ? personnelTerms() : periodicTerms();
+
+    // A Vendeur pack only credits its first allowance after a month; most scenarios need stock to sell straight away.
+    if ($family === PackFamily::Vendeur && $sellableImmediately && ! isset($terms['rules']['first_credit_delay_periods'])) {
+        $terms['rules']['first_credit_delay_periods'] = 0;
+    }
+
+    $version = $catalog->createVersion($actor, $plan, $terms);
     $catalog->publishVersion($actor, $plan, $version);
 
     if ($publish) {

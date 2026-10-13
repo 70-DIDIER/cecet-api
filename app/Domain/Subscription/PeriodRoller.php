@@ -113,7 +113,11 @@ class PeriodRoller
                 $previous->forceFill(['closed_at' => $at])->save();
             }
 
-            $this->ledger->credit($pack, $period->quota, "period:{$period->id}:credit", $period);
+            $this->ledger->credit($pack, YemQuantity::sub($period->quota, $period->cashback_quota), "period:{$period->id}:credit", $period);
+
+            if (YemQuantity::isPositive($period->cashback_quota)) {
+                $this->ledger->creditCashback($pack, $period->cashback_quota, "period:{$period->id}:cashback", $period, 'Cashback');
+            }
             $period->forceFill(['credited_at' => $at])->save();
         });
     }

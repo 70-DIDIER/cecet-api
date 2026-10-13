@@ -19,7 +19,7 @@ it('summarises the member area: profile, YEM balance, active packs and latest mo
         'period' => ['unit' => 'month', 'every' => 1, 'cycles' => 12],
         'cumulative' => true,
         'end_of_term' => 'expire',
-        'rules' => ['reference_value_xof' => 300000, 'discount_bps' => 1500],
+        'rules' => ['reference_value_xof' => 300000],
         'reason' => 'Grille de l\'ancien site',
     ]));
 
@@ -32,8 +32,8 @@ it('summarises the member area: profile, YEM balance, active packs and latest mo
         ->assertJsonPath('data.yem.total_spent', '0.000000')
         ->assertJsonPath('data.active_packs.0.id', $consumer->id)
         ->assertJsonPath('data.active_packs.0.code', 'C1')
-        ->assertJsonPath('data.active_packs.0.price_xof', 255000)
-        ->assertJsonPath('data.active_packs.0.discount_bps', 1500)
+        ->assertJsonPath('data.active_packs.0.price_xof', 300000)
+        ->assertJsonPath('data.active_packs.0.cashback.rate_bps', 0)
         ->assertJsonPath('data.recent_movements.0.label', 'Crédit période 1 — C1')
         ->assertJsonPath('data.recent_movements.0.direction', 'credit')
         ->assertJsonPath('data.recent_movements.0.quantity', '38.461538')
@@ -68,7 +68,7 @@ it('gives the periods of each pack, the monthly activity and the open operations
         'period' => ['unit' => 'month', 'every' => 1, 'cycles' => 12],
         'cumulative' => true,
         'end_of_term' => 'expire',
-        'rules' => ['reference_value_xof' => 300000, 'discount_bps' => 1500],
+        'rules' => ['reference_value_xof' => 300000],
         'reason' => 'Grille de l\'ancien site',
     ]));
 

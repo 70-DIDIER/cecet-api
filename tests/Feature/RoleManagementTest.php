@@ -4,6 +4,7 @@ use App\Domain\Access\PermissionCatalog;
 use App\Domain\Audit\Models\AuditEvent;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -76,7 +77,7 @@ it('refuses assigning a legacy custom role to staff', function () {
         'last_name' => 'Legacy',
         'email' => 'legacy-role@cect.test',
         'roles' => [$legacy->name],
-    ])->assertStatus(422)->assertJsonPath('code', 'CUSTOM_ROLES_DISABLED');
+    ], ['Idempotency-Key' => (string) Str::ulid()])->assertStatus(422)->assertJsonPath('code', 'CUSTOM_ROLES_DISABLED');
 });
 
 it('reserves role permission management to the Superadmin', function () {

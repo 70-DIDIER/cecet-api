@@ -34,6 +34,7 @@ function subscribeTo(User $member, string $planId): TestResponse
 describe('catalog as seen by a member', function () {
     it('shows members only the published packs allowed for their person type', function () {
         setFeeRules(['fake' => ['rate_bps' => 300, 'fixed_xof' => 0, 'rounding_xof' => 1]]);
+        app(SettingsService::class)->set('payment.customer_bears_fees', true, 'Frais à la charge du client pour ce scénario');
         makePlan(code: 'V1');
         $merchant = makePlan(PackFamily::Marchand, 'M1');
         makePlan(code: 'V9', publish: false);
@@ -107,6 +108,7 @@ describe('subscription', function () {
 
     it('adds the transaction fees to the payment and checks the total before activating', function () {
         setFeeRules(['fake' => ['rate_bps' => 300, 'fixed_xof' => 0, 'rounding_xof' => 1]]);
+        app(SettingsService::class)->set('payment.customer_bears_fees', true, 'Frais à la charge du client pour ce scénario');
         $plan = makePlan();
 
         $response = subscribeTo($this->member, $plan->id)

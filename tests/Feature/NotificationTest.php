@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 beforeEach(function () {
     seedCatalogs();
     Mail::fake();
-    $this->validator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
+    $this->validator = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
 });
 
 function noticesTo(User $user, string $event): int

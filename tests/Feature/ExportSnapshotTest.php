@@ -30,7 +30,7 @@ function businessActivity(): User
     $attemptId = test()->withToken(tokenFor($member))
         ->postJson('/api/v1/me/membership/payments', ['method' => 'CASH'], ['Idempotency-Key' => (string) Str::ulid()])
         ->json('data.id');
-    test()->withToken(tokenFor(User::factory()->staff(PermissionCatalog::VALIDATOR)->create(), withStepUp: true))
+    test()->withToken(tokenFor(User::factory()->staff(PermissionCatalog::ACCOUNTING)->create(), withStepUp: true))
         ->postJson("/api/v1/validations/payments/{$attemptId}/approve", ['received_amount' => 25000, 'reference' => 'Reçu 1'], ['Idempotency-Key' => (string) Str::ulid()])
         ->assertOk();
 

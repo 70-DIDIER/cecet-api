@@ -18,7 +18,7 @@ beforeEach(function () {
     Mail::fake();
     $this->member = User::factory()->status(UserStatus::PendingPayment)->create();
     $this->member->pernumIdentities()->create(['pernum' => '1001043953', 'kind' => 'personal', 'status' => 'declared']);
-    $this->validator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
+    $this->validator = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
 });
 
 function payMembershipWith(User $member, ?string $method): TestResponse
@@ -34,6 +34,8 @@ function approvePayment(User $validator, string $attemptId, int $amount, bool $w
 }
 
 it('collects a cash membership payment as on the former site: instructions, declaration, validation', function () {
+    app(SettingsService::class)->set('payment.manual_instructions', ['CASH' => 'Remettez {amount} FCFA au siège, référence {reference}.'], 'Instructions de recette');
+
     $response = payMembershipWith($this->member, 'CASH')
         ->assertCreated()
         ->assertJsonPath('data.mode', 'manual')
@@ -87,15 +89,16 @@ it('refuses a received amount that differs from what is owed, and lets the valid
 
 it('reserves the validation to authorised staff, with a step-up', function () {
     $attemptId = payMembershipWith($this->member, 'CASH')->json('data.id');
-    $accounting = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
+    $yemValidator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
 
-    approvePayment($accounting, $attemptId, 25000)->assertForbidden();
+    approvePayment($yemValidator, $attemptId, 25000)->assertForbidden();
     approvePayment($this->validator, $attemptId, 25000, withStepUp: false)->assertForbidden()->assertJsonPath('code', 'STEP_UP_REQUIRED');
 
-    // Accounting sees the YEM receipts of the queue, not the payments to validate.
-    $this->withToken(tokenFor($accounting))->getJson('/api/v1/validations/queue')->assertOk()->assertJsonCount(0, 'data');
+    // The YEM validator sees the YEM receipts of the queue, not the payments to validate.
+    $this->withToken(tokenFor($yemValidator))->getJson('/api/v1/validations/queue')->assertOk()->assertJsonCount(0, 'data');
 
-    approvePayment(User::factory()->staff(PermissionCatalog::ADMIN)->create(), $attemptId, 25000)->assertOk();
+    approvePayment(User::factory()->staff(PermissionCatalog::ADMIN)->create(), $attemptId, 25000)->assertForbidden();
+    approvePayment($this->validator, $attemptId, 25000)->assertOk();
 });
 
 it('activates a pack paid in cash once validated', function () {

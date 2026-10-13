@@ -7,6 +7,7 @@ use App\Domain\Payout\Data\PayoutRequest;
 use App\Domain\Payout\Data\PayoutResult;
 use App\Domain\Payout\Enums\ProviderPayoutStatus;
 use App\Domain\Payout\Exceptions\PayoutProviderException;
+use App\Domain\Payout\PayoutCountries;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
@@ -28,6 +29,8 @@ class FedaPayPayoutProvider implements PayoutProvider
     private const SANDBOX_URL = 'https://sandbox-api.fedapay.com/v1';
 
     private const LIVE_URL = 'https://api.fedapay.com/v1';
+
+    public function __construct(private readonly PayoutCountries $countries) {}
 
     public function name(): string
     {
@@ -90,14 +93,13 @@ class FedaPayPayoutProvider implements PayoutProvider
         ]);
 
         $country = strtoupper($request->country);
-        $dialingCodes = ['TG' => '228'];
-        $dialingCode = $dialingCodes[$country] ?? null;
+        $dialingCode = $this->countries->dialCode($country);
 
         if ($dialingCode === null) {
             throw new PayoutProviderException("FedaPay payout country {$country} is not configured by CECT.");
         }
 
-        $pattern = '/^\\+'.preg_quote($dialingCode, '/').'([0-9]{8,12})$/';
+        $pattern = '/^\\+'.preg_quote($dialingCode, '/').'([0-9]{4,12})$/';
         if (preg_match($pattern, $request->phone, $matches) === 1) {
             $customer['phone_number'] = ['number' => $matches[1], 'country' => strtolower($country)];
         } else {

@@ -48,7 +48,7 @@ class MemberDashboardController
 
         $totals = QuotaLedgerEntry::query()
             ->whereIn('user_pack_id', $packIds)
-            ->selectRaw("COALESCE(SUM(available_delta) FILTER (WHERE type = 'credit' OR (type = 'adjust' AND available_delta > 0)), 0) AS credited")
+            ->selectRaw("COALESCE(SUM(available_delta) FILTER (WHERE type IN ('credit', 'cashback_credit') OR (type = 'adjust' AND available_delta > 0)), 0) AS credited")
             ->selectRaw("COALESCE(SUM(consumed_delta) FILTER (WHERE type = 'consume'), 0) AS spent")
             ->first();
 
@@ -94,12 +94,20 @@ class MemberDashboardController
                 'code' => $pack->plan->code,
                 'name' => $pack->plan->name,
                 'price_xof' => $pack->price_xof,
+                'version' => $pack->version->version,
+                'level' => $pack->plan->level,
                 'quota_per_period' => $pack->version->quota_per_period,
-                'discount_bps' => is_int($pack->version->rules['discount_bps'] ?? null) ? $pack->version->rules['discount_bps'] : null,
+                'cashback' => [
+                    'rate_bps' => $pack->cashback_bps,
+                    'yem_base' => $pack->yem_base,
+                    'yem_cashback' => $pack->yem_cashback,
+                ],
                 'available' => $pack->account?->available,
                 'reserved' => $pack->account?->reserved,
+                ...$this->packCredits($pack),
                 'consumed' => $pack->account?->consumed,
                 'period' => $this->currentPeriod($pack),
+                'monthly' => $this->monthly($pack),
                 'activated_at' => $pack->activated_at?->toIso8601ZuluString(),
                 'expires_at' => $pack->expires_at?->toIso8601ZuluString(),
             ])->all(),
@@ -125,7 +133,9 @@ class MemberDashboardController
     {
         $periods = $pack->periods;
         $now = now();
-        $current = $periods->first(fn ($period): bool => $period->starts_at <= $now && $now < $period->ends_at) ?? $periods->last();
+        $current = $periods->first(fn ($period): bool => $period->starts_at <= $now && $now < $period->ends_at)
+            ?? $periods->first(fn ($period): bool => $period->starts_at > $now)
+            ?? $periods->last();
 
         if ($current === null) {
             return null;
@@ -143,6 +153,66 @@ class MemberDashboardController
     }
 
     /**
+     * YEM credited on the pack, bought and offered as cashback kept apart (the balance itself is aggregated).
+     *
+     * @return array{credited: string, credited_purchase: string, credited_cashback: string}
+     */
+    private function packCredits(UserPack $pack): array
+    {
+        $row = QuotaLedgerEntry::query()
+            ->where('user_pack_id', $pack->id)
+            ->selectRaw("COALESCE(SUM(available_delta) FILTER (WHERE type = 'credit' OR (type = 'adjust' AND available_delta > 0)), 0) AS purchase")
+            ->selectRaw("COALESCE(SUM(available_delta) FILTER (WHERE type = 'cashback_credit'), 0) AS cashback")
+            ->first();
+
+        $purchase = YemQuantity::of((string) ($row?->getAttribute('purchase') ?? '0'));
+        $cashback = YemQuantity::of((string) ($row?->getAttribute('cashback') ?? '0'));
+
+        return [
+            'credited' => YemQuantity::add($purchase, $cashback),
+            'credited_purchase' => $purchase,
+            'credited_cashback' => $cashback,
+        ];
+    }
+
+    /**
+     * The monthly allowance of the pack: what the period grants, what is left over from the previous one, what was
+     * spent and what is still usable. Quantities are those of the pack alone, never of another one.
+     *
+     * @return array{limit: string, carried_over: string, credited: string, consumed: string, reserved: string, remaining: string, credited_at: string|null}|null
+     */
+    private function monthly(UserPack $pack): ?array
+    {
+        $now = now();
+        $period = $pack->periods->first(fn ($period): bool => $period->starts_at <= $now && $now < $period->ends_at);
+
+        if ($period === null) {
+            return null;
+        }
+
+        $credit = QuotaLedgerEntry::query()
+            ->where('pack_period_id', $period->id)
+            ->where('type', LedgerEntryType::Credit)
+            ->first();
+
+        $consumed = QuotaLedgerEntry::query()
+            ->where('user_pack_id', $pack->id)
+            ->where('type', LedgerEntryType::Consume)
+            ->where('created_at', '>=', $period->starts_at)
+            ->sum('consumed_delta');
+
+        return [
+            'limit' => $period->quota,
+            'carried_over' => $credit === null ? YemQuantity::zero() : YemQuantity::sub($credit->available_after, $credit->available_delta),
+            'credited' => $period->credited_at === null ? YemQuantity::zero() : $period->quota,
+            'consumed' => YemQuantity::of((string) $consumed),
+            'reserved' => $pack->account->reserved ?? YemQuantity::zero(),
+            'remaining' => $pack->account->available ?? YemQuantity::zero(),
+            'credited_at' => $period->credited_at?->toIso8601ZuluString(),
+        ];
+    }
+
+    /**
      * Quantities credited and spent per calendar month over the last six months.
      *
      * @param  Builder<UserPack>  $packIds
@@ -156,7 +226,7 @@ class MemberDashboardController
             ->whereIn('user_pack_id', $packIds)
             ->where('created_at', '>=', $first)
             ->selectRaw("to_char(created_at, 'YYYY-MM') AS month")
-            ->selectRaw("COALESCE(SUM(available_delta) FILTER (WHERE type = 'credit'), 0) AS credit")
+            ->selectRaw("COALESCE(SUM(available_delta) FILTER (WHERE type IN ('credit', 'cashback_credit')), 0) AS credit")
             ->selectRaw("COALESCE(SUM(consumed_delta) FILTER (WHERE type = 'consume'), 0) AS debit")
             ->groupBy(DB::raw("to_char(created_at, 'YYYY-MM')"))
             ->get()
@@ -225,6 +295,7 @@ class MemberDashboardController
 
         return match ($entry->type) {
             LedgerEntryType::Credit => $entry->period !== null ? "Crédit période {$entry->period->number} — {$code}" : ($entry->reason ?? "Crédit {$code}"),
+            LedgerEntryType::CashbackCredit => $entry->period !== null ? "Cashback période {$entry->period->number} — {$code}" : "Cashback {$code}",
             LedgerEntryType::Reserve => "Réservation pour une vente de YEM — {$code}",
             LedgerEntryType::Release => "Réservation libérée — {$code}",
             LedgerEntryType::Consume => "Vente de YEM confirmée — {$code}",

@@ -26,6 +26,7 @@ use App\Domain\Settings\Models\SettingVersion;
 use App\Domain\Settings\SettingsService;
 use App\Domain\Subscription\Actions\RequestPackTopup;
 use App\Domain\Subscription\Actions\SubscribeToPack;
+use App\Domain\Subscription\Models\PackPeriod;
 use App\Domain\Subscription\Models\UserPack;
 use App\Domain\Subscription\PeriodRoller;
 use App\Models\User;
@@ -289,7 +290,32 @@ class DemoClientSeeder extends Seeder
             app(ManualPaymentDesk::class)->approve($this->admin, $result['attempt']->refresh(), $result['attempt']->amount, "REÇU-{$code}-".$member->member_number, null);
         }
 
-        return $result['user_pack']->refresh();
+        return $this->makeSellableNow($result['user_pack']->refresh());
+    }
+
+    /**
+     * A Vendeur pack bought today only releases its first allowance after a month. The demonstration needs a history,
+     * so the periods are moved back by that waiting time and the allowance due is credited.
+     */
+    private function makeSellableNow(UserPack $pack): UserPack
+    {
+        $first = PackPeriod::query()->where('user_pack_id', $pack->id)->orderBy('number')->first();
+
+        if ($first === null || $first->starts_at->lessThanOrEqualTo(now())) {
+            return $pack;
+        }
+
+        $shift = (int) ceil(now()->diffInSeconds($first->starts_at, false));
+
+        PackPeriod::query()->where('user_pack_id', $pack->id)->get()->each(fn (PackPeriod $period) => $period->forceFill([
+            'starts_at' => $period->starts_at->subSeconds($shift),
+            'ends_at' => $period->ends_at->subSeconds($shift),
+        ])->save());
+
+        $pack->forceFill(['expires_at' => $pack->expires_at?->subSeconds($shift)])->save();
+        app(PeriodRoller::class)->creditDuePeriods($pack->refresh(), now());
+
+        return $pack->refresh();
     }
 
     private function topUp(User $member, UserPack $pack, int $amount, bool $validate): void

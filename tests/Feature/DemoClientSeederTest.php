@@ -31,7 +31,7 @@ it('builds a complete, consistent history for the demonstration client', functio
         ->and($packs['C1']->account->reserved)->toBe('10.000000')
         ->and($packs['V1']->account->consumed)->toBe('70.000000')
         ->and($packs['V1']->account->reserved)->toBe('30.000000')
-        ->and($packs['PERSO']->account->available)->toBe('18.099547');
+        ->and($packs['PERSO']->account->available)->toBe('15.384615');
 
     $statuses = ExchangeRequest::query()->where('user_id', $client->id)->pluck('status')->map(fn ($status) => $status->value)->sort()->values()->all();
     expect($statuses)->toBe(['awaiting_transfer', 'completed', 'declared_sent', 'yem_received']);

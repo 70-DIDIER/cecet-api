@@ -130,9 +130,9 @@ describe('versions', function () {
             ->assertJsonPath('data.eligible_person_types', ['legal']);
 
         $consumer = createDraftPlan($this->token, 'CONSOMMATEUR', 'C1');
-        adminPost($this->token, "/api/v1/admin/packs/plans/{$consumer->id}/versions", periodicTerms(['rules' => ['discount_bps' => 300, 'reference_value_xof' => 300000]]))
+        adminPost($this->token, "/api/v1/admin/packs/plans/{$consumer->id}/versions", periodicTerms(['rules' => ['first_credit_delay_periods' => 2, 'reference_value_xof' => 300000]]))
             ->assertCreated()
-            ->assertJsonPath('data.rules.discount_bps', 300);
+            ->assertJsonPath('data.rules.first_credit_delay_periods', 2);
     });
 
     it('freezes a version once published and offers the highest published version', function () {
@@ -272,12 +272,12 @@ describe('Consommateur grid of the former site', function () {
         return Arr::except(periodicTerms(['rules' => $rules]), ['price_xof', 'quota_per_period']);
     }
 
-    it('derives the price and the monthly quota from the reference value, the discount and the sale rate', function () {
+    it('derives the price and the monthly quota from the reference value and the sale rate, without any discount', function () {
         $plan = createDraftPlan($this->token, 'CONSOMMATEUR', 'C1');
 
-        adminPost($this->token, "/api/v1/admin/packs/plans/{$plan->id}/versions", consumerTerms(['reference_value_xof' => 300000, 'discount_bps' => 1500]))
+        adminPost($this->token, "/api/v1/admin/packs/plans/{$plan->id}/versions", consumerTerms(['reference_value_xof' => 300000]))
             ->assertCreated()
-            ->assertJsonPath('data.price_xof', 255000)
+            ->assertJsonPath('data.price_xof', 300000)
             ->assertJsonPath('data.quota_per_period', '38.461538')
             ->assertJsonPath('data.rules.rate_setting_key', 'rates.sale_xof_per_yem')
             ->assertJsonPath('data.rules.rate_xof_per_yem', 650);
@@ -285,8 +285,8 @@ describe('Consommateur grid of the former site', function () {
 
     it('snapshots the rate: a later change of the setting does not alter the version', function () {
         $plan = createDraftPlan($this->token, 'CONSOMMATEUR', 'C6');
-        $id = adminPost($this->token, "/api/v1/admin/packs/plans/{$plan->id}/versions", consumerTerms(['reference_value_xof' => 6000000, 'discount_bps' => 1500]))
-            ->assertJsonPath('data.price_xof', 5100000)
+        $id = adminPost($this->token, "/api/v1/admin/packs/plans/{$plan->id}/versions", consumerTerms(['reference_value_xof' => 6000000]))
+            ->assertJsonPath('data.price_xof', 6000000)
             ->json('data.id');
 
         app(SettingsService::class)->set('rates.sale_xof_per_yem', 700, 'Révision du taux de vente');
@@ -298,7 +298,7 @@ describe('Consommateur grid of the former site', function () {
         $plan = createDraftPlan($this->token, 'CONSOMMATEUR', 'C2');
 
         adminPost($this->token, "/api/v1/admin/packs/plans/{$plan->id}/versions", [
-            ...consumerTerms(['reference_value_xof' => 600000, 'discount_bps' => 1500, 'rate_setting_key' => 'rates.transfer_xof_per_yem']),
+            ...consumerTerms(['reference_value_xof' => 600000, 'rate_setting_key' => 'rates.transfer_xof_per_yem']),
             'price_xof' => 500000,
         ])
             ->assertCreated()
@@ -307,7 +307,7 @@ describe('Consommateur grid of the former site', function () {
             ->assertJsonPath('data.rules.rate_xof_per_yem', 610);
     });
 
-    it('refuses an unknown rate setting and a full discount', function (array $rules, string $field) {
+    it('refuses an unknown rate setting and the discount that cashback replaced', function (array $rules, string $field) {
         $plan = createDraftPlan($this->token, 'CONSOMMATEUR', 'C3');
 
         adminPost($this->token, "/api/v1/admin/packs/plans/{$plan->id}/versions", periodicTerms(['rules' => $rules]))
@@ -315,7 +315,7 @@ describe('Consommateur grid of the former site', function () {
             ->assertJsonStructure(['details' => ['fields' => [$field]]]);
     })->with([
         'unknown rate' => [['reference_value_xof' => 300000, 'rate_setting_key' => 'app.name'], 'rules.rate_setting_key'],
-        'full discount' => [['reference_value_xof' => 300000, 'discount_bps' => 10000], 'rules.discount_bps'],
+        'discount no longer exists' => [['reference_value_xof' => 300000, 'discount_bps' => 1500], 'rules.discount_bps'],
     ]);
 });
 
@@ -331,10 +331,10 @@ describe('grid of the former site', function () {
         $version = fn (string $code) => PackPlan::query()->where('code', $code)->firstOrFail()->versions()->firstOrFail();
 
         expect($version('V2')->quota_per_period)->toBe('333.333333')
-            ->and($version('C1')->price_xof)->toBe(255000)
+            ->and($version('C1')->price_xof)->toBe(300000)
             ->and($version('C1')->quota_per_period)->toBe('38.461538')
-            ->and($version('C6')->price_xof)->toBe(5100000)
-            ->and($version('PERSO')->rules)->toMatchArray(['discount_bps' => 1500, 'min_topup_xof' => 5000])
+            ->and($version('C6')->price_xof)->toBe(6000000)
+            ->and($version('PERSO')->rules)->toMatchArray(['min_topup_xof' => 5000])
             ->and($version('PRESTIGE')->period_cycles)->toBe(48)
             ->and($version('PRESTIGE')->eligible_person_types)->toBe(['legal'])
             ->and($version('BRONZE')->quota_per_period)->toBe('125.000000');

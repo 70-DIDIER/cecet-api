@@ -67,6 +67,71 @@ describe('member request', function () {
             ->assertJsonPath('details.fields.country.0', 'Ce moyen de versement n’est pas disponible dans le pays sélectionné.');
     });
 
+    it('normalizes the typed country, dialing code and number to one international number', function (string $dialCode, string $typed) {
+        $this->withToken(tokenFor($this->member, withStepUp: true))->putJson('/api/v1/me/payout-destination', [
+            'method' => 'TMONEY',
+            'country' => 'tg',
+            'dial_code' => $dialCode,
+            'phone' => $typed,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.country', 'TG')
+            ->assertJsonPath('data.phone', '+22890123456');
+    })->with([
+        'national number' => ['+228', '90 12 34 56'],
+        'dialing code without plus' => ['228', '90-12-34-56'],
+        'already international' => ['+228', '+228 90123456'],
+        'double zero prefix' => ['', '00228 90123456'],
+    ]);
+
+    it('refuses a number that does not match the country or its dialing code', function (array $payload, string $field) {
+        $phoneBefore = PayoutDestination::query()->where('user_id', $this->member->id)->value('phone');
+
+        $this->withToken(tokenFor($this->member, withStepUp: true))->putJson('/api/v1/me/payout-destination', [
+            'method' => 'TMONEY',
+            'country' => 'TG',
+            ...$payload,
+        ])
+            ->assertStatus(422)
+            ->assertJsonStructure(['details' => ['fields' => [$field]]]);
+
+        expect(PayoutDestination::query()->where('user_id', $this->member->id)->value('phone'))->toBe($phoneBefore);
+    })->with([
+        'dialing code of another country' => [['dial_code' => '+229', 'phone' => '90123456'], 'dial_code'],
+        'international number of another country' => [['phone' => '+22966000001'], 'phone'],
+        'too short' => [['dial_code' => '+228', 'phone' => '9012345'], 'phone'],
+        'too long' => [['dial_code' => '+228', 'phone' => '901234567'], 'phone'],
+        'letters' => [['phone' => '90AB3456'], 'phone'],
+    ]);
+
+    it('refuses a country that is not open for payouts', function () {
+        $this->withToken(tokenFor($this->member, withStepUp: true))->putJson('/api/v1/me/payout-destination', [
+            'method' => 'CASH',
+            'country' => 'FR',
+            'phone' => '+33612345678',
+        ])->assertStatus(422)->assertJsonStructure(['details' => ['fields' => ['country']]]);
+    });
+
+    it('exposes the countries, dialing codes and number lengths the front can offer', function () {
+        $countries = collect($this->getJson('/api/v1/config')->assertOk()->json('data.payout_countries'));
+
+        expect($countries->firstWhere('code', 'TG'))->toBe(['code' => 'TG', 'name' => 'Togo', 'dial_code' => '228', 'national_lengths' => [8]]);
+    });
+
+    it('keeps the destination of an operation already created when the profile changes afterwards', function () {
+        $created = sell($this->member, $this->pack)->assertCreated();
+        $before = $created->json('data.payout_destination.phone');
+
+        $this->withToken(tokenFor($this->member, withStepUp: true))->putJson('/api/v1/me/payout-destination', [
+            'method' => 'FLOOZ',
+            'country' => 'TG',
+            'phone' => '99 88 77 66',
+        ])->assertOk()->assertJsonPath('data.phone', '+22899887766');
+
+        expect(ExchangeRequest::query()->findOrFail($created->json('data.id'))->payout_destination['phone'])->toBe($before)
+            ->and($before)->not->toBe('+22899887766');
+    });
+
     it('reserves the quantity and gives the CECT Pernum to send the YEM to (AC-09)', function () {
         sell($this->member, $this->pack)
             ->assertCreated()

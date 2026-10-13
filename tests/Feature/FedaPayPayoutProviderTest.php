@@ -8,8 +8,9 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
+    seedCatalogs();
     config(['services.fedapay.secret_key' => 'sk_sandbox_test', 'services.fedapay.environment' => 'sandbox']);
-    $this->provider = new FedaPayPayoutProvider;
+    $this->provider = app(FedaPayPayoutProvider::class);
 });
 
 function payoutRequest(string $phone = '+22890123456'): PayoutRequest

@@ -13,24 +13,30 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Carbon;
 
 /**
- * A top-up of a Personnel pack: the amount paid and the YEM it buys, at the discount and rate of the day.
+ * A top-up of a Personnel pack: the amount paid, the YEM it buys at the rate of the day and the cashback offered on top,
+ * all frozen when the top-up is requested.
  *
  * @property string $id
  * @property string $user_id
  * @property string $user_pack_id
  * @property PackTopupStatus $status
  * @property int $amount_xof
- * @property int $discount_bps
+ * @property int $cashback_bps
+ * @property string $yem_base
+ * @property string $yem_cashback
+ * @property string $cashback_rounding
+ * @property string|null $cashback_rule_effective_from
+ * @property Carbon|null $calculated_at
  * @property string $rate_setting_key
  * @property int $rate_xof_per_yem
- * @property string $quantity
+ * @property string $quantity total credited (base + cashback)
  * @property Carbon|null $credited_at
  * @property Carbon|null $canceled_at
  * @property Carbon $created_at
  * @property-read User $user
  * @property-read UserPack $userPack
  */
-#[Fillable(['user_id', 'user_pack_id', 'status', 'amount_xof', 'discount_bps', 'rate_setting_key', 'rate_xof_per_yem', 'quantity', 'credited_at', 'canceled_at'])]
+#[Fillable(['user_id', 'user_pack_id', 'status', 'amount_xof', 'cashback_bps', 'yem_base', 'yem_cashback', 'cashback_rounding', 'cashback_rule_effective_from', 'calculated_at', 'rate_setting_key', 'rate_xof_per_yem', 'quantity', 'credited_at', 'canceled_at'])]
 class PackTopup extends Model
 {
     use HasUlids;
@@ -67,7 +73,8 @@ class PackTopup extends Model
         return [
             'status' => PackTopupStatus::class,
             'amount_xof' => 'integer',
-            'discount_bps' => 'integer',
+            'cashback_bps' => 'integer',
+            'calculated_at' => 'datetime',
             'rate_xof_per_yem' => 'integer',
             'credited_at' => 'datetime',
             'canceled_at' => 'datetime',

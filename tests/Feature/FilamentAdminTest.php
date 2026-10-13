@@ -74,6 +74,7 @@ it('keeps the validations page to those who validate', function () {
 
 describe('validations', function () {
     beforeEach(function () {
+        $this->accountant = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
         $this->member = User::factory()->status(UserStatus::PendingPayment)->create(['first_name' => 'Yendoukoa', 'last_name' => 'NAKORE']);
         $this->member->pernumIdentities()->create(['pernum' => '1001043953', 'kind' => 'personal', 'status' => 'declared']);
 
@@ -86,13 +87,13 @@ describe('validations', function () {
     });
 
     it('lists the payment awaiting validation', function () {
-        $this->actingAs($this->validator, 'web');
+        $this->actingAs($this->accountant, 'web');
 
         Livewire::test(Validations::class)->assertSee('Yendoukoa NAKORE')->assertSee('Remis au siège');
     });
 
     it('does not validate without the confirmation code', function () {
-        $this->actingAs($this->validator, 'web');
+        $this->actingAs($this->accountant, 'web');
 
         Livewire::test(Validations::class)
             ->callTableAction('approvePayment', "payment:{$this->attemptId}", ['received_amount' => 25000, 'reference' => 'Reçu 1', 'step_up_code' => '000000']);
@@ -101,7 +102,7 @@ describe('validations', function () {
     });
 
     it('validates the payment once the identity is confirmed and informs the member', function () {
-        $this->actingAs($this->validator, 'web')->withSession([ConfirmStepUp::SESSION_KEY => now()->addMinutes(10)->getTimestamp()]);
+        $this->actingAs($this->accountant, 'web')->withSession([ConfirmStepUp::SESSION_KEY => now()->addMinutes(10)->getTimestamp()]);
 
         Livewire::test(Validations::class)
             ->callTableAction('approvePayment', "payment:{$this->attemptId}", ['received_amount' => 25000, 'reference' => 'Reçu 1', 'comment' => 'Espèces comptées'])
@@ -111,7 +112,7 @@ describe('validations', function () {
     });
 
     it('refuses an amount that differs from what is due', function () {
-        $this->actingAs($this->validator, 'web')->withSession([ConfirmStepUp::SESSION_KEY => now()->addMinutes(10)->getTimestamp()]);
+        $this->actingAs($this->accountant, 'web')->withSession([ConfirmStepUp::SESSION_KEY => now()->addMinutes(10)->getTimestamp()]);
 
         Livewire::test(Validations::class)
             ->callTableAction('approvePayment', "payment:{$this->attemptId}", ['received_amount' => 10000, 'reference' => 'Reçu 1']);

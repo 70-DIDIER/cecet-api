@@ -38,19 +38,20 @@ enum PackFamily: string
     {
         return match ($this) {
             self::Consommateur => [
-                'discount_bps' => ['integer', 'min:0', 'max:9999'],
+                'first_credit_delay_periods' => ['integer', 'min:0', 'max:12'],
                 'reference_value_xof' => ['integer', 'min:1'],
                 'rate_setting_key' => ['string', 'in:rates.purchase_xof_per_yem,rates.sale_xof_per_yem,rates.transfer_xof_per_yem'],
                 'rate_xof_per_yem' => ['integer', 'min:1'],
             ],
             self::Vendeur => [
+                'first_credit_delay_periods' => ['integer', 'min:0', 'max:12'],
                 'rate_setting_key' => ['string', 'in:rates.purchase_xof_per_yem,rates.sale_xof_per_yem,rates.transfer_xof_per_yem'],
             ],
             self::Marchand => [
+                'first_credit_delay_periods' => ['integer', 'min:0', 'max:12'],
                 'rate_setting_key' => ['string', 'in:rates.purchase_xof_per_yem,rates.sale_xof_per_yem,rates.transfer_xof_per_yem'],
             ],
             self::Personnel => [
-                'discount_bps' => ['integer', 'min:0', 'max:9999'],
                 'min_topup_xof' => ['integer', 'min:1'],
                 'rate_setting_key' => ['string', 'in:rates.purchase_xof_per_yem,rates.sale_xof_per_yem,rates.transfer_xof_per_yem'],
             ],

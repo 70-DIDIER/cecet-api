@@ -2,12 +2,13 @@
 
 namespace App\Domain\Settings\Http\Controllers;
 
+use App\Domain\Payout\PayoutCountries;
 use App\Domain\Settings\SettingsService;
 use Illuminate\Http\JsonResponse;
 
 class PublicConfigController
 {
-    public function __construct(private readonly SettingsService $settings) {}
+    public function __construct(private readonly SettingsService $settings, private readonly PayoutCountries $countries) {}
 
     /**
      * Public configuration used by the website: membership fees, indicative rates, legal forms and payment methods.
@@ -41,6 +42,7 @@ class PublicConfigController
             'rccm_required' => $this->settings->boolean('organization.rccm_required'),
             'nif_required' => $this->settings->boolean('organization.nif_required'),
             'payment_methods' => $methods,
+            'payout_countries' => $this->countries->enabled(),
             'content' => [
                 'key_figures' => $this->settings->array('content.key_figures'),
                 'faq' => collect($this->settings->array('content.faq'))->filter(fn (mixed $item): bool => is_array($item) && ($item['published'] ?? false) === true)->values()->all(),

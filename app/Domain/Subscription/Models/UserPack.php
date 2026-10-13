@@ -28,6 +28,12 @@ use Illuminate\Support\Carbon;
  * @property PackFamily $family
  * @property UserPackStatus $status
  * @property int $price_xof
+ * @property int $cashback_bps
+ * @property string|null $yem_base YEM granted over the whole term, frozen at purchase
+ * @property string $yem_cashback cashback offered on top, frozen at purchase
+ * @property string $cashback_rounding
+ * @property string|null $cashback_rule_effective_from
+ * @property Carbon|null $calculated_at
  * @property Carbon|null $paid_at
  * @property Carbon|null $activated_at
  * @property Carbon|null $expires_at
@@ -37,7 +43,7 @@ use Illuminate\Support\Carbon;
  * @property-read PackVersion $version
  * @property-read QuotaAccount|null $account
  */
-#[Fillable(['user_id', 'pack_plan_id', 'pack_version_id', 'family', 'status', 'price_xof', 'paid_at', 'activated_at', 'expires_at', 'canceled_at'])]
+#[Fillable(['user_id', 'pack_plan_id', 'pack_version_id', 'family', 'status', 'price_xof', 'cashback_bps', 'yem_base', 'yem_cashback', 'cashback_rounding', 'cashback_rule_effective_from', 'calculated_at', 'paid_at', 'activated_at', 'expires_at', 'canceled_at'])]
 class UserPack extends Model
 {
     use HasUlids;
@@ -107,6 +113,8 @@ class UserPack extends Model
             'family' => PackFamily::class,
             'status' => UserPackStatus::class,
             'price_xof' => 'integer',
+            'cashback_bps' => 'integer',
+            'calculated_at' => 'datetime',
             'paid_at' => 'datetime',
             'activated_at' => 'datetime',
             'expires_at' => 'datetime',
