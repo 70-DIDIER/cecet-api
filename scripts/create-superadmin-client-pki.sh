@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Execute ONLY on a trusted, offline administrative machine.
-# Never run this script on the CECT web server or inside a repository checkout.
+# Run exclusively on a trusted OFFLINE administrative machine, never the web server.
 set -euo pipefail
 umask 077
 if [[ $# -ne 2 ]]; then
@@ -23,25 +22,53 @@ if [[ ! -f ca.crt ]]; then
     -addext 'keyUsage=critical,keyCertSign,cRLSign'
   chmod 600 ca.key
 fi
+mkdir -p newcerts
+touch index.txt
+[[ -f serial ]] || echo 1000 >serial
+[[ -f crlnumber ]] || echo 1000 >crlnumber
+cat >openssl-ca.cnf <<'EOT'
+[ ca ]
+default_ca = CA_default
+[ CA_default ]
+dir = .
+database = $dir/index.txt
+new_certs_dir = $dir/newcerts
+certificate = $dir/ca.crt
+private_key = $dir/ca.key
+serial = $dir/serial
+crlnumber = $dir/crlnumber
+default_md = sha256
+default_days = 365
+default_crl_days = 7
+policy = policy_common_name
+unique_subject = no
+email_in_dn = no
+copy_extensions = none
+[ policy_common_name ]
+commonName = supplied
+[ client_certificate ]
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature
+extendedKeyUsage = clientAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+EOT
 [[ ! -e "${CLIENT}.key" && ! -e "${CLIENT}.crt" && ! -e "${CLIENT}.p12" ]] || {
   echo 'Client identity already exists; choose a new identifier.' >&2; exit 1;
 }
 openssl req -new -newkey rsa:3072 -nodes \
   -keyout "${CLIENT}.key" -out "${CLIENT}.csr" \
   -subj "/CN=CECT SuperAdmin ${CLIENT}"
-cat >"${CLIENT}.ext" <<'EOT'
-basicConstraints=critical,CA:FALSE
-keyUsage=critical,digitalSignature
-extendedKeyUsage=clientAuth
-subjectKeyIdentifier=hash
-authorityKeyIdentifier=keyid,issuer
-EOT
-openssl x509 -req -in "${CLIENT}.csr" -CA ca.crt -CAkey ca.key \
-  -CAcreateserial -out "${CLIENT}.crt" -days 365 -sha256 -extfile "${CLIENT}.ext"
+openssl ca -batch -notext -config openssl-ca.cnf -extensions client_certificate \
+  -in "${CLIENT}.csr" -out "${CLIENT}.crt"
+openssl ca -gencrl -config openssl-ca.cnf -out clients.crl.pem
+openssl verify -CAfile ca.crt -CRLfile clients.crl.pem -crl_check "${CLIENT}.crt"
 openssl pkcs12 -export -inkey "${CLIENT}.key" -in "${CLIENT}.crt" -certfile ca.crt \
   -out "${CLIENT}.p12" -name "CECT SuperAdmin ${CLIENT}"
 chmod 600 "${CLIENT}.key" "${CLIENT}.p12"
-echo "Client certificate SHA-256 (DER, pin it on the API server):"
+echo "Bootstrap client certificate SHA-256 (DER):"
 openssl x509 -in "${CLIENT}.crt" -outform DER | sha256sum
-echo "Copy ONLY ca.crt to Nginx. Transfer the encrypted .p12 to the owner's browser securely."
-echo "NEVER copy ca.key, the unencrypted client .key, or the P12 passphrase to GitHub or the web server."
+echo "Publish only ca.crt AND clients.crl.pem to Nginx; update CRL at least every 7 days."
+echo "To revoke: openssl ca -config openssl-ca.cnf -revoke CLIENT.crt && openssl ca -gencrl -config openssl-ca.cnf -out clients.crl.pem"
+echo "Transfer the password-protected .p12 to the SuperAdmin's browser securely."
+echo "Never publish ca.key, the client .key or any private key."
