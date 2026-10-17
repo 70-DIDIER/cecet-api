@@ -31,12 +31,7 @@ class CollectionRouter
         // The chosen payment phone, if supplied, controls available operators.
         // A mobile provider cannot be offered for a country where CECT has not enabled it.
         $phone = $paymentPhone ?? $payer->phone;
-        $country = match (true) {
-            is_string($phone) && str_starts_with($phone, '+228') => 'TG',
-            is_string($phone) && str_starts_with($phone, '+221') => 'SN',
-            is_string($phone) && str_starts_with($phone, '+225') => 'CI',
-            default => null,
-        };
+        $country = AfricanMobileMoneyCatalog::countryFromPhone($phone);
         $enabled = $this->enabledMethods($country);
         $method = $method ?? ($payer->preferred_payment_method !== null && in_array($payer->preferred_payment_method, $enabled, true) ? $payer->preferred_payment_method : null);
         $modes = $this->settings->array('payment.collection_modes');
