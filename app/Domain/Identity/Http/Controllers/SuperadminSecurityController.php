@@ -168,7 +168,7 @@ class SuperadminSecurityController
         $request->session()->put('superadmin_verified_cert', $fp);
         $request->session()->put('superadmin_verified_key', $keyId);
         $user->forceFill(['last_login_at' => now()])->save();
-        Log::notice('superadmin.login_success', ['user_id' => $user->id, 'key_id' => $keyId]);
+        Log::notice('superadmin.login_success', ['user_id' => $user->id, 'key_id' => $keyId, 'cert_sha256' => $fp]);
     }
 
     private function requireVerified(Request $request, User $user, string $fp): void
@@ -248,11 +248,13 @@ class SuperadminSecurityController
             ->where('user_id', $user->id)->where('cert_sha256', $fp)
             ->whereIn('status', ['pending', 'active'])->where('expires_at', '>', now())->first();
         abort_unless($key, 403);
+        abort_if($challenge->attempts >= config('superadmin.max_attempts', 5), 403, 'Trop de tentatives.');
         $sig = base64_decode($data['signature'], true);
         $message = "CECT_SUPERADMIN_V1\n{$challenge->id}\n{$challenge->nonce}";
         $valid = $sig !== false && openssl_verify($message, $sig, $key->public_key_pem, OPENSSL_ALGO_SHA256) === 1;
         if (! $valid) {
-            DB::table('superadmin_security_challenges')->where('id', $challenge->id)->increment('attempts');
+            DB::table('superadmin_security_challenges')->where('id', $challenge->id)
+                ->where('attempts', '<', config('superadmin.max_attempts', 5))->increment('attempts');
             abort(403, 'Signature de clé invalide.');
         }
         abort_if($challenge->attempts >= config('superadmin.max_attempts', 5), 403);
