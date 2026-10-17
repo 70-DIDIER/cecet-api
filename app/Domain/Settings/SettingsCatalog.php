@@ -53,9 +53,11 @@ final class SettingsCatalog
     {
         return [
             new SettingDefinition('membership.fee.natural_person', 'membership', SettingType::Integer, 25000,
-                'Frais d\'adhésion initiale d\'une personne physique (XOF).', rules: ['value' => ['required', 'min:0']]),
+                'Frais d\'adhésion initiale d\'une personne physique (XOF).', SettingEditLevel::Superadmin,
+                rules: ['value' => ['required', 'integer', 'min:0']]),
             new SettingDefinition('membership.fee.legal_person', 'membership', SettingType::Integer, 200000,
-                'Frais d\'adhésion initiale d\'une personne morale (XOF).', rules: ['value' => ['required', 'min:0']]),
+                'Frais d\'adhésion initiale d\'une personne morale (XOF).', SettingEditLevel::Superadmin,
+                rules: ['value' => ['required', 'integer', 'min:0']]),
             new SettingDefinition('membership.commitment_version', 'membership', SettingType::String, 'statuts-ri-2026',
                 'Version du texte d\'engagement (statuts et règlement intérieur) acceptée à l\'inscription ; à changer quand le texte change.',
                 rules: ['value' => ['required', 'max:40']]),

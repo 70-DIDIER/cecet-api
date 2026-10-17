@@ -556,10 +556,12 @@ it('accepts simulated card fallback in an African country without a named mobile
         ->assertCreated()->assertJsonPath('data.method', 'CARD_SIM');
 });
 
-it('refuses simulated card on a phone from an African mobile money market', function () {
+it('offers the simulated bank card as an alternative to Mobile Money in Togo', function () {
     $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
         'method' => 'CARD_SIM',
         'payment_phone' => '+22890123456',
-    ], ['Idempotency-Key' => (string) Str::ulid()])->assertStatus(422);
-    expect(PaymentAttempt::count())->toBe(0);
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated()->assertJsonPath('data.method', 'CARD_SIM')
+        ->assertJsonPath('data.provider', 'fake')
+        ->assertJsonPath('data.simulation_available', true);
 });

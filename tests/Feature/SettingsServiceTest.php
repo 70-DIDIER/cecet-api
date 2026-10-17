@@ -147,3 +147,11 @@ it('serves the new value immediately after a change despite the cache', function
     expect($this->settings->get('exchange.reservation_ttl_minutes'))->toBe(60)
         ->and(SettingVersion::query()->where('setting_key', 'exchange.reservation_ttl_minutes')->count())->toBe(2);
 });
+
+
+it('reserves changes of both membership fees to the Superadmin', function () {
+    $natural = \App\Domain\Settings\Models\Setting::query()->findOrFail('membership.fee.natural_person');
+    $legal = \App\Domain\Settings\Models\Setting::query()->findOrFail('membership.fee.legal_person');
+    expect($natural->edit_level->value)->toBe('superadmin')
+        ->and($legal->edit_level->value)->toBe('superadmin');
+});

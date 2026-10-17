@@ -76,11 +76,10 @@ class CollectionRouter
                     return false;
                 }
                 $code = (string) ($method['code'] ?? '');
-                // Card simulation is only a fallback for countries with no
-                // documented African Mobile Money network, including non-African phones.
+                // Card simulation is a test-only alternative, including in
+                // African countries where Mobile Money is available.
                 if ($code === AfricanMobileMoneyCatalog::CARD_SIM) {
-                    return app()->environment(['staging', 'testing'])
-                        && ! AfricanMobileMoneyCatalog::hasMobileMoney($country);
+                    return app()->environment(['staging', 'testing']);
                 }
                 // The generic test-only wallet is retired; it must never be accepted
                 // even when an older database settings version still contains it.

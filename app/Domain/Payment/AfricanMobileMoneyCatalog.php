@@ -185,7 +185,7 @@ final class AfricanMobileMoneyCatalog
                 'code' => self::CARD_SIM,
                 'label' => 'Carte bancaire (simulation uniquement)',
                 'channel' => 'card',
-                // The router constrains it to countries outside African MM coverage.
+                // Available in simulation as an alternative even where Mobile Money exists.
                 'countries' => [], 'enabled' => true,
             ];
         }
