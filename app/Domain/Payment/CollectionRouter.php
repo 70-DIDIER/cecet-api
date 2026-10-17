@@ -75,6 +75,18 @@ class CollectionRouter
                 if (! is_array($method) || ($method['enabled'] ?? false) !== true) {
                     return false;
                 }
+                $code = (string) ($method['code'] ?? '');
+                // Card simulation is only a fallback for countries with no
+                // documented African Mobile Money network, including non-African phones.
+                if ($code === AfricanMobileMoneyCatalog::CARD_SIM) {
+                    return app()->environment(['staging', 'testing'])
+                        && ! AfricanMobileMoneyCatalog::hasMobileMoney($country);
+                }
+                // The generic test-only wallet is retired; it must never be accepted
+                // even when an older database settings version still contains it.
+                if ($code === 'AFRICA_WALLET_TEST') {
+                    return false;
+                }
                 $countries = $method['countries'] ?? [];
                 return ! is_array($countries) || $countries === [] ||
                     ($country !== null && in_array($country, $countries, true));

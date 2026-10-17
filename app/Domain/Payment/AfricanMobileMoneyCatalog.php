@@ -161,7 +161,7 @@ final class AfricanMobileMoneyCatalog
         'MIXX' => 'Mixx Tanzania',
         'TPESA' => 'T-Pesa',
     ];
-    public const GENERIC_TEST_WALLET = 'AFRICA_WALLET_TEST';
+    public const CARD_SIM = 'CARD_SIM';
 
     public static function methods(bool $simulation): array
     {
@@ -182,10 +182,11 @@ final class AfricanMobileMoneyCatalog
         }
         if ($simulation) {
             $methods[] = [
-                'code' => self::GENERIC_TEST_WALLET,
-                'label' => 'Autre portefeuille mobile (simulation uniquement)',
-                'channel' => 'mobile_money', 'countries' => array_keys(self::CALLING_CODES),
-                'enabled' => true,
+                'code' => self::CARD_SIM,
+                'label' => 'Carte bancaire (simulation uniquement)',
+                'channel' => 'card',
+                // The router constrains it to countries outside African MM coverage.
+                'countries' => [], 'enabled' => true,
             ];
         }
         $methods[] = [
@@ -197,6 +198,11 @@ final class AfricanMobileMoneyCatalog
             'channel' => 'manual', 'countries' => [], 'enabled' => true,
         ];
         return $methods;
+    }
+
+    public static function hasMobileMoney(?string $country): bool
+    {
+        return $country !== null && ! empty(self::COUNTRY_NETWORKS[$country] ?? []);
     }
 
     public static function countryFromPhone(?string $phone): ?string
@@ -221,7 +227,7 @@ final class AfricanMobileMoneyCatalog
         foreach (self::LABELS as $code => $_label) {
             $modes[$code] = 'psp';
         }
-        $modes[self::GENERIC_TEST_WALLET] = 'psp';
+        $modes[self::CARD_SIM] = 'psp';
         $modes['BANK_TRANSFER'] = 'manual';
         $modes['CASH'] = 'manual';
         return $modes;

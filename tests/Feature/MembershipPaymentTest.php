@@ -535,3 +535,31 @@ it('rejects a foreign phone without an enabled operator and prevents a test chec
 
     expect(PaymentAttempt::query()->count())->toBe(0);
 });
+
+
+it('accepts simulated card fallback for a non-African phone and never creates a real charge', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'CARD_SIM',
+        'payment_phone' => '+33612345678',
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated()
+        ->assertJsonPath('data.method', 'CARD_SIM')
+        ->assertJsonPath('data.provider', 'fake')
+        ->assertJsonPath('data.simulation_available', true);
+});
+
+it('accepts simulated card fallback in an African country without a named mobile money network', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'CARD_SIM',
+        'payment_phone' => '+213555123456',
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated()->assertJsonPath('data.method', 'CARD_SIM');
+});
+
+it('refuses simulated card on a phone from an African mobile money market', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'CARD_SIM',
+        'payment_phone' => '+22890123456',
+    ], ['Idempotency-Key' => (string) Str::ulid()])->assertStatus(422);
+    expect(PaymentAttempt::count())->toBe(0);
+});

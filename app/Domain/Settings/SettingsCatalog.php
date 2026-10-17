@@ -448,7 +448,7 @@ final class SettingsCatalog
                 'value' => ['required', 'min:1'],
                 'value.*.code' => ['required', 'string', 'alpha_dash:ascii', 'distinct'],
                 'value.*.label' => ['required', 'string', 'max:80'],
-                'value.*.channel' => ['required', 'in:mobile_money,manual'],
+                'value.*.channel' => ['required', 'in:mobile_money,card,manual'],
                 'value.*.countries' => ['sometimes', 'array', 'max:250'],
                 'value.*.countries.*' => ['required', 'string', 'size:2', 'alpha:ascii'],
                 'value.*.enabled' => ['required', 'boolean'],

@@ -44,10 +44,15 @@ it('keeps new African payment providers disabled in production', function () {
     }
 });
 
-it('offers a generic test-only mobile wallet for all 54 African countries', function () {
-    $fallback = collect(Catalog::methods(true))->firstWhere('code', Catalog::GENERIC_TEST_WALLET);
-    expect($fallback)->not->toBeNull()
-        ->and($fallback['countries'])->toHaveCount(54)
-        ->and($fallback['label'])->toContain('simulation');
-    expect(collect(Catalog::methods(false))->firstWhere('code', Catalog::GENERIC_TEST_WALLET))->toBeNull();
+it('offers a simulated bank card only as fallback instead of inventing African wallets', function () {
+    $card = collect(Catalog::methods(true))->firstWhere('code', Catalog::CARD_SIM);
+    expect($card)->not->toBeNull()
+        ->and($card['channel'])->toBe('card')
+        ->and($card['label'])->toContain('simulation')
+        ->and(Catalog::hasMobileMoney('TG'))->toBeTrue()
+        ->and(Catalog::hasMobileMoney('BF'))->toBeTrue()
+        ->and(Catalog::hasMobileMoney('DZ'))->toBeFalse()
+        ->and(Catalog::hasMobileMoney(null))->toBeFalse();
+    expect(collect(Catalog::methods(true))->firstWhere('code', 'AFRICA_WALLET_TEST'))->toBeNull();
+    expect(collect(Catalog::methods(false))->firstWhere('code', Catalog::CARD_SIM))->toBeNull();
 });
