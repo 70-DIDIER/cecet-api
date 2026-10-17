@@ -129,7 +129,10 @@ class SuperadminSecurityController
 
             return $valid ? $challenge : null;
         });
-        abort_unless($result, 422, 'Code incorrect, expiré ou déjà utilisé.');
+        if (! $result) {
+            Log::warning('superadmin.otp_rejected', ['user_id' => $user->id, 'purpose' => $purpose, 'cert_sha256' => $fp]);
+            abort(422, 'Code incorrect, expiré ou déjà utilisé.');
+        }
 
         return $result;
     }
@@ -149,12 +152,18 @@ class SuperadminSecurityController
     private function pendingKey(User $user, string $fp, string $pem): string
     {
         $id = (string) Str::uuid();
-        DB::table('superadmin_access_keys')->insert([
-            'id' => $id, 'user_id' => $user->id, 'cert_sha256' => $fp,
-            'public_key_pem' => $pem, 'status' => 'pending',
-            'expires_at' => now()->addMinutes(15),
-            'created_at' => now(), 'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($user, $fp, $pem, $id): void {
+            // An unfinished file cannot remain independently activatable after another issuance.
+            DB::table('superadmin_security_profiles')->where('user_id', $user->id)->lockForUpdate()->first();
+            DB::table('superadmin_access_keys')->where('user_id', $user->id)
+                ->where('status', 'pending')->update(['status' => 'revoked', 'updated_at' => now()]);
+            DB::table('superadmin_access_keys')->insert([
+                'id' => $id, 'user_id' => $user->id, 'cert_sha256' => $fp,
+                'public_key_pem' => $pem, 'status' => 'pending',
+                'expires_at' => now()->addMinutes(15),
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        });
 
         return $id;
     }
@@ -260,7 +269,9 @@ class SuperadminSecurityController
         abort_if($challenge->attempts >= config('superadmin.max_attempts', 5), 403);
         // Conditional atomic consume closes the replay window for signed challenges.
         $changed = DB::table('superadmin_security_challenges')->where('id', $challenge->id)
-            ->whereNull('consumed_at')->where('expires_at', '>', now())->update(['consumed_at' => now()]);
+            ->whereNull('consumed_at')->where('expires_at', '>', now())
+            ->where('attempts', '<', config('superadmin.max_attempts', 5))
+            ->update(['consumed_at' => now()]);
         abort_unless($changed === 1, 403, 'Preuve déjà utilisée.');
 
         if ($key->status === 'active') {
@@ -269,10 +280,12 @@ class SuperadminSecurityController
         }
 
         DB::transaction(function () use ($user, $fp, $key): void {
+            DB::table('superadmin_security_profiles')->where('user_id', $user->id)->lockForUpdate()->first();
             $pending = DB::table('superadmin_access_keys')->where('id', $key->id)->lockForUpdate()->first();
             abort_unless($pending && $pending->status === 'pending' && now()->lessThan($pending->expires_at), 403);
             DB::table('superadmin_access_keys')->where('user_id', $user->id)
-                ->where('cert_sha256', $fp)->where('status', 'active')
+                ->where('cert_sha256', $fp)->whereIn('status', ['active', 'pending'])
+                ->where('id', '<>', $key->id)
                 ->update(['status' => 'revoked', 'updated_at' => now()]);
             DB::table('superadmin_access_keys')->where('id', $key->id)->update([
                 'status' => 'active', 'activated_at' => now(),
