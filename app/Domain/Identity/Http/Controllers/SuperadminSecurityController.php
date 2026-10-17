@@ -149,9 +149,10 @@ class SuperadminSecurityController
         return $pem;
     }
 
-    private function pendingKey(User $user, string $fp, string $pem): string
+    private function pendingKey(User $user, string $fp, string $pem, ?string $requestedId = null): string
     {
-        $id = (string) Str::uuid();
+        $id = $requestedId ?? (string) Str::uuid();
+        abort_if(DB::table('superadmin_access_keys')->where('id', $id)->exists(), 409, 'Identifiant de clé déjà utilisé.');
         DB::transaction(function () use ($user, $fp, $pem, $id): void {
             // An unfinished file cannot remain independently activatable after another issuance.
             DB::table('superadmin_security_profiles')->where('user_id', $user->id)->lockForUpdate()->first();
@@ -214,7 +215,7 @@ class SuperadminSecurityController
     {
         [$user, $fp, $profile] = $this->identity($request);
         abort_if($profile, 409);
-        $data = $request->validate(['challenge_id' => ['required', 'uuid'], 'codes' => ['required', 'array', 'size:3'], 'codes.*' => ['required', 'digits:6']]);
+        $data = $request->validate(['challenge_id' => ['required', 'uuid'], 'codes' => ['required', 'array', 'size:3'], 'codes.*' => ['required', 'digits:6'], 'key_id' => ['required', 'uuid']]);
         $pem = $this->validatedKey($request);
         $challenge = $this->take($user, $fp, 'enroll', $data['challenge_id'], $data['codes']);
         $emails = json_decode($challenge->email_addresses, true);
@@ -225,7 +226,7 @@ class SuperadminSecurityController
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        return $this->respond(['key_id' => $this->pendingKey($user, $fp, $pem), 'activation_required' => true]);
+        return $this->respond(['key_id' => $this->pendingKey($user, $fp, $pem, $data['key_id']), 'activation_required' => true]);
     }
 
     public function keyChallenge(Request $request): JsonResponse
