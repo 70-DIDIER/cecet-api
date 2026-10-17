@@ -52,6 +52,18 @@ V5-12 : toute évolution future du code met à jour le présent cahier cumulatif
 ## 11. Points ouverts avant production
 Obtenir les fichiers de logos des opérateurs manquants auprès des marques et vérifier leurs droits d'usage. Auditer dépendances frontend et résoudre les vulnérabilités. Recetter un véritable parcours utilisateur connecté complet. Confirmer par contrats les moyens de paiement réellement autorisés (la recette simulée ne vaut pas agrément). Toute mise en production réelle de la carte requerra prestataire PCI DSS et une nouvelle décision de gouvernance.
 
+## 12. Continuité des versions frontend — correctif du 17 octobre 2026
+
+**Incident identifié :** malgré le statut HTTP 200 de l'interface et le bon fonctionnement de l'API, les déploiements React/Vite remplaçaient un jeu de fichiers JS/CSS fingerprintés. Une session déjà ouverte pouvait tenter de charger un ancien chunk dynamique, recevoir HTTP 404 et laisser une fonction ou une page blanche.
+
+**Règle de déploiement v5 obligatoire :** le script `70-DIDIER/CECT-frontend: custum / scripts/deploy-staging.sh` doit conserver dans la nouvelle release tous les assets `.js` et `.css` à empreinte des releases antérieures issues de Didier. Les assets portant la même empreinte ne sont jamais écrasés ; les anciens fichiers HTML, secrets et données financières ne sont pas copiés. La publication par lien symbolique et la procédure de rollback restent atomiques.
+
+**Recette de non-régression :** vérifier les fichiers d'entrée HTML et les chunks JS/CSS des anciennes releases avec HTTP 200 et type MIME correct après chaque publication. Le serveur ne doit pas effacer les fichiers auxquels une session ouverte peut encore faire référence.
+
+**Amélioration d'exploitation ouverte :** configurer dans Nginx, après vérification des droits administrateur, des en-têtes de cache adaptés : HTML avec revalidation fréquente, assets à nom fingerprinté avec cache immuable. Cette amélioration exige un changement d'infrastructure distinct et n'est pas déclarée réalisée.
+
+Les conditions de recette fonctionnelle (authentification complète et simulateurs de paiements dans un navigateur réel) restent applicables ; la disponibilité HTTP n'est pas une validation de l'expérience utilisateur.
+
 ---
 # ANNEXE HISTORIQUE : Cahier des charges v4.0 intégral
 Attention : les décisions v5.0 ci-dessus prévalent sur les anciennes formulations contradictoires.
