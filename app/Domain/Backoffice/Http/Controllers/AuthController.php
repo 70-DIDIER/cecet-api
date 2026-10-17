@@ -34,7 +34,7 @@ class AuthController
     {
         $user = Auth::guard('web')->user();
 
-        if ($user instanceof User && $user->isStaff() && $user->status === UserStatus::Active) {
+        if ($user instanceof User && $user->isStaff() && $user->status === UserStatus::Active && (! $user->isSuperadmin() || ! config('superadmin.enabled'))) {
             return redirect()->route('backoffice.dashboard');
         }
 
