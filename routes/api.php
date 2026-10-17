@@ -9,6 +9,7 @@ use App\Domain\Exchange\Http\Controllers\MemberExchangeController;
 use App\Domain\Exchange\Http\Controllers\ValidationController;
 use App\Domain\Identity\Enums\UserKind;
 use App\Domain\Identity\Http\Controllers\LoginController;
+use App\Domain\Identity\Http\Controllers\SuperadminSecurityController;
 use App\Domain\Identity\Http\Controllers\OtpController;
 use App\Domain\Identity\Http\Controllers\PasswordResetController;
 use App\Domain\Identity\Http\Controllers\RegistrationController;
@@ -66,6 +67,24 @@ Route::prefix('v1')->name('v1.')->group(function () {
         });
     });
 
+    // Every route here requires a valid client certificate presented to the isolated Nginx vhost.
+    Route::prefix('superadmin')->name('superadmin.')->middleware(['superadmin.mtls', 'throttle:5,1'])->group(function () {
+        Route::get('status', [SuperadminSecurityController::class, 'status']);
+        Route::post('enroll/start', [SuperadminSecurityController::class, 'enrollStart']);
+        Route::post('enroll/finish', [SuperadminSecurityController::class, 'enrollFinish']);
+        Route::post('key/challenge', [SuperadminSecurityController::class, 'keyChallenge']);
+        Route::post('key/prove', [SuperadminSecurityController::class, 'keyProve']);
+        Route::post('login/verify', [SuperadminSecurityController::class, 'loginVerify']);
+        Route::post('rotate/finish', [SuperadminSecurityController::class, 'rotateFinish']);
+        Route::post('recover/start', [SuperadminSecurityController::class, 'recoverStart']);
+        Route::post('recover/finish', [SuperadminSecurityController::class, 'recoverFinish']);
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::get('security', [SuperadminSecurityController::class, 'security']);
+            Route::post('emails/start', [SuperadminSecurityController::class, 'emailsStart']);
+            Route::post('emails/finish', [SuperadminSecurityController::class, 'emailsFinish']);
+        });
+    });
+
     /*
      * Public pack catalog (the price to pay is personalised when a member is signed in).
      */
@@ -87,7 +106,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
     /*
      * Authenticated account (members and staff).
      */
-    Route::middleware(['auth:sanctum', 'throttle:api-user'])->group(function () {
+    Route::middleware(['auth:sanctum', 'superadmin.session', 'throttle:api-user'])->group(function () {
         Route::post('auth/logout', [SessionController::class, 'logout'])->name('auth.logout');
         Route::post('auth/step-up', [StepUpController::class, 'store'])->middleware('throttle:auth-otp')->name('auth.step-up');
         Route::post('auth/step-up/verify', [StepUpController::class, 'confirm'])->middleware('throttle:auth-otp')->name('auth.step-up.verify');
