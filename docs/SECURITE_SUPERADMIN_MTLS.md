@@ -30,7 +30,7 @@ bash scripts/create-superadmin-client-pki.sh "$HOME/secure-cect-pki" superadmin-
 
 La commande génère `ca.crt`, la clé racine **chiffrée** `ca.key`, un certificat client `superadmin-principal.crt` et un `.p12` **protégé par mot de passe**. Importer le `.p12` dans le magasin de certificats du navigateur. Certains navigateurs, notamment Firefox, utilisent un magasin de certificats indépendant. Détruire les CSR et extensions intermédiaires après archivage si souhaité, sans perdre les registres nécessaires à la révocation.
 
-Le seul matériel transféré à Nginx est **`ca.crt`** (et ultérieurement la CRL signée). Copier `ca.key` sur un serveur accessible sur Internet est interdit. La clé de certificat client `.key` est non chiffrée pendant l'émission ; la conserver uniquement sur un média chiffré hors ligne, puis la supprimer après transfert vérifié du `.p12`.
+Seuls **`ca.crt` et `clients.crl.pem` (la CRL signée et tenue à jour)** sont transférés à Nginx. Copier `ca.key` sur un serveur accessible sur Internet est interdit. La clé de certificat client `.key` est non chiffrée pendant l'émission ; la conserver uniquement sur un média chiffré hors ligne, puis la supprimer après transfert vérifié du `.p12`.
 
 ## Variables API
 
@@ -43,7 +43,7 @@ SUPERADMIN_BOOTSTRAP_CERT_SHA256=<EMPREINTE_SHA256_DER_DU_CERTIFICAT_CLIENT>
 SUPERADMIN_KEY_DAYS=30
 ```
 
-- Installer une virtual host HTTPS fonctionnelle, avec certificat serveur valide (Let's Encrypt ou autre), `ca.crt`, `ssl_verify_client on`.
+- Installer une virtual host HTTPS fonctionnelle, avec certificat serveur valide (Let's Encrypt ou autre), `ca.crt`, la **CRL signée `clients.crl.pem`** et `ssl_verify_client on`.
 - Ajouter le sous-domaine SuperAdmin à `SANCTUM_STATEFUL_DOMAINS` ; sur ce sous-domaine, les appels React sont same-origin, et le cookie Laravel doit être `HttpOnly`, `Secure` et de préférence host-only. Définir `SESSION_SECURE_COOKIE=true`. Éviter un `SESSION_DOMAIN=.domaine` partagé qui faciliterait des transferts de sessions inter-domaines.
 - Déployer la migration `2026_10_18_000000_create_superadmin_security_tables.php` et le frontend Admin (incluant la route `/superadmin/connexion`).
 - Vérifier qu'aucun autre virtual host, route PHP-FPM ou proxy ne transmet `CECT_MTLS_VERIFY`/`CECT_MTLS_CERT` depuis le réseau public, et que l'accès public direct à l'API SuperAdmin est rejeté.
@@ -63,7 +63,7 @@ Les commandes curl avec la clé privée non chiffrée doivent être exécutées 
 ## Gestion opérationnelle
 
 - **CA racine :** disque/média chiffré, coffre physique ou HSM, mot de passe fort distinct, plusieurs sauvegardes scellées, journal d'émission, double contrôle administratif.
-- **Révocation X.509 :** publier une CRL signée et à jour (`ssl_crl`) et définir un processus d'urgence. Il ne suffit pas de révoquer seulement le fichier `.cectkey` si le certificat navigateur est compromis.
+- **Révocation X.509 :** publier une CRL signée et à jour (`ssl_crl`) et définir un processus d'urgence. Une fois sur la machine de CA hors ligne, exécuter `openssl ca -config openssl-ca.cnf -revoke CLIENT.crt`, puis `openssl ca -gencrl -config openssl-ca.cnf -out clients.crl.pem` ; transférer et recharger Nginx. Renouveler la CRL avant ses 7 jours de validité, même sans révocation. Il ne suffit pas de révoquer seulement le fichier `.cectkey` si le certificat navigateur est compromis.
 - **Fichiers .cectkey :** les clés privées RSA exportées dans ces fichiers ne sont **pas chiffrées par l'application**. Stocker chaque fichier sur un volume chiffré ; ne pas l'envoyer par e-mail, cloud non chiffré ni journal applicatif. En production haute assurance, substituer une clé matérielle non exportable/FIDO2 à ce fichier exportable.
 - **OTP :** 6 chiffres, hachage HMAC serveur, TTL 5 minutes, 5 tentatives au maximum, jamais enregistrés dans les logs. Livraison fiable des trois messages requise.
 - **Sessions :** à la connexion, renouveler l'identifiant ; l'accès métier est subordonné au certificat mTLS et à la clé active courante. Mettre une durée de session stricte et invalider les autres sessions SuperAdmin en cas de révocation.
