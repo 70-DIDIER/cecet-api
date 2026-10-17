@@ -14,8 +14,8 @@ server {
     ssl_client_certificate /etc/nginx/cect-pki/ca.crt;
     ssl_verify_client on;
     ssl_verify_depth 1;
-    # Enable as soon as a signed, current CRL is published by the offline CA:
-    # ssl_crl /etc/nginx/cect-pki/clients.crl.pem;
+    # Keep the signed CRL up to date; a stale CRL can block all legitimate clients.
+    ssl_crl /etc/nginx/cect-pki/clients.crl.pem;
 
     add_header Strict-Transport-Security "max-age=31536000" always;
     add_header X-Content-Type-Options nosniff always;
