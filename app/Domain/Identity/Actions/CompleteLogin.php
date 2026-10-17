@@ -20,6 +20,10 @@ class CompleteLogin
     {
         $user = $this->otp->verify($challengeId, $code, OtpPurpose::Login)->user;
 
+        if ($user->isSuperadmin() && config('superadmin.enabled')) {
+            throw IdentityException::invalidCredentials();
+        }
+
         if (! $user->status->canAuthenticate()) {
             throw IdentityException::accountDisabled();
         }
