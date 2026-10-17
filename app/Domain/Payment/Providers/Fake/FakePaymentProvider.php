@@ -10,6 +10,9 @@ use App\Domain\Payment\Data\WebhookEvent;
 use App\Domain\Payment\Enums\ProviderPaymentStatus;
 use App\Domain\Payment\Exceptions\InvalidWebhookSignature;
 use App\Domain\Payment\Exceptions\PaymentProviderException;
+use App\Domain\Payment\Enums\PaymentAttemptStatus;
+use App\Domain\Payment\Enums\PaymentIntentStatus;
+use App\Domain\Payment\Models\PaymentAttempt;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -45,7 +48,7 @@ class FakePaymentProvider implements PaymentProvider
 
     public function fetchTransaction(string $providerTransactionId): ProviderTransaction
     {
-        $state = Cache::get($this->key($providerTransactionId));
+        $state = $this->state($providerTransactionId);
 
         if (! is_array($state)) {
             throw new PaymentProviderException('Unknown fake transaction.');
@@ -86,7 +89,7 @@ class FakePaymentProvider implements PaymentProvider
      */
     public function simulate(string $providerTransactionId, ProviderPaymentStatus $status, ?int $amount = null, ?string $eventId = null): array
     {
-        $state = Cache::get($this->key($providerTransactionId));
+        $state = $this->state($providerTransactionId);
 
         if (! is_array($state)) {
             throw new PaymentProviderException('Unknown fake transaction.');
@@ -113,6 +116,55 @@ class FakePaymentProvider implements PaymentProvider
         ]);
 
         return ['body' => $body, 'headers' => [self::SIGNATURE_HEADER => hash_hmac('sha256', $body, $this->secret())]];
+    }
+
+    /**
+     * Fake checkouts are staging-only, but their actual attempts are persisted.
+     * Recover a PENDING checkout after a cache clear/redeploy without inventing
+     * a new payment or trusting an arbitrary client-supplied transaction ID.
+     *
+     * @return array<string, mixed>
+     */
+    private function state(string $transactionId): array
+    {
+        $state = Cache::get($this->key($transactionId));
+
+        if (is_array($state)) {
+            return $state;
+        }
+
+        if (! app()->environment(['staging', 'testing'])) {
+            throw new PaymentProviderException('Unknown fake transaction.');
+        }
+
+        $attempt = PaymentAttempt::query()
+            ->with('intent')
+            ->where('provider', self::NAME)
+            ->where('provider_transaction_id', $transactionId)
+            ->first();
+
+        if ($attempt === null
+            || $attempt->status !== PaymentAttemptStatus::Pending
+            || $attempt->intent === null
+            || $attempt->intent->status !== PaymentIntentStatus::Open
+        ) {
+            throw new PaymentProviderException('Unknown or closed fake transaction.');
+        }
+
+        $state = [
+            'status' => ProviderPaymentStatus::Pending->value,
+            'amount' => (int) $attempt->intent->total_amount,
+            'currency' => $attempt->intent->currency,
+            'metadata' => [
+                'attempt_id' => $attempt->id,
+                'intent_id' => $attempt->intent->id,
+                'purpose' => $attempt->intent->purpose->value,
+            ],
+        ];
+
+        Cache::put($this->key($transactionId), $state, now()->addDays(2));
+
+        return $state;
     }
 
     private function key(string $transactionId): string

@@ -482,3 +482,24 @@ it('shows a safe information page for historical fake-checkout links on staging'
     app()->detectEnvironment(fn () => 'production');
     $this->get('/fake-checkout/fake_01m55fwt1234')->assertNotFound();
 });
+
+
+it('recovers an owned pending simulated payment after a server cache reset', function () {
+    $attemptId = startMembershipPayment($this->member)->assertCreated()->json('data.id');
+    $transactionId = (string) PaymentAttempt::query()->findOrFail($attemptId)->provider_transaction_id;
+    \Illuminate\Support\Facades\Cache::forget('fake_payment:'.$transactionId);
+
+    $this->withToken(tokenFor($this->member))
+        ->postJson("/api/v1/me/payments/{$attemptId}/simulate")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'approved')
+        ->assertJsonPath('data.simulation_available', false);
+
+    expect($this->member->refresh()->status)->toBe(UserStatus::Active)
+        ->and(PaymentAttempt::query()->count())->toBe(1);
+});
+
+it('never reconstructs unknown fake transactions from arbitrary identifiers', function () {
+    expect(fn () => app(FakePaymentProvider::class)->fetchTransaction('fake_unknown'))
+        ->toThrow(\App\Domain\Payment\Exceptions\PaymentProviderException::class);
+});
