@@ -48,7 +48,7 @@ class StartMembershipPayment
             throw PaymentException::notPayable();
         }
 
-        $channel = $this->router->route($member, $method);
+        $channel = $this->router->route($member, $method, $paymentPhone);
 
         ['attempt' => $attempt, 'reused' => $reused] = DB::transaction(fn (): array => $this->prepare($member, $channel['provider'], $channel['method']));
 

@@ -503,3 +503,35 @@ it('never reconstructs unknown fake transactions from arbitrary identifiers', fu
     expect(fn () => app(FakePaymentProvider::class)->fetchTransaction('fake_unknown'))
         ->toThrow(\App\Domain\Payment\Exceptions\PaymentProviderException::class);
 });
+
+
+it('accepts an international Senegal phone for enabled simulated Wave', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'WAVE',
+        'payment_phone' => '+221771234567',
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated()
+        ->assertJsonPath('data.method', 'WAVE')
+        ->assertJsonPath('data.provider', 'fake')
+        ->assertJsonPath('data.simulation_available', true);
+});
+
+it('refuses a mobile money method not enabled for the payment phone country', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'ORANGE_MONEY',
+        'payment_phone' => '+22890123456',
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertStatus(422);
+
+    expect(PaymentAttempt::query()->count())->toBe(0);
+});
+
+it('rejects a foreign phone without an enabled operator and prevents a test checkout', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'TMONEY',
+        'payment_phone' => '+33612345678',
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertStatus(422);
+
+    expect(PaymentAttempt::query()->count())->toBe(0);
+});

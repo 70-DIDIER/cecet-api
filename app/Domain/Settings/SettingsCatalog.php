@@ -425,6 +425,8 @@ final class SettingsCatalog
             new SettingDefinition('payment.collection_modes', 'payment', SettingType::Json, [
                 'TMONEY' => 'psp',
                 'FLOOZ' => 'psp',
+                'WAVE' => 'psp',
+                'ORANGE_MONEY' => 'psp',
                 'BANK_TRANSFER' => 'manual',
                 'CASH' => 'manual',
             ], 'Routage métier : Mobile Money via provider/simulateur ; banque et espèces via workflow manuel contrôlé.',
@@ -448,6 +450,9 @@ final class SettingsCatalog
             new SettingDefinition('payment.methods', 'payment', SettingType::Json, [
                 ['code' => 'TMONEY', 'label' => 'T-Money'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
                 ['code' => 'FLOOZ', 'label' => 'Flooz'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
+                // Available only as test simulations until the cooperative configures real rails.
+                ['code' => 'WAVE', 'label' => 'Wave'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['SN', 'CI'], 'enabled' => $simulationEnvironment],
+                ['code' => 'ORANGE_MONEY', 'label' => 'Orange Money'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['SN', 'CI'], 'enabled' => $simulationEnvironment],
                 ['code' => 'BANK_TRANSFER', 'label' => 'Virement bancaire'.$methodSuffix, 'channel' => 'manual', 'countries' => [], 'enabled' => true],
                 ['code' => 'CASH', 'label' => 'Espèces'.$methodSuffix, 'channel' => 'manual', 'countries' => [], 'enabled' => true],
             ], 'Moyens métier. Une liste de pays vide signifie disponibilité globale ; le routage réel reste soumis à la gouvernance provider.', rules: [

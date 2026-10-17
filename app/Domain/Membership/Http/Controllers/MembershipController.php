@@ -95,7 +95,7 @@ class MembershipController
     {
         $validated = $request->validate([
             'method' => ['nullable', 'string', 'max:30'],
-            'payment_phone' => ['nullable', 'string', 'regex:/^\\+228[0-9]{8}$/'],
+            'payment_phone' => ['nullable', 'string', 'regex:/^\\+[1-9][0-9]{7,14}$/'],
         ]);
 
         $member = $this->member($request);
