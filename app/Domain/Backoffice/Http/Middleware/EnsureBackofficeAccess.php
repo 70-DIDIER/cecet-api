@@ -25,7 +25,7 @@ class EnsureBackofficeAccess
             return redirect()->guest(route('backoffice.login'));
         }
 
-        if (! $user->isStaff() || $user->status !== UserStatus::Active) {
+        if (! $user->isStaff() || $user->status !== UserStatus::Active || ($user->isSuperadmin() && config('superadmin.enabled'))) {
             Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
