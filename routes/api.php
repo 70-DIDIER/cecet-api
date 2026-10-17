@@ -68,7 +68,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
     });
 
     // Every route here requires a valid client certificate presented to the isolated Nginx vhost.
-    Route::prefix('superadmin')->name('superadmin.')->middleware(['superadmin.mtls', 'throttle:5,1'])->group(function () {
+    Route::prefix('superadmin')->name('superadmin.')->middleware(['superadmin.mtls', 'throttle:20,1'])->group(function () {
         Route::get('status', [SuperadminSecurityController::class, 'status']);
         Route::post('enroll/start', [SuperadminSecurityController::class, 'enrollStart']);
         Route::post('enroll/finish', [SuperadminSecurityController::class, 'enrollFinish']);
