@@ -58,7 +58,9 @@ it('opens a hosted checkout for the configured fee and ignores any amount sent b
         ->assertCreated()
         ->assertJsonPath('data.status', 'pending')
         ->assertJsonPath('data.amount', 25000)
-        ->assertJsonPath('data.currency', 'XOF');
+        ->assertJsonPath('data.currency', 'XOF')
+        ->assertJsonPath('data.provider', 'fake')
+        ->assertJsonPath('data.simulation_available', true);
 
     expect($response->json('data.checkout_url'))->toStartWith('http');
 
@@ -466,4 +468,17 @@ describe('demo gateway bypass', function () {
 
         expect($this->member->refresh()->status)->toBe(UserStatus::PendingPayment);
     });
+});
+
+
+it('shows a safe information page for historical fake-checkout links on staging', function () {
+    app()->detectEnvironment(fn () => 'staging');
+
+    $this->get('/fake-checkout/fake_01m55fwt1234')
+        ->assertOk()
+        ->assertSee('mode simulation')
+        ->assertSee('aucun paiement');
+
+    app()->detectEnvironment(fn () => 'production');
+    $this->get('/fake-checkout/fake_01m55fwt1234')->assertNotFound();
 });
