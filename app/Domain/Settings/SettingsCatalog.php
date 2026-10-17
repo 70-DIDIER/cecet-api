@@ -422,14 +422,9 @@ final class SettingsCatalog
                     'value.*.fixed_xof' => ['required', 'integer', 'min:0'],
                     'value.*.rounding_xof' => ['sometimes', 'integer', 'min:1', 'max:1000'],
                 ]),
-            new SettingDefinition('payment.collection_modes', 'payment', SettingType::Json, [
-                'TMONEY' => 'psp',
-                'FLOOZ' => 'psp',
-                'WAVE' => 'psp',
-                'ORANGE_MONEY' => 'psp',
-                'BANK_TRANSFER' => 'manual',
-                'CASH' => 'manual',
-            ], 'Routage métier : Mobile Money via provider/simulateur ; banque et espèces via workflow manuel contrôlé.',
+            new SettingDefinition('payment.collection_modes', 'payment', SettingType::Json,
+                \App\Domain\Payment\AfricanMobileMoneyCatalog::mobileCollectionModes(),
+                'Routage de test des opérateurs mobiles et règlements manuels (aucun débit réel).',
                 rules: ['value' => ['required'], 'value.*' => ['in:psp,manual']]),
             new SettingDefinition('payment.manual_instructions', 'payment', SettingType::Json,
                 $simulationEnvironment ? [
@@ -447,15 +442,9 @@ final class SettingsCatalog
             new SettingDefinition('payment.webhook_tolerance_seconds', 'payment', SettingType::Integer, 300,
                 'Écart maximal toléré entre l’horodatage signé d’un webhook et l’heure serveur (secondes).',
                 SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:0', 'max:3600']]),
-            new SettingDefinition('payment.methods', 'payment', SettingType::Json, [
-                ['code' => 'TMONEY', 'label' => 'T-Money'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
-                ['code' => 'FLOOZ', 'label' => 'Flooz'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
-                // Available only as test simulations until the cooperative configures real rails.
-                ['code' => 'WAVE', 'label' => 'Wave'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['SN', 'CI'], 'enabled' => $simulationEnvironment],
-                ['code' => 'ORANGE_MONEY', 'label' => 'Orange Money'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['SN', 'CI'], 'enabled' => $simulationEnvironment],
-                ['code' => 'BANK_TRANSFER', 'label' => 'Virement bancaire'.$methodSuffix, 'channel' => 'manual', 'countries' => [], 'enabled' => true],
-                ['code' => 'CASH', 'label' => 'Espèces'.$methodSuffix, 'channel' => 'manual', 'countries' => [], 'enabled' => true],
-            ], 'Moyens métier. Une liste de pays vide signifie disponibilité globale ; le routage réel reste soumis à la gouvernance provider.', rules: [
+            new SettingDefinition('payment.methods', 'payment', SettingType::Json,
+                \App\Domain\Payment\AfricanMobileMoneyCatalog::methods($simulationEnvironment),
+                'Simulation Mobile Money : pays documentés BCEAO/GSMA, sans contrat de paiement réel.', rules: [
                 'value' => ['required', 'min:1'],
                 'value.*.code' => ['required', 'string', 'alpha_dash:ascii', 'distinct'],
                 'value.*.label' => ['required', 'string', 'max:80'],
