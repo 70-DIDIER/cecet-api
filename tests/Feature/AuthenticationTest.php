@@ -178,3 +178,13 @@ it('does not reveal whether an account exists when a reset is requested', functi
 
     Mail::assertNothingQueued();
 });
+
+it('returns a normalized 401 for unauthenticated API requests without an Accept header', function () {
+    $this->get('/api/v1/me')
+        ->assertUnauthorized()
+        ->assertJsonPath('code', 'UNAUTHENTICATED');
+
+    $this->get('/api/v1/admin/dashboard')
+        ->assertUnauthorized()
+        ->assertJsonPath('code', 'UNAUTHENTICATED');
+});

@@ -42,6 +42,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // The React site authenticates with HttpOnly session cookies (Sanctum SPA); other clients use bearer tokens.
         $middleware->statefulApi();
+        // Never attempt to redirect an unauthenticated API request to the
+        // non-existent route named "login". API guests receive normalized 401s.
+        $middleware->redirectGuestsTo(
+            fn (Request $request): ?string => $request->is('api/*') ? null : route('backoffice.login'),
+        );
         $middleware->append(AddSecurityHeaders::class);
 
         $middleware->alias([
