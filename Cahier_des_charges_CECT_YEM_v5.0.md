@@ -263,6 +263,45 @@ La table des versions `pack_versions` reste la source contractuelle. Pour les se
 - Recette navigateur à effectuer : créer une nouvelle version de pack Consommateur avec 5 % et vérifier la distribution et les crédits YEM après simulation ; configurer un pack Personnel avec 5 %, effectuer deux rechargements et vérifier les crédits de cashback distincts ; vérifier l'absence de bonus sur Vendeur/Marchand ; vérifier qu'un ancien contrat n'est pas recalculé.
 - La configuration financière réelle et les taux définitifs doivent être ratifiés par la coopérative avant toute production.
 
+## 19. ADDENDUM V5.7 — Catalogue administrable, adhésions et calcul transparent (18 octobre 2026)
+
+Cette décision complète l'addendum 18 et prévaut sur les anciennes grilles/UI incompatibles. Les branches de référence demeurent `custum` des dépôts `70-DIDIER`. Aucune suppression réelle de données ni nouvelle tarification n'est déduite des illustrations.
+
+### 19.1 Quatre onglets distincts de packs
+
+Le SuperAdmin dispose de **quatre onglets explicites** : **Vendeur**, **Consommateur**, **Personnel**, **Marchand**, avec recherche, vue « Toutes les formules » et accès séparé aux **Archives**. Chaque fiche permet : créer, dupliquer, modifier le nom/le niveau, définir une version tarifaire et ses conditions, publier, suspendre, réactiver, retirer et « **Supprimer / retirer** », avec un motif. Les montants contractuels sont versionnés, immuables après publication, et jamais recalculés rétroactivement.
+
+**Suppression sécurisée d'un pack :**
+- Si le plan n'a **jamais été publié et jamais été souscrit**, suppression physique du brouillon et de ses versions brouillon, journalisée avec motif.
+- Si le plan a **déjà été publié ou souscrit**, l'action le **classe en archive**, masquée du catalogue actif et inaccessible aux nouvelles souscriptions, mais elle conserve les versions, les contrats, les crédits YEM et les journaux financiers. L'archive reste consultable séparément. Les droits d'une souscription existante ne doivent pas être effacés par l'archivage.
+- La route `DELETE /api/v1/admin/packs/plans/{plan}` requiert `packs.manage`, la confirmation renforcée `step-up` et un motif de décision ; la réponse indique `deleted` ou `archived`.
+
+### 19.2 Définition simplifiée du pack Consommateur
+
+Le SuperAdmin définit **un seul prix de vente du pack en FCFA**, la fréquence de versement et le nombre de périodes. Le **cours de vente YEM** est un paramètre global modifiable par le SuperAdmin (`rates.sale_xof_per_yem`), puis **figé à la création de la version contractuelle** lors du calcul des YEM par période. Le formulaire déduit automatiquement la quantité totale de YEM : `prix_du_pack / cours_vente_YEM`. Pour les versions nouvelles, le champ technique `reference_value_xof` ne doit plus être demandé une seconde fois ni un quota YEM saisi à la main ; le backend le déduit.
+
+**Exemple demandé (illustratif, non une valeur appliquée à une formule existante) :** 100 000 FCFA au cours de 650 FCFA/YEM donnent 153,846153 YEM de base (6 décimales). Un cashback de **5 %** ajoute 7,692307 YEM, soit **161,538460 YEM** au total après arrondis/quantification au niveau du backend. Le membre paie toujours 100 000 FCFA, pas 95 000. Le total est distribué selon les périodes définies par la version ; le bonus est tracé à part.
+
+### 19.3 Définition simplifiée du pack Personnel
+
+Le pack Personnel donne accès à un solde **rechargeable**, sans quota fixe et sans échéancier périodique. Le SuperAdmin définit la tarification d'ouverture éventuelle, le montant minimal de rechargement et **dans la version du pack** le taux/limite de cashback. À chaque rechargement `M` FCFA, le membre achète `M / cours_de_vente_actuel` YEM et reçoit un bonus supplémentaire selon le taux propre à sa version de pack. Le bonus est calculé et figé **au moment de chaque recharge**, puis crédité après confirmation du paiement. Les frais d'ouverture ne doivent pas être assimilés à un rechargement sans action métier explicite.
+
+### 19.4 Gestion des adhésions par les Administrateurs
+
+La page **Membres** doit permettre la création **d'une invitation à adhérer** (type PF/PM, prénom et nom du représentant, e-mail), l'envoi d'un lien vers le formulaire public prérempli, la suspension, la réactivation et la clôture de l'adhésion. Le candidat **choisit lui-même son mot de passe**, confirme son e-mail, accepte lui-même les statuts et complète ses données et sa signature ; l'Administrateur ne peut pas attester ces consentements à sa place ni déclarer artificiellement un paiement.
+
+- **Suspension** : bloque connexions et opérations, révoque sessions, conserve les historiques et peut être levée.
+- **Réactivation** : restitue l'état précédant la suspension, avec motif.
+- **Suppression d'une adhésion utilisée** : opération de **clôture**, terminale et historisée, avec révocation des sessions, sans effacement destructif des transactions/écritures YEM et preuves légales. Le compte clos peut être recherché à des fins d'audit mais ne doit plus opérer.
+- Ces actions demandent l'autorisation `members.manage`, une nouvelle confirmation `step-up` et un **motif obligatoire** pour la suspension, réactivation et clôture.
+- Les invitations doivent être limitées en fréquence et tracées ; l'e-mail et les informations ne constituent pas encore une adhésion active.
+
+### 19.5 Cashback et critères de recette
+
+Le cashback **se configure exclusivement sur chaque nouvelle version** de pack Consommateur ou Personnel. Les packs Vendeur et Marchand ne reçoivent jamais de bonus, même si un ancien paramètre l'exige. Le réglage global est conservé uniquement pour les anciennes versions sans politique de pack, sans second formulaire d'administration.
+
+Recette nécessaire avant déclaration de conformité : compilation React Admin/Public, syntaxe PHP et routes, test sécurisé de suppression brouillon vs archivage d'un plan publié, test de motif d'adhésion et invitation, test de non-contournement RBAC, conservation des historiques, confirmation 403 sur entrée SuperAdmin sans certificat, 200 sur interface et API, paiement test et comparaison des écritures YEM achetés vs cashback. **Ne jamais supprimer automatiquement les 25 packs existants ni les membres pour réaliser cette recette.**
+
 ---
 # ANNEXE HISTORIQUE : Cahier des charges v4.0 intégral
 Attention : les décisions v5.0 ci-dessus prévalent sur les anciennes formulations contradictoires.
