@@ -155,6 +155,22 @@ Les grilles historiques C7–C8 et M1–M10 ne doivent pas être ajoutées artif
 - Le déploiement n'est déclaré réussi que si le build React, la syntaxe PHP, les routes d'édition, l'API publique, l'accès Admin normal et le mTLS sans certificat ont été vérifiés après publication.
 - Vérifier explicitement en recette : nouvelle formule, version, publication avec transition, suspension/réactivation, duplication, modification de niveau, éligibilité Marchand PM, refus pour Administrateur du changement de frais PF/PM, date d'effet et consultation d'historique.
 
+## 16. ADDENDUM V5.4 — Affichage synchronisé des frais d'adhésion PF/PM (18 octobre 2026)
+
+Le SuperAdmin est l'unique autorité applicative pour définir `membership.fee.natural_person` et `membership.fee.legal_person`. Les valeurs évoluent en base par versions historisées, avec motif et date d'effet, et sont servies à l'inscription via `GET /api/v1/config`.
+
+**Règles impératives pour toutes les interfaces publiques :**
+
+- Le formulaire d'inscription affiche pour chaque option du champ « Type de membre » le **prix courant renvoyé par l'API**, et le récapitulatif sous le champ affiche strictement le même montant.
+- Aucun montant PF/PM fixe, ni en français ni en anglais, ne doit subsister dans les libellés de sélection, la FAQ, les pages d'accueil, les descriptions commerciales ou les formulaires.
+- Un appel échoué à l'API ne doit jamais être remplacé silencieusement par un ancien montant : afficher « Tarif temporairement indisponible » ou une attente de chargement, selon l'état.
+- Le catalogue public et les formulaires consomment une même source : `membership_fees.natural_person` et `membership_fees.legal_person` ; la configuration se rafraîchit lors de l'ouverture, au retour de l'onglet et périodiquement.
+- Le backend **recalcule les frais au moment d'enregistrer/traiter une adhésion** : le montant montré côté React est informatif, il ne détermine jamais le montant payable.
+- Le 18 octobre 2026, après modification par le SuperAdmin, la configuration publique renvoie **20 000 FCFA pour PF** et **200 000 FCFA pour PM**, alors que le menu employait auparavant l'ancien montant statique **25 000 FCFA**. La correction frontale a été compilée et déployée ; aucune réinitialisation du tarif vers 25 000 FCFA n'a été effectuée.
+- Toute publication modifiant les tarifs doit tester `/inscription`, `/packs`, les ressources JS, `/api/v1/config`, ainsi que l'accès mTLS SuperAdmin refusé sans certificat (403). Les anciennes releases sont conservées pour rollback.
+
+**Implémentation :** `70-DIDIER/CECT-frontend:custum` (formulaire, traductions FR/EN, cache de la configuration publique). Le dépôt API `custum` conserve les paramètres modifiables par le SuperAdmin ; pas de modification des montants contractuels via un frontend.
+
 ---
 # ANNEXE HISTORIQUE : Cahier des charges v4.0 intégral
 Attention : les décisions v5.0 ci-dessus prévalent sur les anciennes formulations contradictoires.
