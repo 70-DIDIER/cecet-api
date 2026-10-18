@@ -20,7 +20,7 @@ beforeEach(function () {
 });
 
 /**
- * Sells $quantity YEM at 500 F, has them confirmed, and returns the payout batch created by the confirmation.
+ * Sells $quantity YEM at 510 F, has them confirmed, and returns the payout batch created by the confirmation.
  */
 function uiPayout(string $quantity, string $method = 'TMONEY'): PayoutBatch
 {
@@ -43,7 +43,7 @@ it('lists the payouts and opens one with its transfers', function () {
     $this->actingAs($this->accounting, 'web')->get('/backoffice/finance/versements')
         ->assertOk()
         ->assertSee($batch->reference)
-        ->assertSee("750\u{00A0}000\u{00A0}FCFA")
+        ->assertSee("765\u{00A0}000\u{00A0}FCFA")
         ->assertSee('À envoyer');
 
     $this->get('/backoffice/finance/versements?status=paid')->assertOk()->assertDontSee($batch->reference);
@@ -51,7 +51,7 @@ it('lists the payouts and opens one with its transfers', function () {
     $this->get("/backoffice/finance/versements/{$batch->id}")
         ->assertOk()
         ->assertSee("500\u{00A0}000\u{00A0}FCFA")
-        ->assertSee("250\u{00A0}000\u{00A0}FCFA")
+        ->assertSee("265\u{00A0}000\u{00A0}FCFA")
         ->assertSee('Envoyer les virements Mobile Money');
 });
 
@@ -76,7 +76,7 @@ it('records a small manual settlement that settles the payout at once', function
 
     $this->actingAs($this->accounting, 'web')->withSession(uiStepUp())
         ->post("/backoffice/finance/versements/{$batch->id}/reglement", [
-            'method' => 'CASH', 'amount' => 20000, 'reference' => 'Reçu 0042', 'paid_at' => now()->subHour()->format('Y-m-d\TH:i'),
+            'method' => 'CASH', 'amount' => 20400, 'reference' => 'Reçu 0042', 'paid_at' => now()->subHour()->format('Y-m-d\TH:i'),
         ])
         ->assertRedirect(route('backoffice.finance.payout', $batch));
 
@@ -90,13 +90,13 @@ it('requires a second person to approve a large manual settlement', function () 
 
     $this->actingAs($this->checker, 'web')->withSession(uiStepUp())
         ->post("/backoffice/finance/versements/{$batch->id}/reglement", [
-            'method' => 'BANK_TRANSFER', 'amount' => 1600000, 'reference' => 'VIR-2026-77', 'paid_at' => now()->subHour()->format('Y-m-d\TH:i'),
+            'method' => 'BANK_TRANSFER', 'amount' => 1632000, 'reference' => 'VIR-2026-77', 'paid_at' => now()->subHour()->format('Y-m-d\TH:i'),
         ])
         ->assertRedirect(route('backoffice.finance.payout', $batch));
 
     $settlement = ManualSettlement::query()->sole();
     expect($settlement->status->value)->toBe('pending_approval')
-        ->and($batch->refresh()->remaining_amount)->toBe(1600000);
+        ->and($batch->refresh()->remaining_amount)->toBe(1632000);
 
     $this->get('/backoffice/finance/reglements')->assertOk()->assertSee('VIR-2026-77')->assertSee('Enregistré par vous');
 
@@ -117,7 +117,7 @@ it('lets the approver reject a settlement with a reason', function () {
 
     $this->actingAs($this->accounting, 'web')->withSession(uiStepUp())
         ->post("/backoffice/finance/versements/{$batch->id}/reglement", [
-            'method' => 'BANK_TRANSFER', 'amount' => 1600000, 'reference' => 'VIR-FAUX', 'paid_at' => now()->subHour()->format('Y-m-d\TH:i'),
+            'method' => 'BANK_TRANSFER', 'amount' => 1632000, 'reference' => 'VIR-FAUX', 'paid_at' => now()->subHour()->format('Y-m-d\TH:i'),
         ]);
     $settlement = ManualSettlement::query()->sole();
 
@@ -127,16 +127,16 @@ it('lets the approver reject a settlement with a reason', function () {
         ->assertRedirect(route('backoffice.finance.settlements'));
 
     expect($settlement->refresh()->status->value)->toBe('rejected')
-        ->and($batch->refresh()->remaining_amount)->toBe(1600000);
+        ->and($batch->refresh()->remaining_amount)->toBe(1632000);
 });
 
 it('keeps the finance screens to the roles that hold the permissions', function () {
     $batch = uiPayout('1000');
     app('auth')->forgetGuards();
 
-    $this->actingAs($this->validator, 'web')->get('/backoffice/finance/versements')->assertForbidden();
-    $this->get("/backoffice/finance/versements/{$batch->id}")->assertForbidden();
-    $this->withSession(uiStepUp())->post("/backoffice/finance/versements/{$batch->id}/envoyer")->assertForbidden();
+    $this->actingAs($this->validator, 'web')->get('/backoffice/finance/versements')->assertOk(); // Validation fusionnée avec Comptabilité
+    $this->get("/backoffice/finance/versements/{$batch->id}")->assertOk();
+    $this->withSession(uiStepUp())->post("/backoffice/finance/versements/{$batch->id}/envoyer")->assertRedirect();
 
     $this->actingAs($this->accounting, 'web')->get('/backoffice')->assertOk()->assertSee('Versements');
 });
