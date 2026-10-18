@@ -56,3 +56,17 @@
 - Exécuter `php artisan ledger:verify` sur staging avant reset puis après reset.
 - Préserver le certificat et le fichier d'accès du SuperAdmin ; ne jamais déposer une clé privée dans GitHub, dans des logs ou dans un export demo.
 - Faire des sauvegardes et une marche arrière testée avant tout remplacement des fichiers UI ou activation du contrôle de connexion staff.
+
+
+## Addendum urgent QA v5.9 — correctifs déposés pendant l'indisponibilité du serveur
+
+**État : code commité, non redéployé, suite globale non revalidée.** La machine Remote Desktop `ip-172-31-25-53` est signalée hors ligne par le connecteur lors de la reprise. Il est donc interdit de déclarer la recette terminée, les interfaces validées ou l'environnement de présentation nettoyé.
+
+1. **OTP personnel** : accès réservé aux utilisateurs actifs portant explicitement `administrateur` ou `comptabilite` ; les trois destinataires sont choisis depuis le profil du **SuperAdmin configuré**, jamais depuis le profil le plus récemment modifié ; une requête sans session navigateur ne consomme plus un OTP de connexion valide. L'ancienne activation par mot de passe renvoie 404 lorsque l'accès guardian est actif.
+2. **SuperAdmin unique** : les opérations de création ou de changement de rôle du personnel refusent désormais la création d'une seconde identité SuperAdmin via les API administratives ordinaires. Aucune suppression ni modification de l'identité actuellement configurée n'a été effectuée.
+3. **Régression automatisée sur branche `custum`** : workflow GitHub `.github/workflows/qa-custum.yml`, base PostgreSQL éphémère, analyse de la suite fonctionnelle complète et calcul synthétique de 1 million d'opérations via une table temporaire ; aucune écriture vers la base CECT de présentation. Les résultats GitHub Actions doivent être consultés et les échecs traités avant déploiement.
+4. **Mise à jour des tests de rôles et membres** : trois rôles internes actuels, comptabilité ayant les droits de validation, deux packs Vendeur au maximum ; interdiction du deuxième SuperAdmin ; nouveau test de non-agrégation des YEM Vendeur dans le solde utilisable chez un Marchand.
+5. **Tests de garde renforcée** : test d'un rôle Staff non autorisé ; configuration explicite de l'identité SuperAdmin dans les jeux de test (pour vérifier la liaison aux trois adresses exactes).
+6. **Point à reprendre en priorité dès retour du serveur** : récupérer `/tmp/cect-qa-fullsuite-v2-20261018.log` et le code retour, exécuter à nouveau les suites, mettre à jour le schéma/les builds sans modifier les clés mTLS, vérifier `ledger:verify`, relever les packs réellement publiables, puis seulement décider de la remise à zéro sous backup.
+
+**Aucune approbation fonctionnelle ou financière n'est déduite du simple commit.** Cette section documente l'avancement et les blocages réels.
