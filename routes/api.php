@@ -80,6 +80,8 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::post('recover/finish', [SuperadminSecurityController::class, 'recoverFinish']);
         Route::middleware('auth:sanctum')->group(function () {
             Route::get('security', [SuperadminSecurityController::class, 'security']);
+            Route::post('step-up/start', [SuperadminSecurityController::class, 'stepUpStart']);
+            Route::post('step-up/verify', [SuperadminSecurityController::class, 'stepUpVerify']);
             Route::post('emails/start', [SuperadminSecurityController::class, 'emailsStart']);
             Route::post('emails/finish', [SuperadminSecurityController::class, 'emailsFinish']);
         });
