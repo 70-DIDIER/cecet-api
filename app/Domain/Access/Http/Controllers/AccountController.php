@@ -41,7 +41,13 @@ class AccountController
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $users = $search->builder($kind, $validated)->paginate($validated['per_page'] ?? 25);
+        $builder = $search->builder($kind, $validated);
+        // Closed adhesions remain auditable by choosing the "closed" status,
+        // but disappear from the ordinary active-member list.
+        if ($kind === UserKind::Member && empty($validated['status'])) {
+            $builder->where('users.status', '<>', UserStatus::Closed->value);
+        }
+        $users = $builder->paginate($validated['per_page'] ?? 25);
 
         return UserResource::collection($users);
     }
