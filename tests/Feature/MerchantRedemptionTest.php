@@ -52,13 +52,13 @@ function merchantBalance(UserPack $pack): array
     return [$account->eligible, $account->reserved, $account->redeemed];
 }
 
-it('redeems collected YEM: reservation, transfer to the CECT, Validator confirmation, payout', function () {
+it('redeems collected YEM: reservation, transfer to the CECT, Accounting confirmation, payout', function () {
     $exchange = redeem($this->merchant, $this->merchantPack, '50')
         ->assertCreated()
         ->assertJsonPath('data.kind', 'merchant_redemption')
         ->assertJsonPath('data.transfer_instructions.send_to_pernum', '1000000001')
         ->assertJsonPath('data.transfer_instructions.from_pernum', '1001292934')
-        ->assertJsonPath('data.rate_xof_per_yem', 500)
+        ->assertJsonPath('data.rate_xof_per_yem', 610)
         ->json('data');
 
     expect($exchange['reference'])->toStartWith('RD-')
@@ -73,12 +73,12 @@ it('redeems collected YEM: reservation, transfer to the CECT, Validator confirma
     $this->withToken(tokenFor($this->validator, withStepUp: true))
         ->postJson("/api/v1/validations/{$exchange['id']}/confirm", ['quantity_received' => '45', 'external_reference' => 'YEMPay 9'], ['Idempotency-Key' => (string) Str::ulid()])
         ->assertOk()
-        ->assertJsonPath('data.amount_due_xof', 22500);
+        ->assertJsonPath('data.amount_due_xof', 27450);
 
     // 45 redeemed, the 5 not received go back to the eligible balance and to the pack quota.
     expect(merchantBalance($this->merchantPack))->toBe(['15.000000', '0.000000', '45.000000'])
         ->and($this->merchantPack->account()->first()->consumed)->toBe('45.000000')
-        ->and(PayoutBatch::query()->sole()->total_amount)->toBe(22500);
+        ->and(PayoutBatch::query()->sole()->total_amount)->toBe(27450);
 
     $this->artisan('ledger:verify')->assertSuccessful();
 });
@@ -130,7 +130,7 @@ it('reports the YEM activity of the period', function () {
         ->assertJsonPath('data.yem_activity.paid_to_merchants', '60.000000')
         ->assertJsonPath('data.yem_activity.merchant_payments', 1)
         ->assertJsonPath('data.yem_activity.redeemed_by_merchants', '40.000000')
-        ->assertJsonPath('data.yem_activity.redeemed_by_merchants_xof', 20000)
+        ->assertJsonPath('data.yem_activity.redeemed_by_merchants_xof', 24400)
         ->assertJsonPath('data.yem_activity.active_merchants', 1);
 });
 
@@ -182,7 +182,7 @@ it('reports the payouts owed and paid', function () {
         ->assertOk();
 
     $this->withToken(tokenFor(User::factory()->staff(PermissionCatalog::ADMIN)->create()))->getJson('/api/v1/admin/reports/summary')
-        ->assertJsonPath('data.payouts.remaining_due_xof', 20000)
+        ->assertJsonPath('data.payouts.remaining_due_xof', 24400)
         ->assertJsonPath('data.payouts.remaining_due_batches', 1)
         ->assertJsonPath('data.payouts.paid_by_provider_xof', 0);
 });
