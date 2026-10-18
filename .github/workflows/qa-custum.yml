@@ -56,6 +56,8 @@ jobs:
       - name: Confirm isolated PostgreSQL target
         run: |
           php artisan tinker --execute='if (DB::selectOne("select current_database() as n")->n !== "cectapi_test") {throw new RuntimeException("Unsafe database.");} echo "QA database isolated";'
+      - name: Isolated Blade compile directory
+        run: mkdir -p /tmp/cect-qa-blade-views
       - name: Complete backend API suite (functional, payments, ledger, roles and security)
         shell: bash
         run: |
