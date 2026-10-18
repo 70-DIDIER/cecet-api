@@ -41,7 +41,7 @@ it('sends the same short-lived code to all three guardian inboxes, naming the st
 it('refuses invalid OTP codes and never accepts the same challenge twice', function () {
     $start = $this->postJson('/api/v1/auth/staff/login/start', ['email' => $this->accountant->email])->assertStatus(202);
     $id = $start->json('data.challenge_id');
-    $this->withSession(['qa_browser' => true])->postJson('/api/v1/auth/staff/login/verify', ['challenge_id' => $id, 'code' => '000000'])->assertStatus(422);
+    $this->withHeader('Referer', 'http://localhost:5173')->withSession(['qa_browser' => true])->postJson('/api/v1/auth/staff/login/verify', ['challenge_id' => $id, 'code' => '000000'])->assertStatus(422);
     expect(DB::table('staff_guardian_challenges')->where('id', $id)->value('attempts'))->toBe(1);
 });
 
