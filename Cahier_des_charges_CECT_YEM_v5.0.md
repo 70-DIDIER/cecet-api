@@ -90,6 +90,7 @@ Cette section est la dernière décision retenue pour le SuperAdmin et **prévau
 - Première inscription : certificat mTLS + trois adresses e-mail personnelles différentes, chacune vérifiée par un OTP distinct, puis activation d'une clé personnelle `.cectkey` au moyen d'une signature cryptographique.
 - Connexion ordinaire : certificat + clé active + signature de défi + **un seul OTP commun envoyé aux trois adresses**. Aucune rotation automatique lors des connexions normales.
 - Renouvellement/récupération de clé : trois OTP distincts, nouvelle clé téléchargée et activée, ancienne révoquée lorsque la nouvelle est prouvée.
+- Les actions critiques SuperAdmin (tarifs, seuils, rôles, packs sensibles, exports) demandent une **réauthentification courte dite step-up**. Le SuperAdmin reçoit un **OTP unique dans ses trois boîtes vérifiées**, jamais sur l'adresse technique du compte de démonstration ; les agents ordinaires gardent leur step-up habituel.
 - Gestion des trois adresses seulement sous session cryptographiquement validée. En recette les clés restent exportables, ne conviennent pas à un système financier de production ; ajout de chiffrement du `.cectkey` et/ou FIDO2 matériel avant go-live.
 
 ### 13.4 Référence financière et données de recette
@@ -110,7 +111,7 @@ Cette section est la dernière décision retenue pour le SuperAdmin et **prévau
 | Cashback | Configuration côté SuperAdmin et aperçu calculé | Formaliser et tester le barème métier définitif, notamment les éventuels paliers |
 | Moyens de paiement africains | Catalogue et simulation de recette | Finaliser les logos officiels et leur provenance |
 | Finance / exports / audit | Routes et interfaces accessibles sous permissions | Recette intégrée des cas complexes, transactions externes exclues de la démo |
-| Sécurité préproduction | Historique, mTLS, OTP, contrôle de sessions | Rotation CRL avant le 24 octobre, clé privée chiffrée, red-team/pentest avant production |
+| Sécurité préproduction | Historique, mTLS, OTP, step-up à trois adresses, contrôle de sessions | Rotation CRL avant le 24 octobre, clé privée chiffrée, red-team/pentest avant production |
 
 **Ne jamais qualifier la plateforme de « totalement conforme et prête en production » sans les tests et validations encore ouverts.**
 
