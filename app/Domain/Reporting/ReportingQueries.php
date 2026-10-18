@@ -339,6 +339,7 @@ class ReportingQueries
             ->join('user_packs as up', 'up.id', '=', 'qa.user_pack_id')
             ->whereColumn('up.user_id', $userColumn)
             ->where('up.status', 'active')
+            ->whereIn('up.family', ['CONSOMMATEUR', 'PERSONNEL'])
             ->selectRaw('COALESCE(SUM(qa.available), 0)');
     }
 
