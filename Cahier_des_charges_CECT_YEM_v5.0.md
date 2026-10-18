@@ -302,6 +302,54 @@ Le cashback **se configure exclusivement sur chaque nouvelle version** de pack C
 
 Recette nécessaire avant déclaration de conformité : compilation React Admin/Public, syntaxe PHP et routes, test sécurisé de suppression brouillon vs archivage d'un plan publié, test de motif d'adhésion et invitation, test de non-contournement RBAC, conservation des historiques, confirmation 403 sur entrée SuperAdmin sans certificat, 200 sur interface et API, paiement test et comparaison des écritures YEM achetés vs cashback. **Ne jamais supprimer automatiquement les 25 packs existants ni les membres pour réaliser cette recette.**
 
+## 20. ADDENDUM V5.8 — Gouvernance interne, packs PF, soldes et Marchands (18 octobre 2026)
+
+**Cet addendum prévaut sur les anciennes sections qui limitaient indifféremment tous les packs structurés à deux.** Les changements s'appliquent aux branches `custum` de `70-DIDIER/cecet-api`, `70-DIDIER/cect-admin` et `70-DIDIER/CECT-frontend`. Les comptes, les souscriptions et la comptabilité déjà enregistrés sont préservés.
+
+### 20.1 Souscription d'une personne physique
+
+- **Vendeur : au maximum deux souscriptions simultanément actives ou en attente de paiement**, y compris deux souscriptions de la même formule V1 ou de deux formules différentes. Une place est libérée uniquement à l'expiration ou annulation effective. Cette règle s'applique atomiquement côté serveur et non seulement au bouton du frontend.
+- **Consommateur : nouvelles souscriptions sans plafond de deux packs**, y compris plusieurs souscriptions à la même formule C1. Chacune crée un contrat, ses crédits périodiques, ses réservations et son solde distincts. Une demande du même plan *déjà en attente de paiement* reprend le panier existant pour éviter les doubles débits.
+- **Personnel :** pack rechargeable selon les montants et bonus de sa version ; pas de quota de souscriptions Consommateur consommé.
+- **Marchand :** réservé aux personnes morales éligibles ; ne crée aucun YEM à la souscription. Les droits de rachat et les plafonds relèvent du pack Marchand.
+
+Le paramètre existant `packs.max_structured_active` reste provisionnellement la valeur configurée de la **limite Vendeur** (actuellement 2). La logique qui additionnait Consommateur et Vendeur est remplacée. L'ancien `packs.families_excluded_from_limit` reste à disposition pour compatibilité documentaire et ne doit plus court-circuiter la règle Vendeur.
+
+### 20.2 Connexion Administrateur et Comptabilité
+
+- Endpoint distinct de connexion `/equipe/connexion` dans le domaine Admin. API `POST /api/v1/auth/staff/login/start` et `POST /api/v1/auth/staff/login/verify`.
+- **Aucune auto-activation ni mot de passe à fournir** pour les nouveaux comptes internes créés par le SuperAdmin. Les rôles demeurent uniquement Administrateur et Comptabilité, plus le SuperAdmin distinct.
+- Le collaborateur désigne **son compte professionnel nominatif** ; le système crée un défi OTP court (6 chiffres, cinq minutes, au maximum cinq essais, usage unique). **Le même code est envoyé séparément aux trois adresses de sécurité préalablement vérifiées du SuperAdmin**, en indiquant le prénom, nom et rôle du collaborateur demandeur. Les adresses et les codes ne sont jamais retournés dans les réponses API ni affichés aux autres utilisateurs.
+- Le SuperAdmin choisit pour chaque compte les **jours de semaine (1=lundi à 7=dimanche) et une plage horaire de connexion** en heure `Africa/Lome`, avec motif et historique. La plage est vérifiée avant l'envoi du code, avant l'ouverture de session et **à chaque requête authentifiée**. Une politique active invalide refuse l'accès ; pas de chevauchement de minuit pour la première version.
+- Les anciens identifiants ou sessions de personnel (mot de passe + OTP ordinaire, bearer token non conforme) sont invalidés par le nouveau contrôle `staff.guardian` lorsqu'il est activé. Le SuperAdmin conserve exclusivement sa connexion mTLS + fichier de clé + ses OTP ; il n'utilise pas ce parcours.
+- Le site Blade ancien `/backoffice` doit lui aussi refuser les sessions de personnel non conformes à la validation des trois adresses et aux horaires.
+- **Déploiement contrôlé** : migration de schéma, configuration de l'adresse de sécurité SuperAdmin déjà validée, tests OTP sans envoi réel, fenêtres horaires, statut des comptes existants, activation du drapeau `STAFF_GUARDIAN_LOGIN_ENABLED` et vérification de l'interface. Ne pas activer prématurément avant la recette.
+
+### 20.3 Dashboard personne physique et morale
+
+- **Ne jamais présenter un quota Vendeur comme un solde YEM dépensable chez un Marchand.** Le solde de consommation agrège uniquement les packs Consommateur et Personnel. Le quota de cession Vendeur reste isolé.
+- Chaque souscription possède son écran individuel : **disponible**, **crédité** (dont cashback pour les packs éligibles), **réservé**, **utilisé/vendu**, quota par période et compte à rebours **jours/heures/minutes/secondes** jusqu'au prochain crédit applicable.
+- Priorité d'affichage : Crédité, Réservé, Disponible ; la répartition par pack et l'horodatage proviennent du ledger backend, non de chiffres factices.
+- La zone d'accueil doit être mobile-first, lisible sur grand écran, avec cartes de packs, valeurs tabulaires, animations discrètes, états actionnables et parcours explicites. Les dashboards de personnes physiques et morales n'ont pas à afficher les mêmes actions sans éligibilité.
+
+### 20.4 Marchand : circuit transactionnel réel
+
+- **Pack Marchand** : droit d'accès au QR du marchand, limites d'encaissement/rééchange, pas de YEM attribués au moment de la souscription.
+- Le Marchand affiche ses QR par point de vente, les paiements de clients, la confirmation réelle de réception, les litiges, **le solde réellement encaissé éligible au rééchange**, les sommes réservées à une demande de rééchange et les sommes déjà rachetées.
+- Lors du paiement client, le QR ne transfère rien tout seul : le client envoie réellement des YEM au Pernum Marchand ; les validations et reçus alimentent le ledger. Lors du rééchange, le Marchand transfère les YEM à la CECT ; **la Comptabilité** confirme les étapes relevant de sa permission, puis la contre-valeur fiat est versée selon la procédure autorisée.
+- La présentation de l'espace Marchand doit suivre un tableau de pilotage moderne et responsive : états, chiffres réels du ledger, reçus, QR, solde, rééchange, annuaire. Les règles tarifaires Merchant / commissions / délais restant contradictoires ou non ratifiées ne sont pas codées arbitrairement.
+
+### 20.5 Réception de paiements et configuration des pays
+
+- Le formulaire du membre choisit le **pays de réception** et le **moyen de versement**. Les réseaux Mobile Money disponibles sont déterminés automatiquement par les paramètres de pays et de méthodes configurés dans l'API ; le téléphone est prérempli si connu et reste modifiable.
+- **Mobile Money :** numéro international avec indicatif et validation serveur. **Virement :** banque, nom du titulaire, numéro de compte obligatoires. Les champs inadaptés ne sont pas affichés. La modification du bénéficiaire nécessite une confirmation OTP, et les opérations passées conservent leurs instantanés de destination.
+- **Carte bancaire en versement :** interface prévue mais **désactivée tant qu'un prestataire de décaissement sur carte et une tokenisation de bénéficiaire ne sont pas intégrés**. Le système ne collecte jamais ni ne sauvegarde de PAN/CVV brut sous prétexte de permettre un versement.
+- L'ancien menu autonome **« Pays de paiement »** dans l'espace Admin est retiré pour réduire les doublons ; les paramètres pays/réseaux restent actifs côté backend car nécessaires au routage des moyens et à la validation des numéros, accessibles via Configuration avancée.
+
+### 20.6 Recette
+
+Recettes indispensables : essais d'authentification Administrateur et Comptabilité (trois boîtes de sécurité), contrôle des horaires et contournements, souscription de deux Vendeur identiques puis refus de la troisième, plusieurs Consommateur, rechargement Personnel avec cashback, dashboard séparant droits vendeurs/consommation, paiement QR marchand puis rééchange et confirmation comptable, simulation du versement et historique, bascule mTLS SuperAdmin 403 sans certificat, compilation des deux React et tests unitaires. **Ne pas considérer le circuit complet ou une mise en production financière comme validés sur la seule base de tests HTTP 200.**
+
 ---
 # ANNEXE HISTORIQUE : Cahier des charges v4.0 intégral
 Attention : les décisions v5.0 ci-dessus prévalent sur les anciennes formulations contradictoires.
