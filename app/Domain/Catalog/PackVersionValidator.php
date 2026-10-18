@@ -66,6 +66,16 @@ class PackVersionValidator
                 $validator->errors()->add("rules.{$key}", "La règle « {$key} » n'existe pas pour la famille {$family->value}.");
             }
 
+            // Merchant rights belong to legal entities only, regardless of
+            // what an administrator or a crafted API request submits.
+            if ($family === PackFamily::Marchand && array_key_exists('eligible_person_types', $input)
+                && $input['eligible_person_types'] !== [PersonType::Legal->value]) {
+                $validator->errors()->add(
+                    'eligible_person_types',
+                    'Le pack Marchand est réservé aux personnes morales.',
+                );
+            }
+
             $min = $input['min_operation'] ?? null;
             $max = $input['max_operation'] ?? null;
 
