@@ -261,6 +261,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
             Route::middleware(['can:packs.manage', 'step-up'])->group(function () {
                 Route::post('packs/plans', [PackPlanAdminController::class, 'store'])->middleware('idempotent')->name('packs.plans.store');
                 Route::put('packs/plans/{plan}', [PackPlanAdminController::class, 'update'])->middleware('idempotent')->name('packs.plans.update');
+                Route::delete('packs/plans/{plan}', [PackPlanAdminController::class, 'destroy'])->name('packs.plans.destroy');
                 Route::post('packs/plans/{plan}/versions', [PackPlanAdminController::class, 'storeVersion'])->middleware('idempotent')->name('packs.versions.store');
                 Route::post('packs/plans/{plan}/versions/{version}/publish', [PackPlanAdminController::class, 'publishVersion'])->scopeBindings()->name('packs.versions.publish');
                 Route::delete('packs/plans/{plan}/versions/{version}', [PackPlanAdminController::class, 'destroyVersion'])->scopeBindings()->name('packs.versions.destroy');
