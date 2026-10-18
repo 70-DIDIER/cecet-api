@@ -308,14 +308,12 @@ class SuperadminSecurityController
         $challenge = $this->take($user, $fp, 'login', $data['challenge_id'], [$data['code'], $data['code'], $data['code']]);
         abort_unless(DB::table('superadmin_access_keys')->where('id', $challenge->key_id)
             ->where('status', 'active')->where('expires_at', '>', now())->exists(), 403);
-        abort_unless($request->hasSession(), 403);
-        Auth::guard('web')->login($user);
-        $request->session()->regenerate();
-        $request->session()->forget(['superadmin_verified_key', 'superadmin_verified_cert']);
-        $request->session()->put('superadmin_pending_rotation', $challenge->key_id);
-        $rotation = $this->issue($user, $fp, 'rotate', $this->savedAddresses($profile), true, $challenge->key_id);
+        // Routine login: mTLS + RSA proof + one OTP delivered to all three inboxes.
+        // Do not force a key replacement on every login; preserve the active key
+        // until expiry or explicit recovery/renewal.
+        $this->authenticated($request, $user, $fp, $challenge->key_id);
 
-        return $this->respond(['status' => 'rotation_otp_required', 'challenge_id' => $rotation]);
+        return $this->respond(['status' => 'authenticated']);
     }
 
     public function rotateFinish(Request $request): JsonResponse
