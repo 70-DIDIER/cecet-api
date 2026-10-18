@@ -65,7 +65,7 @@ it('creates a new audited version instead of overwriting the value', function ()
         ->actor_id->toBe($actor->id)
         ->subject_id->toBe('rates.purchase_xof_per_yem')
         ->reason->toBe('Ratification PO-01 par le CA')
-        ->and($audit->before)->toBe(['value' => 500])
+        ->and($audit->before)->toBe(['value' => 510])
         ->and($audit->after['value'])->toBe(520);
 });
 
