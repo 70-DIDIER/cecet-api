@@ -53,8 +53,8 @@ class AccountManager
                     'last_name' => $identity['last_name'],
                     'email' => $identity['email'],
                     'phone' => $identity['phone'] ?? null,
-                    'status' => UserStatus::Active,
-                    'email_verified_at' => now(), // identity pre-validated by SuperAdmin; guardian OTP gates login
+                    'status' => config('staff_guardian.enabled') ? UserStatus::Active : UserStatus::PendingActivation,
+                    'email_verified_at' => config('staff_guardian.enabled') ? now() : null,
                 ]);
                 $user->syncRoles($roles);
 
