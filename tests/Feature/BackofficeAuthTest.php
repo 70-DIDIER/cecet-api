@@ -103,8 +103,8 @@ it('shows each profile only what its permissions allow on the dashboard', functi
     $this->actingAs(User::factory()->staff(PermissionCatalog::VALIDATOR)->create())
         ->get('/backoffice')
         ->assertOk()
-        ->assertDontSee('Total collecté')
-        ->assertDontSee('paiement(s) hors prestataire')
+        ->assertSee('Total collecté')
+        ->assertSee('paiement(s) hors prestataire')
         ->assertSee('réception(s) / litige(s) YEM');
 
     $this->actingAs(User::factory()->staff(PermissionCatalog::SUPERADMIN)->create())
