@@ -15,7 +15,7 @@ beforeEach(function () {
 it('gives only SuperAdmin access to read and change named staff working hours', function () {
     $url="/api/v1/admin/staff/{$this->accounting->id}/login-hours";
     $this->withToken(tokenFor($this->admin, true))->getJson($url)->assertForbidden();
-    $this->withToken(tokenFor($this->accounting, true))->putJson($url, ['enabled'=>true])->assertForbidden();
+    $this->withToken(tokenFor($this->accounting, true))->putJson($url, ['enabled'=>true], ['Idempotency-Key'=>(string) Str::ulid()])->assertForbidden();
     $this->withToken(tokenFor($this->superadmin, true))->getJson($url)->assertOk()
         ->assertJsonPath('data.enabled', false);
     $this->withToken(tokenFor($this->superadmin, true))->putJson($url, [
