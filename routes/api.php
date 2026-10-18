@@ -40,6 +40,8 @@ use App\Domain\Settings\Http\Controllers\PublicConfigController;
 use App\Domain\Settings\Http\Controllers\SettingController;
 use App\Domain\Shared\Http\Controllers\HealthController;
 use App\Domain\Subscription\Http\Controllers\MemberPackController;
+use App\Domain\Identity\Http\Controllers\StaffGuardianLoginController;
+use App\Domain\Identity\Http\Controllers\StaffAccessWindowController;
 use App\Domain\Subscription\Http\Controllers\UserPackAdminController;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +57,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
             Route::post('register/check', [RegistrationController::class, 'check'])->name('register.check');
             Route::post('login', [LoginController::class, 'store'])->name('login');
             Route::post('staff/activate', StaffActivationController::class)->name('staff.activate');
+            Route::post('staff/login/start', [StaffGuardianLoginController::class, 'start'])->middleware('throttle:5,1')->name('staff.login.start');
             Route::post('password/forgot', [PasswordResetController::class, 'forgot'])->name('password.forgot');
         });
 
@@ -62,6 +65,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
             Route::post('email/verify', [RegistrationController::class, 'verifyEmail'])->name('email.verify');
             Route::post('login/verify', [LoginController::class, 'verifyOtp'])->name('login.verify');
             Route::post('mfa/verify', [LoginController::class, 'verifyOtp'])->name('mfa.verify');
+            Route::post('staff/login/verify', [StaffGuardianLoginController::class, 'verify'])->name('staff.login.verify');
             Route::post('otp/resend', [OtpController::class, 'resend'])->name('otp.resend');
             Route::post('password/reset', [PasswordResetController::class, 'reset'])->name('password.reset');
         });
@@ -108,7 +112,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
     /*
      * Authenticated account (members and staff).
      */
-    Route::middleware(['auth:sanctum', 'superadmin.session', 'throttle:api-user'])->group(function () {
+    Route::middleware(['auth:sanctum', 'superadmin.session', 'staff.guardian', 'throttle:api-user'])->group(function () {
         Route::post('auth/logout', [SessionController::class, 'logout'])->name('auth.logout');
         Route::post('auth/step-up', [StepUpController::class, 'store'])->middleware('throttle:auth-otp')->name('auth.step-up');
         Route::post('auth/step-up/verify', [StepUpController::class, 'confirm'])->middleware('throttle:auth-otp')->name('auth.step-up.verify');
@@ -248,6 +252,11 @@ Route::prefix('v1')->name('v1.')->group(function () {
             Route::post('members/{user}/close', [AccountController::class, 'closeMember'])
                 ->middleware(['can:members.manage', 'step-up'])
                 ->name('members.close');
+
+            Route::get('staff/{user}/login-hours', [StaffAccessWindowController::class, 'show'])
+                ->middleware(['can:staff.manage', 'can:settings.update_critical'])->name('staff.login-hours.show');
+            Route::put('staff/{user}/login-hours', [StaffAccessWindowController::class, 'update'])
+                ->middleware(['can:staff.manage', 'can:settings.update_critical', 'step-up', 'idempotent'])->name('staff.login-hours.update');
 
             Route::get('members/{user}/overview', MemberOverviewController::class)->middleware('can:members.view')->name('members.overview');
 
