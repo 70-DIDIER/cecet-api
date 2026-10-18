@@ -56,7 +56,7 @@ it('lists the webhooks received from providers', function () {
 });
 
 it('hides payments from roles without the permission and from members', function () {
-    $validator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
+    $validator = User::factory()->staff()->create();
     $member = User::factory()->create();
 
     $this->withToken(tokenFor($validator))->getJson('/api/v1/admin/payments/attempts')->assertForbidden();
