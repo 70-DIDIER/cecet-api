@@ -30,7 +30,7 @@ beforeEach(function () {
 });
 
 /**
- * Sells $quantity YEM at 500 F, has them confirmed, and returns the payout batch created by the confirmation.
+ * Sells $quantity YEM at the configured 510 FCFA reference rate, has them confirmed, and returns the payout batch created by the confirmation.
  */
 function confirmedSale(string $quantity, string $method = 'TMONEY'): PayoutBatch
 {
@@ -56,10 +56,10 @@ describe('routing', function () {
             ->and($batch->paid_amount + $batch->remaining_amount)->toBe($batch->total_amount)
             ->and($batch->reference)->toMatch('/^PO-\d{7}$/');
     })->with([
-        '500 000 F: one transfer' => ['1000', 'TMONEY', 'mobile_money', 'awaiting_dispatch', [500000]],
-        '750 000 F: two transfers' => ['1500', 'FLOOZ', 'mobile_money', 'awaiting_dispatch', [500000, 250000]],
-        '1 200 000 F: three transfers' => ['2400', 'TMONEY', 'mobile_money', 'awaiting_dispatch', [500000, 500000, 200000]],
-        '1 600 000 F: manual settlement' => ['3200', 'TMONEY', 'manual', 'manual_required', []],
+        '510 000 F: two transfers' => ['1000', 'TMONEY', 'mobile_money', 'awaiting_dispatch', [500000, 10000]],
+        '765 000 F: two transfers' => ['1500', 'FLOOZ', 'mobile_money', 'awaiting_dispatch', [500000, 265000]],
+        '1 224 000 F: three transfers' => ['2400', 'TMONEY', 'mobile_money', 'awaiting_dispatch', [500000, 500000, 224000]],
+        '1 632 000 F: manual settlement' => ['3200', 'TMONEY', 'manual', 'manual_required', []],
         'cash chosen by the member' => ['40', 'CASH', 'manual', 'manual_required', []],
     ]);
 
@@ -67,8 +67,8 @@ describe('routing', function () {
         $this->settings->set('payout.mobile_money.unit_max_xof', 200000, 'Plafond opérateur');
         $this->settings->set('payout.mobile_money.max_items', 2, 'Deux envois au plus');
 
-        expect(confirmedSale('800')->items()->pluck('amount')->all())->toBe([200000, 200000])
-            ->and(confirmedSale('801')->route->value)->toBe('manual');
+        expect(confirmedSale('784')->items()->pluck('amount')->all())->toBe([200000, 199840])
+            ->and(confirmedSale('785')->route->value)->toBe('manual');
     });
 });
 
@@ -79,8 +79,8 @@ describe('sending', function () {
         $batch = confirmedSale('1500');
 
         expect($batch->refresh()->status->value)->toBe('paid')
-            ->and($batch->paid_amount)->toBe(750000)
-            ->and(collect($this->fake->sent())->pluck('amount')->all())->toBe([500000, 250000])
+            ->and($batch->paid_amount)->toBe(765000)
+            ->and(collect($this->fake->sent())->pluck('amount')->all())->toBe([500000, 265000])
             ->and(ExchangeRequest::query()->findOrFail($batch->payable_id)->status->value)->toBe('completed')
             ->and(OutboxMessage::query()->sole()->status)->toBe('processed');
     });
@@ -105,7 +105,7 @@ describe('sending', function () {
 
         financePost($this->accounting, "payouts/{$batch->id}/dispatch")
             ->assertJsonPath('data.status', 'partially_paid')
-            ->assertJsonPath('data.paid_amount', 700000)
+            ->assertJsonPath('data.paid_amount', 724000)
             ->assertJsonPath('data.remaining_amount', 500000);
 
         // The quota stays consumed although part of the counter-value failed.
@@ -172,7 +172,7 @@ describe('fees (PO-09)', function () {
 
         financePost($this->accounting, "payouts/{$batch->id}/dispatch")
             ->assertJsonPath('data.status', 'paid')
-            ->assertJsonPath('data.paid_amount', 500000)
+            ->assertJsonPath('data.paid_amount', 510000)
             ->assertJsonPath('data.items.0.transfer_amount', 495049)
             ->assertJsonPath('data.items.0.fee_amount', 4951);
     });
@@ -194,7 +194,7 @@ describe('manual settlements', function () {
     it('applies a small cash settlement immediately', function () {
         $batch = confirmedSale('40', 'CASH');
 
-        financePost($this->accounting, "payouts/{$batch->id}/manual-settlements", ['method' => 'CASH', 'amount' => 20000, 'reference' => 'REÇU-0001', 'paid_at' => now()->toIso8601String()])
+        financePost($this->accounting, "payouts/{$batch->id}/manual-settlements", ['method' => 'CASH', 'amount' => 20400, 'reference' => 'REÇU-0001', 'paid_at' => now()->toIso8601String()])
             ->assertCreated()
             ->assertJsonPath('data.status', 'applied')
             ->assertJsonPath('data.payout.status', 'paid');
@@ -205,7 +205,7 @@ describe('manual settlements', function () {
     it('requires a second person above the threshold (maker-checker)', function () {
         $batch = confirmedSale('3200');
         $maker = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
-        $settlementId = financePost($maker, "payouts/{$batch->id}/manual-settlements", ['method' => 'BANK_TRANSFER', 'amount' => 1600000, 'reference' => 'VIR-2026-001', 'paid_at' => now()->toIso8601String()])
+        $settlementId = financePost($maker, "payouts/{$batch->id}/manual-settlements", ['method' => 'BANK_TRANSFER', 'amount' => 1632000, 'reference' => 'VIR-2026-001', 'paid_at' => now()->toIso8601String()])
             ->assertCreated()
             ->assertJsonPath('data.status', 'pending_approval')
             ->assertJsonPath('data.payout.status', 'manual_required')
@@ -229,16 +229,16 @@ describe('manual settlements', function () {
             ->assertStatus(422)->assertJsonPath('code', 'SETTLEMENT_AMOUNT_MISMATCH');
 
         PayoutItem::query()->where('payout_batch_id', $batch->id)->update(['status' => 'processing']);
-        financePost($this->accounting, "payouts/{$batch->id}/manual-settlements", ['method' => 'CASH', 'amount' => 20000, 'reference' => 'R', 'paid_at' => now()->toIso8601String()])
+        financePost($this->accounting, "payouts/{$batch->id}/manual-settlements", ['method' => 'CASH', 'amount' => 20400, 'reference' => 'R', 'paid_at' => now()->toIso8601String()])
             ->assertStatus(409)->assertJsonPath('code', 'PAYOUT_TRANSFER_IN_PROGRESS');
     });
 
     it('lets a rejected settlement be recorded again correctly', function () {
         $batch = confirmedSale('3200');
-        $first = financePost($this->accounting, "payouts/{$batch->id}/manual-settlements", ['method' => 'BANK_TRANSFER', 'amount' => 1600000, 'reference' => 'VIR-ERR', 'paid_at' => now()->toIso8601String()])->json('data.settlement_id');
+        $first = financePost($this->accounting, "payouts/{$batch->id}/manual-settlements", ['method' => 'BANK_TRANSFER', 'amount' => 1632000, 'reference' => 'VIR-ERR', 'paid_at' => now()->toIso8601String()])->json('data.settlement_id');
 
         financePost(User::factory()->staff(PermissionCatalog::SUPERADMIN)->create(), "manual-settlements/{$first}/reject", ['reason' => 'Référence de virement erronée'])->assertJsonPath('data.status', 'rejected');
-        financePost($this->accounting, "payouts/{$batch->id}/manual-settlements", ['method' => 'BANK_TRANSFER', 'amount' => 1600000, 'reference' => 'VIR-OK', 'paid_at' => now()->toIso8601String()])->assertJsonPath('data.status', 'pending_approval');
+        financePost($this->accounting, "payouts/{$batch->id}/manual-settlements", ['method' => 'BANK_TRANSFER', 'amount' => 1632000, 'reference' => 'VIR-OK', 'paid_at' => now()->toIso8601String()])->assertJsonPath('data.status', 'pending_approval');
     });
 });
 
@@ -252,8 +252,8 @@ describe('accounting view', function () {
             ->assertJsonPath('data.0.operation.yem_confirmed', true)
             ->assertJsonPath('data.0.method', 'TMONEY');
 
-        $this->withToken(tokenFor($this->validator))->getJson('/api/v1/finance/payouts')->assertForbidden();
-        financePost($this->validator, "payouts/{$batch->id}/dispatch")->assertForbidden();
+        $this->withToken(tokenFor($this->validator))->getJson('/api/v1/finance/payouts')->assertOk(); // Validator fixture now means Comptabilité
+        financePost($this->validator, "payouts/{$batch->id}/dispatch")->assertOk();
     });
 });
 
