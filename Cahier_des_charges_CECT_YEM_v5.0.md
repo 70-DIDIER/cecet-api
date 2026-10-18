@@ -115,6 +115,46 @@ Cette section est la dernière décision retenue pour le SuperAdmin et **prévau
 
 **Ne jamais qualifier la plateforme de « totalement conforme et prête en production » sans les tests et validations encore ouverts.**
 
+## 15. ADDENDUM V5.3 — Gestion des packs et tarifs d'adhésion (18 octobre 2026)
+
+Cette décision consolide la comparaison de `joseph` avec `custum`. La branche API `joseph` est un ancêtre de la branche de travail `custum`, donc aucun retour à l'ancien code n'est effectué. **Seule `custum` reçoit les modifications**.
+
+### 15.1 Interface de gestion des packs
+
+Le panneau `/admin/packs` doit permettre, sous les permissions `packs.view` / `packs.manage` et confirmation renforcée pour les opérations sensibles :
+
+1. Consulter les 4 familles VENDEUR, CONSOMMATEUR, PERSONNEL et MARCHAND, rechercher et filtrer les formules, voir les états publiés et brouillons.
+2. Créer une nouvelle formule avec code métier unique, famille, nom, niveau, description. Le premier état est **brouillon**, non public.
+3. Modifier nom, description et niveau avec **motif obligatoire, API auditée et verrouillage transactionnel** ; code et famille de la formule sont immuables. Les prix et quotas nécessitent une nouvelle version contractuelle.
+4. Dupliquer une formule dans un nouveau brouillon, consulter l'historique et les motifs de chaque version, publier ou supprimer uniquement une version non publiée.
+5. Créer une version avec prix/droit d'accès, périodicité, fréquence et cycles, quota par période, cumul, règle de fin, min/max opération, délai du premier crédit et éligibilité PF/PM. Les formules MARCHAND sont obligatoirement réservées aux personnes morales.
+6. Consommateur : permettre une valeur de référence XOF ; le backend peut en déduire le quota au taux de vente YEM en vigueur, figé dans la version. Le cashback est distinct, en bonus de YEM ; le montant payé n'est pas remisé en FCFA.
+7. Personnel : aucun quota ni durée fixe ; définir à la place le rechargement minimum et les règles de solde. Le pack est exclu de la limite de deux packs structurés, sous réserve de configuration.
+8. Quand le SuperAdmin publie une première version d'un pack `DRAFT`, effectuer aussi la transition de la formule vers `PUBLISHED`. Le pack ne doit pas être affiché souscriptible si la version n'a pas été publiée.
+9. Pouvoir suspendre, réactiver, retirer, archiver selon la machine à états. Ne jamais modifier les anciennes souscriptions et leurs versions figées.
+10. Utiliser uniquement les endpoints Laravel authentifiés, la vérification RBAC, les motifs et la confirmation step-up des opérations sensibles.
+
+### 15.2 Frais d'adhésion dans le tableau SuperAdmin
+
+L'écran Packs doit afficher, pour le seul SuperAdmin, les frais de personne physique et morale calculés par l'API : `membership.fee.natural_person` et `membership.fee.legal_person`. Le SuperAdmin peut créer une nouvelle valeur sur le même écran avec un motif et éventuellement une date d'effet. Aucun membre ordinaire ni Administrateur ne peut modifier ces deux paramètres.
+
+L'inscription publique prend ses montants depuis `GET /api/v1/config` ; aucune valeur statique frontend ne doit s'y substituer. Tarifs de travail actuels : **25 000 FCFA (PF)** et **200 000 FCFA (PM)**.
+
+### 15.3 Grilles non ratifiées
+
+Le catalogue contient 25 formules historiques : 12 Vendeur (V1–V12), 6 Consommateur (C1–C6), 6 Marchand (BRONZE, ARGENT, OR, DIAMANT, PLATINE, PRESTIGE), 1 Personnel (PERSO). La plupart des formules de niveau supérieur n'ont pas de version publiée.
+
+La grille ancienne de l'annexe A indique **V1 100 000 FCFA / 125 YEM par mois pendant 12 mois**, mais une discussion ultérieure a envisagé **100 000 FCFA / 500 YEM par mois pendant 12 mois**. Ce point étant contradictoire, **aucun remplacement automatique des 25 formules par un seed de tarifs non ratifiés** n'est permis. Le SuperAdmin peut paramétrer les valeurs après décision commerciale.
+
+Les grilles historiques C7–C8 et M1–M10 ne doivent pas être ajoutées artificiellement à la base : une migration des gammes doit être explicitement approuvée et documentée. Les règles économiques de rééchange Marchand et les paliers de cashback restent configurables et sujets à ratification.
+
+### 15.4 Statut d'implémentation de la version
+
+- Backend et interface modifiés sur `70-DIDIER/cecet-api:custum` et `70-DIDIER/cect-admin:custum`.
+- Aucun tarif de pack existant n'est modifié par ces évolutions de code.
+- Le déploiement n'est déclaré réussi que si le build React, la syntaxe PHP, les routes d'édition, l'API publique, l'accès Admin normal et le mTLS sans certificat ont été vérifiés après publication.
+- Vérifier explicitement en recette : nouvelle formule, version, publication avec transition, suspension/réactivation, duplication, modification de niveau, éligibilité Marchand PM, refus pour Administrateur du changement de frais PF/PM, date d'effet et consultation d'historique.
+
 ---
 # ANNEXE HISTORIQUE : Cahier des charges v4.0 intégral
 Attention : les décisions v5.0 ci-dessus prévalent sur les anciennes formulations contradictoires.
