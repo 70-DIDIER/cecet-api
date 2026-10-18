@@ -4,6 +4,7 @@ use App\Domain\Access\PermissionCatalog;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
 return new class extends Migration
@@ -11,10 +12,18 @@ return new class extends Migration
     public function up(): void
     {
         DB::transaction(function (): void {
-            $accounting = Role::query()->where('name', PermissionCatalog::ACCOUNTING)->firstOrFail();
+            $accounting = Role::query()->where('name', PermissionCatalog::ACCOUNTING)->first();
+            if ($accounting === null) {
+                // Fresh installs migrate before roles are seeded. SyncAccessCatalog
+                // creates the new Accounting role with Validator permissions later.
+                return;
+            }
             $legacy = Role::query()->where('name', PermissionCatalog::VALIDATOR)->first();
             foreach (['yem_validations.view', 'yem_validations.confirm', 'yem_validations.dispute'] as $permission) {
-                $accounting->givePermissionTo($permission);
+                $resolved = Permission::query()->where('name', $permission)->where('guard_name', 'web')->first();
+                if ($resolved !== null) {
+                    $accounting->givePermissionTo($resolved);
+                }
             }
 
             if ($legacy !== null) {
