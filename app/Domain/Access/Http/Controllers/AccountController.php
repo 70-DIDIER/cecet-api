@@ -3,6 +3,8 @@
 namespace App\Domain\Access\Http\Controllers;
 
 use App\Domain\Access\AccountManager;
+use App\Domain\Audit\AuditLogger;
+use Illuminate\Support\Facades\Mail;
 use App\Domain\Access\AccountSearch;
 use App\Domain\Access\Exceptions\AccessException;
 use App\Domain\Identity\Enums\PersonType;
@@ -73,6 +75,41 @@ class AccountController
         ], array_values($validated['roles']));
 
         return (new UserResource($user->load('roles')))->response()->setStatusCode(201);
+    }
+
+    /**
+     * Staff-assisted new adhesion. The staff member invites the applicant;
+     * only the applicant chooses their password, accepts the statutes and
+     * verifies email. This never fabricates consent or records a paid fee.
+     */
+    public function inviteMember(Request $request, AuditLogger $audit): JsonResponse
+    {
+        $data = $request->validate([
+            'person_type' => ['required', Rule::in(['natural', 'legal'])],
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')],
+        ]);
+        $email = mb_strtolower(trim($data['email']));
+        $params = http_build_query([
+            'email' => $email,
+            'person_type' => $data['person_type'],
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
+        ], '', '&', PHP_QUERY_RFC3986);
+        $site = rtrim(config('cect.member_portal_url', 'https://13-49-203-235.sslip.io'), '/');
+        $url = $site.'/inscription?'.$params;
+        Mail::raw(
+            "Bonjour {$data['first_name']} {$data['last_name']},\n\n".
+            "La CECT vous invite à compléter votre demande d'adhésion.\n".
+            "Vous devez personnellement choisir votre mot de passe, vérifier votre e-mail et accepter les statuts.\n\n".
+            $url."\n\nSi vous n'avez pas demandé cette invitation, vous pouvez ignorer ce message.",
+            fn ($message) => $message->to($email)->subject("CECT — Invitation à l'adhésion"),
+        );
+        $audit->record('members.invited', null,
+            after: ['email' => $email, 'person_type' => $data['person_type']],
+            actor: $this->actor($request));
+        return response()->json(['data' => ['invited' => true, 'email' => $email]]);
     }
 
     /**
