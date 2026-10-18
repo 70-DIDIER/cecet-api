@@ -2,6 +2,8 @@
 
 namespace App\Domain\Subscription\Actions;
 
+use App\Domain\Catalog\Enums\PackFamily;
+
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Catalog\Models\PackPlan;
 use App\Domain\Catalog\Models\PackVersion;
@@ -166,20 +168,23 @@ class SubscribeToPack
         ])->save();
     }
 
+    /**
+     * A natural person may hold at most two active/pending SELLER pack
+     * subscriptions, including two subscriptions of the same formula.
+     * Consumer packs do not consume these seller slots; Personnel remains
+     * a balance top-up product. User lock in prepare() serializes purchases.
+     */
     private function assertWithinStructuredLimit(User $member, PackPlan $plan): void
     {
-        $excluded = array_map('strval', $this->settings->array('packs.families_excluded_from_limit'));
-
-        if (in_array($plan->family->value, $excluded, true)) {
+        if ($plan->family !== PackFamily::Vendeur) {
             return;
         }
 
         $max = $this->settings->integer('packs.max_structured_active');
-
         $held = UserPack::query()
             ->where('user_id', $member->id)
+            ->where('family', PackFamily::Vendeur->value)
             ->whereIn('status', [UserPackStatus::PendingPayment, UserPackStatus::Active])
-            ->whereNotIn('family', $excluded)
             ->count();
 
         if ($held >= $max) {
