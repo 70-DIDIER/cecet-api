@@ -43,6 +43,12 @@ class AccountManager
     public function create(?User $actor, array $identity, array $roleNames): User
     {
         $this->assertCanGrant($actor, $roleNames);
+        // Certificate-bound SuperAdmin is a unique identity. The regular
+        // staff-creation form must never mint a second SuperAdmin account.
+        if (in_array(PermissionCatalog::SUPERADMIN, $roleNames, true)
+            && User::query()->role(PermissionCatalog::SUPERADMIN)->exists()) {
+            throw AccessException::superadminProtected();
+        }
         $roles = $this->roles->resolveAssignableRoles($roleNames);
 
         try {
@@ -86,6 +92,11 @@ class AccountManager
         $this->assertStaff($staff);
         $this->assertCanManage($actor, $staff);
         $this->assertCanGrant($actor, $roleNames);
+        if (in_array(PermissionCatalog::SUPERADMIN, $roleNames, true)
+            && ! $staff->isSuperadmin()
+            && User::query()->role(PermissionCatalog::SUPERADMIN)->exists()) {
+            throw AccessException::superadminProtected();
+        }
 
         $roles = $this->roles->resolveAssignableRoles($roleNames, $staff->id);
 
