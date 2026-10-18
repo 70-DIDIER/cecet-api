@@ -27,26 +27,28 @@ it('lists settings with their definition and effective value', function () {
     $this->withToken(tokenFor($admin))->getJson('/api/v1/admin/settings?group=rates')
         ->assertOk()
         ->assertJsonCount(3, 'data')
-        ->assertJsonFragment(['key' => 'rates.purchase_xof_per_yem', 'current_value' => 500, 'edit_level' => 'admin']);
+        ->assertJsonFragment(['key' => 'rates.purchase_xof_per_yem', 'current_value' => 510, 'edit_level' => 'superadmin']);
 });
 
-it('lets an administrator version an admin-level setting', function () {
+it('reserves membership fee versioning to SuperAdmin', function () {
     $admin = User::factory()->staff(PermissionCatalog::ADMIN)->create();
+    $superadmin = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
+    putSetting(tokenFor($admin, withStepUp: true), 'membership.fee.natural_person', 30000)->assertForbidden();
 
-    putSetting(tokenFor($admin, withStepUp: true), 'membership.fee.natural_person', 30000)
+    putSetting(tokenFor($superadmin, withStepUp: true), 'membership.fee.natural_person', 30000)
         ->assertOk()
         ->assertJsonPath('data.current_value', 30000);
 
     $this->withToken(tokenFor($admin))->getJson('/api/v1/admin/settings/membership.fee.natural_person')
         ->assertOk()
         ->assertJsonCount(2, 'data.versions')
-        ->assertJsonPath('data.versions.0.created_by', $admin->id);
+        ->assertJsonPath('data.versions.0.created_by', $superadmin->id);
 });
 
-it('schedules a future version without changing the current value', function () {
-    $admin = User::factory()->staff(PermissionCatalog::ADMIN)->create();
+it('allows SuperAdmin to schedule a future rate without changing the current value', function () {
+    $superadmin = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
 
-    putSetting(tokenFor($admin, withStepUp: true), 'rates.sale_xof_per_yem', 700, ['effective_from' => now()->addMonth()->toIso8601String()])
+    putSetting(tokenFor($superadmin, withStepUp: true), 'rates.sale_xof_per_yem', 700, ['effective_from' => now()->addMonth()->toIso8601String()])
         ->assertOk()
         ->assertJsonPath('data.current_value', 650);
 });
@@ -61,10 +63,10 @@ it('reserves critical settings to the Superadmin', function () {
     expect(app(SettingsService::class)->get('payout.auto_enabled'))->toBeTrue();
 });
 
-it('returns domain validation errors in the standard envelope', function () {
-    $admin = User::factory()->staff(PermissionCatalog::ADMIN)->create();
+it('returns domain validation errors for an authorized SuperAdmin', function () {
+    $superadmin = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
 
-    putSetting(tokenFor($admin, withStepUp: true), 'membership.fee.natural_person', -5)
+    putSetting(tokenFor($superadmin, withStepUp: true), 'membership.fee.natural_person', -5)
         ->assertStatus(422)
         ->assertJsonPath('code', 'SETTING_VALUE_INVALID')
         ->assertJsonStructure(['details' => ['fields' => ['value']]]);
