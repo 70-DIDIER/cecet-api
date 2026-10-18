@@ -89,13 +89,13 @@ it('refuses a received amount that differs from what is owed, and lets the valid
 
 it('reserves the validation to authorised staff, with a step-up', function () {
     $attemptId = payMembershipWith($this->member, 'CASH')->json('data.id');
-    $yemValidator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
+    $yemValidator = User::factory()->staff()->create();
 
     approvePayment($yemValidator, $attemptId, 25000)->assertForbidden();
     approvePayment($this->validator, $attemptId, 25000, withStepUp: false)->assertForbidden()->assertJsonPath('code', 'STEP_UP_REQUIRED');
 
     // The YEM validator sees the YEM receipts of the queue, not the payments to validate.
-    $this->withToken(tokenFor($yemValidator))->getJson('/api/v1/validations/queue')->assertOk()->assertJsonCount(0, 'data');
+    $this->withToken(tokenFor($yemValidator))->getJson('/api/v1/validations/queue')->assertForbidden();
 
     approvePayment(User::factory()->staff(PermissionCatalog::ADMIN)->create(), $attemptId, 25000)->assertForbidden();
     approvePayment($this->validator, $attemptId, 25000)->assertOk();
