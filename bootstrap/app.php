@@ -3,6 +3,7 @@
 use App\Domain\Identity\Http\Middleware\EnsureStaff;
 use App\Domain\Identity\Http\Middleware\EnsureStepUp;
 use App\Domain\Identity\Http\Middleware\EnsureSuperadminSession;
+use App\Domain\Identity\Http\Middleware\EnsureStaffGuardianSession;
 use App\Domain\Identity\Http\Middleware\RequireSuperadminMtls;
 use App\Domain\Shared\Http\ApiErrorRenderer;
 use App\Domain\Shared\Http\Middleware\AddSecurityHeaders;
@@ -57,6 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'staff' => EnsureStaff::class,
             'superadmin.mtls' => RequireSuperadminMtls::class,
             'superadmin.session' => EnsureSuperadminSession::class,
+            'staff.guardian' => EnsureStaffGuardianSession::class,
         ]);
 
         // Idempotency keys are scoped per user, so authentication must run first.
