@@ -149,7 +149,12 @@ class SubscribeToPack
             return;
         }
 
-        $quote = $this->cashback->quote($pack->family, YemQuantity::times($version->quota_per_period, $version->period_cycles));
+        $quote = $this->cashback->quote(
+            $pack->family,
+            YemQuantity::times($version->quota_per_period, $version->period_cycles),
+            is_array($version->rules['cashback'] ?? null) ? $version->rules['cashback'] : null,
+            $version->published_at?->toIso8601String(),
+        );
 
         $pack->forceFill([
             'cashback_bps' => $quote->rateBps,
