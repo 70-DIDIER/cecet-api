@@ -171,6 +171,48 @@ Le SuperAdmin est l'unique autorité applicative pour définir `membership.fee.n
 
 **Implémentation :** `70-DIDIER/CECT-frontend:custum` (formulaire, traductions FR/EN, cache de la configuration publique). Le dépôt API `custum` conserve les paramètres modifiables par le SuperAdmin ; pas de modification des montants contractuels via un frontend.
 
+## 17. ADDENDUM V5.5 — Packs, quotas et cashback intégrés (18 octobre 2026)
+
+Cet addendum **prévaut sur les sections antérieures** qui présentaient « Packs » et « Cashback » comme des modules de gestion distincts, ou qui prévoyaient le cashback pour les vendeurs et les marchands.
+
+### 17.1 Un seul module métier SuperAdmin
+
+Le back-office réunit désormais dans **« Packs, quotas et avantages »** :
+- **Formules et quotas :** création, duplication, niveau, prix, quantité de YEM par période, durée et statut de publication. Une formule en brouillon n'est pas souscriptible ; publier crée une version contractuelle immuable.
+- **Bonus cashback :** paramétrage commun versionné des bonus en YEM, accessible depuis le même module. Il ne constitue pas une réduction en FCFA du prix d'achat.
+- **Adhésion et règles :** frais d'adhésion PF/PM fixés par le SuperAdmin, limite de packs simultanés et accès à l'historique des paramètres.
+
+L'ancien lien `/admin/cashback` doit rediriger vers `/admin/packs?section=cashback` afin de préserver les anciens favoris. Les **pays de versement** relèvent de la configuration des paiements (`/admin/pays`), et **non** de la politique commerciale de cashback.
+
+### 17.2 Fonctionnement non ambigu des quatre familles
+
+| Famille de packs | Montant et quota | Cashback YEM |
+| --- | --- | --- |
+| **VENDEUR** | Droits de cession et quota YEM par période, selon la formule et les règles coopératives | **Interdit** |
+| **CONSOMMATEUR** | Prix plein en FCFA ; quantité de YEM et durée prévues au pack ; bonus calculé au moment de l'achat et réparti sur les périodes | **Autorisé** |
+| **PERSONNEL** | Compte rechargeable, pas de quotas ni durée de pack fixes ; bonus calculé à chaque rechargement selon le taux applicable | **Autorisé** |
+| **MARCHAND** | Droits d'accès/acceptation/cession YEM, personne morale uniquement | **Interdit** |
+
+**Invariant de sécurité :** `cashback.rules.families` ne peut contenir que `CONSOMMATEUR` et/ou `PERSONNEL`. L'API de configuration **rejette toute tentative** d'ajouter `VENDEUR` ou `MARCHAND`, y compris depuis une requête forgée ; le calculateur refuse également ces deux familles même si une ancienne valeur invalide subsistait en base.
+
+**Calcul :** `YEM bonus = YEM de base × taux cashback (%)`, selon le plafond et l'arrondi configurés. Le paiement en FCFA n'est jamais diminué. Le montant et les règles utilisés pour un achat sont figés dans sa transaction : aucune modification rétroactive après paiement.
+
+### 17.3 Formulaire de configuration compréhensible
+
+Le paramétrage d'une nouvelle version suit l'ordre :
+1. **Conditions essentielles :** prix en FCFA, éligibilité PF/PM, périodicité, durée et quantité de YEM par période ; pack Personnel = rechargement minimum, sans durée ni quota fixe.
+2. **Options avancées (repliées par défaut) :** cumul des YEM non utilisés, expiration/conservation, montant minimum et maximum par opération, délai de premier crédit.
+3. **Validation :** motif obligatoire, brouillon ou publication, confirmation renforcée pour les actions sensibles.
+
+Une simulation pédagogique rappelle le sens économique de chaque famille et montre le total de YEM distribués sur le contrat. Pour Consommateur, si le SuperAdmin choisit une valeur de référence en FCFA, le backend calcule automatiquement le quota selon le taux de vente et la durée ; ce champ est **exclusif d'un quota saisi manuellement** pour éviter les doubles calculs.
+
+### 17.4 Recette et gouvernance
+
+- Toutes les modifications sont versionnées, auditées, autorisées côté backend et portées uniquement sur les branches `custum` de `70-DIDIER`.
+- Aucun changement rétroactif des 25 formules historiques, de leurs contrats, montants ou quotas n'est réalisé par cette refonte. **Aucun barème de cashback n'est activé automatiquement** ; seule l'éligibilité légale des familles est restreinte.
+- Vérifications indispensables avant la mise en service : build React, tests backend rejetant Vendeur/Marchand, validité des simulations Consommateur et Personnel, conservation des paramètres existants, routes mTLS (403 sans certificat), Admin/ API (200), sauvegarde de la release précédente et rollback.
+- **État au moment de rédaction :** changements enregistrés sur GitHub, build React réussi ; recette serveur intégrée et déploiement encore à confirmer lors du rétablissement de l'agent distant.
+
 ---
 # ANNEXE HISTORIQUE : Cahier des charges v4.0 intégral
 Attention : les décisions v5.0 ci-dessus prévalent sur les anciennes formulations contradictoires.
