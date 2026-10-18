@@ -44,7 +44,7 @@ describe('configuration', function () {
     });
 
     it('creates a new version of a setting once the identity is confirmed', function () {
-        $this->actingAs($this->admin, 'web')->withSession(stepUpOpen());
+        $this->actingAs($this->superadmin, 'web')->withSession(stepUpOpen());
 
         Livewire::test(ListSettings::class)->callTableAction('edit', $this->fee, ['value' => 30000, 'reason' => 'Nouvelle grille 2027']);
 
@@ -53,7 +53,7 @@ describe('configuration', function () {
     });
 
     it('does not change anything without the confirmation code', function () {
-        $this->actingAs($this->admin, 'web');
+        $this->actingAs($this->superadmin, 'web');
 
         Livewire::test(ListSettings::class)->callTableAction('edit', $this->fee, ['value' => 30000, 'reason' => 'Nouvelle grille 2027', 'step_up_code' => '000000']);
 
@@ -70,17 +70,17 @@ describe('configuration', function () {
 
     it('keeps the critical settings to the superadmin', function () {
         $this->actingAs($this->admin, 'web');
-        Livewire::test(ListSettings::class)->assertTableActionHidden('edit', $this->critical)->assertTableActionVisible('edit', $this->fee);
+        Livewire::test(ListSettings::class)->assertTableActionHidden('edit', $this->critical)->assertTableActionHidden('edit', $this->fee);
 
         $this->actingAs($this->superadmin, 'web');
-        Livewire::test(ListSettings::class)->assertTableActionVisible('edit', $this->critical);
+        Livewire::test(ListSettings::class)->assertTableActionVisible('edit', $this->critical)->assertTableActionVisible('edit', $this->fee);
     });
 });
 
 describe('exports', function () {
     it('shows the exports to those who may read the reports', function () {
         $this->actingAs($this->admin, 'web')->get('/admin/exports')->assertOk()->assertSee('Liste des membres')->assertSee('Snapshots consolidés');
-        $this->actingAs($this->validator, 'web')->get('/admin/exports')->assertForbidden();
+        $this->actingAs($this->validator, 'web')->get('/admin/exports')->assertOk();
     });
 
     it('downloads a CSV once the identity is confirmed and audits it', function () {
