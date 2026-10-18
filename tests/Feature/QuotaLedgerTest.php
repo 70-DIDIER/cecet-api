@@ -241,7 +241,7 @@ describe('manual adjustments', function () {
             ->assertJsonPath('data.owner_id', $this->member->id)
             ->assertJsonCount(2, 'data.ledger');
 
-        $this->withToken(tokenFor(User::factory()->staff(PermissionCatalog::VALIDATOR)->create()))->getJson('/api/v1/admin/user-packs')->assertForbidden();
+        $this->withToken(tokenFor(User::factory()->staff()->create()))->getJson('/api/v1/admin/user-packs')->assertForbidden();
     });
 });
 
