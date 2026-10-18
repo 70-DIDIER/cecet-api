@@ -274,7 +274,7 @@ Le SuperAdmin dispose de **quatre onglets explicites** : **Vendeur**, **Consomma
 **Suppression sécurisée d'un pack :**
 - Si le plan n'a **jamais été publié et jamais été souscrit**, suppression physique du brouillon et de ses versions brouillon, journalisée avec motif.
 - Si le plan a **déjà été publié ou souscrit**, l'action le **classe en archive**, masquée du catalogue actif et inaccessible aux nouvelles souscriptions, mais elle conserve les versions, les contrats, les crédits YEM et les journaux financiers. L'archive reste consultable séparément. Les droits d'une souscription existante ne doivent pas être effacés par l'archivage.
-- La route `DELETE /api/v1/admin/packs/plans/{plan}` requiert `packs.manage`, la confirmation renforcée `step-up` et un motif de décision ; la réponse indique `deleted` ou `archived`.
+- La route `DELETE /api/v1/admin/packs/plans/{plan}` requiert le rôle **SuperAdmin** (`packs.manage` et `settings.update_critical`), la confirmation renforcée `step-up` et un motif de décision ; la réponse indique `deleted` ou `archived`.
 
 ### 19.2 Définition simplifiée du pack Consommateur
 
@@ -292,7 +292,7 @@ La page **Membres** doit permettre la création **d'une invitation à adhérer**
 
 - **Suspension** : bloque connexions et opérations, révoque sessions, conserve les historiques et peut être levée.
 - **Réactivation** : restitue l'état précédant la suspension, avec motif.
-- **Suppression d'une adhésion utilisée** : opération de **clôture**, terminale et historisée, avec révocation des sessions, sans effacement destructif des transactions/écritures YEM et preuves légales. Le compte clos peut être recherché à des fins d'audit mais ne doit plus opérer.
+- **Suppression d'une adhésion utilisée** : opération de **clôture**, terminale et historisée, avec révocation des sessions, sans effacement destructif des transactions/écritures YEM et preuves légales. Le compte clos ne figure plus dans la liste courante, mais apparaît dans le filtre **« Clôturés (archives) »** pour consultation et audit ; il ne doit plus opérer.
 - Ces actions demandent l'autorisation `members.manage`, une nouvelle confirmation `step-up` et un **motif obligatoire** pour la suspension, réactivation et clôture.
 - Les invitations doivent être limitées en fréquence et tracées ; l'e-mail et les informations ne constituent pas encore une adhésion active.
 
