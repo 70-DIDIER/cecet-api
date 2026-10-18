@@ -80,7 +80,7 @@ class ReportingQueries
         return [
             'members' => DB::table('users')->where('kind', 'member')->count(),
             'active_members' => DB::table('users')->where('kind', 'member')->where('status', 'active')->count(),
-            'total_collected_xof' => (int) DB::table('payment_intents')->where('status', 'succeeded')->sum('amount'),
+            'total_collected_xof' => (int) $this->realCollectedIntents()->sum('pi.amount'),
             'pending_validations' => $pending['count'] + DB::table('exchange_requests')->whereIn('status', ['declared_sent', 'disputed'])->count(),
             'yem_in_circulation' => $this->yemInCirculation(),
         ];
@@ -464,6 +464,11 @@ class ReportingQueries
             ->leftJoin('organizations as o', 'o.user_id', '=', 'u.id')
             ->leftJoin('user_packs as up', fn ($join) => $join->on('up.id', '=', 'pi.payable_id')->where('pi.payable_type', '=', 'user_pack'))
             ->where('pi.status', 'succeeded')
+            ->whereExists(fn (Builder $query) => $query->selectRaw('1')
+                ->from('payment_attempts as pa')
+                ->whereColumn('pa.payment_intent_id', 'pi.id')
+                ->where('pa.status', 'approved')
+                ->where('pa.provider', '<>', 'fake'))
             ->orderByDesc('pi.succeeded_at')
             ->limit($limit)
             ->select(['pi.id', 'pi.purpose', 'pi.amount', 'pi.succeeded_at', 'up.family', 'u.first_name', 'u.last_name', 'o.legal_name'])
@@ -505,10 +510,24 @@ class ReportingQueries
         ];
     }
 
-    private function paidIntents(CarbonImmutable $from, CarbonImmutable $to): Builder
+    /**
+     * Only actual confirmed provider receipts count as collected cash.
+     * Fake/simulation provider payments must never inflate financial KPIs.
+     */
+    private function realCollectedIntents(): Builder
     {
         return DB::table('payment_intents as pi')
             ->where('pi.status', 'succeeded')
+            ->whereExists(fn (Builder $query) => $query->selectRaw('1')
+                ->from('payment_attempts as pa')
+                ->whereColumn('pa.payment_intent_id', 'pi.id')
+                ->where('pa.status', 'approved')
+                ->where('pa.provider', '<>', 'fake'));
+    }
+
+    private function paidIntents(CarbonImmutable $from, CarbonImmutable $to): Builder
+    {
+        return $this->realCollectedIntents()
             ->where('pi.succeeded_at', '>=', $from)
             ->where('pi.succeeded_at', '<', $to);
     }
