@@ -36,6 +36,7 @@
         <env name="DB_DATABASE" value="cectapi_test" force="true"/>
         <env name="DB_URL" value="" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
+        <env name="VIEW_COMPILED_PATH" value="/tmp/cect-qa-blade-views" force="true"/>
         <env name="SUPERADMIN_MTLS_ENABLED" value="false" force="true"/>
         <env name="STAFF_GUARDIAN_LOGIN_ENABLED" value="false" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
