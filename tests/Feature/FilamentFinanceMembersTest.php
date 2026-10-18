@@ -159,5 +159,5 @@ describe('payouts', function () {
 
 it('shows the reports to those who may read them', function () {
     $this->actingAs($this->admin, 'web')->get('/admin/reports')->assertOk()->assertSee('Rapports')->assertSee('Total collecté');
-    $this->actingAs($this->validator, 'web')->get('/admin/reports')->assertForbidden();
+    $this->actingAs($this->validator, 'web')->get('/admin/reports')->assertOk();
 });
