@@ -52,9 +52,8 @@ class CatalogManager
     }
 
     /**
-     * Adds an unpublished version. It is not offered to anyone until it is published.
-     *
-     * @param  array<string, mixed>  $terms  raw API input, validated according to the family of the plan
+     * Update the commercial name, description and level without changing past
+     * contracts. Code and family remain immutable. Every change is audited.
      */
     public function updatePlanMetadata(User $actor, PackPlan $plan, string $name, ?int $level, ?string $description, string $reason): PackPlan
     {
@@ -82,6 +81,11 @@ class CatalogManager
         });
     }
 
+    /**
+     * Adds an unpublished version; already purchased versions remain immutable.
+     *
+     * @param array<string, mixed> $terms Validated by PackVersionValidator
+     */
     public function createVersion(User $actor, PackPlan $plan, array $terms): PackVersion
     {
         $this->assertMutable($plan);
