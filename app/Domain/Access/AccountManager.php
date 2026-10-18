@@ -173,6 +173,36 @@ class AccountManager
         });
     }
 
+    /**
+     * Close an existing membership without deleting financial, quota, legal
+     * or audit records. Closure is terminal; it revokes member sessions.
+     */
+    public function closeMember(User $actor, User $member, string $reason): User
+    {
+        $this->assertCanManage($actor, $member);
+        if (! $member->isMember() || $member->status === UserStatus::Closed) {
+            throw AccessException::invalidStatusTransition($member->status->value, 'closed');
+        }
+
+        return DB::transaction(function () use ($actor, $member, $reason): User {
+            $locked = User::query()->lockForUpdate()->findOrFail($member->id);
+            $before = $locked->status;
+            $locked->forceFill([
+                'status' => UserStatus::Closed,
+                'suspended_at' => now(),
+                'status_before_suspension' => null,
+            ])->save();
+            $sessions = $this->terminator->terminateAll($locked);
+            $this->auditLogger->record('members.closed', $locked,
+                before: ['status' => $before->value],
+                after: ['status' => 'closed'],
+                reason: $reason, actor: $actor);
+            $this->securityLogger->record('account.closed', SecuritySeverity::Warning, $actor->id,
+                metadata: ['target_id' => $locked->id, 'revoked_sessions' => $sessions]);
+            return $locked;
+        });
+    }
+
     private function action(User $target, string $verb): string
     {
         return ($target->isStaff() ? 'staff.' : 'members.').$verb;
