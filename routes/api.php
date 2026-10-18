@@ -242,6 +242,13 @@ Route::prefix('v1')->name('v1.')->group(function () {
                 });
             }
 
+            Route::post('members/invitations', [AccountController::class, 'inviteMember'])
+                ->middleware(['can:members.manage', 'step-up', 'throttle:5,1', 'idempotent'])
+                ->name('members.invitations.store');
+            Route::post('members/{user}/close', [AccountController::class, 'closeMember'])
+                ->middleware(['can:members.manage', 'step-up'])
+                ->name('members.close');
+
             Route::get('members/{user}/overview', MemberOverviewController::class)->middleware('can:members.view')->name('members.overview');
 
             Route::middleware(['can:staff.manage', 'step-up'])->group(function () {
