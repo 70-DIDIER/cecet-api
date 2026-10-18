@@ -144,7 +144,7 @@ it('lets the back-office ask for a snapshot and download the latest one, with a 
 });
 
 it('reserves snapshots to staff allowed to export', function () {
-    $validator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
+    $validator = User::factory()->staff()->create();
 
     $this->withToken(tokenFor($validator))->getJson('/api/v1/admin/snapshots')->assertForbidden();
     $this->withToken(tokenFor($validator, withStepUp: true))->get('/api/v1/admin/snapshots/latest/download')->assertForbidden();
