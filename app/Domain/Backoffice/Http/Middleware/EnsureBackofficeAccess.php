@@ -4,6 +4,7 @@ namespace App\Domain\Backoffice\Http\Middleware;
 
 use App\Domain\Backoffice\Menu\BackofficeMenu;
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Identity\StaffAccessPolicy;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
@@ -31,6 +32,16 @@ class EnsureBackofficeAccess
             $request->session()->regenerateToken();
 
             return redirect()->route('backoffice.login')->withErrors(['identifier' => 'Ce compte n\'a plus accès au back-office.']);
+        }
+
+        if (config('staff_guardian.enabled') && ! $user->isSuperadmin()
+            && ($request->session()->get('staff_guardian_user') !== $user->id
+                || ! app(StaffAccessPolicy::class)->allows($user))) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            return redirect()->route('backoffice.login')
+                ->withErrors(['identifier' => 'Reconnectez-vous avec le code envoyé aux trois adresses et pendant vos horaires autorisés.']);
         }
 
         // Shared here (not by a layout composer): the content of a child view is rendered before its layout.
