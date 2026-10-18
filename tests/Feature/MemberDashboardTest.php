@@ -1,3 +1,16 @@
+<?php
+
+use App\Domain\Catalog\Enums\PackFamily;
+use App\Domain\Identity\Enums\UserStatus;
+use App\Models\User;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+
+beforeEach(function () {
+    seedCatalogs();
+    Mail::fake();
+});
+
 it('never exposes Vendeur sale capacity as spendable YEM on the member dashboard', function () {
     $member = User::factory()->create();
     $seller = subscribeAndPay($member, makePlan(PackFamily::Vendeur, 'V1'));
@@ -18,18 +31,6 @@ it('never exposes Vendeur sale capacity as spendable YEM on the member dashboard
     expect((float) $response->json('data.yem.balance'))->toBeLessThan((float) $consumerAvailable + (float) $sellerAvailable);
 });
 
-<?php
-
-use App\Domain\Catalog\Enums\PackFamily;
-use App\Domain\Identity\Enums\UserStatus;
-use App\Models\User;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
-
-beforeEach(function () {
-    seedCatalogs();
-    Mail::fake();
-});
 
 it('summarises the member area: profile, YEM balance, active packs and latest movements', function () {
     $member = User::factory()->create(['city' => 'Lomé']);
