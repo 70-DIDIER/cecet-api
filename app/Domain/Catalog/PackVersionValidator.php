@@ -57,6 +57,15 @@ class PackVersionValidator
             $rules["rules.{$key}"] = ['sometimes', ...$keyRules];
         }
 
+        if (in_array($family, [PackFamily::Consommateur, PackFamily::Personnel], true)) {
+            $rules += [
+                'rules.cashback.enabled' => ['required_with:rules.cashback', 'boolean'],
+                'rules.cashback.rate_bps' => ['required_with:rules.cashback', 'integer', 'min:0', 'max:9999'],
+                'rules.cashback.max_yem' => ['nullable', 'regex:/^\\d{1,22}(\\.\\d{1,6})?$/'],
+                'rules.cashback.rounding' => ['required_with:rules.cashback', 'in:down,half_up'],
+            ];
+        }
+
         $validator = Validator::make($this->stringifyDecimals($input), $rules);
 
         $validator->after(function ($validator) use ($family, $input): void {
@@ -64,6 +73,12 @@ class PackVersionValidator
 
             foreach ($unknown as $key) {
                 $validator->errors()->add("rules.{$key}", "La règle « {$key} » n'existe pas pour la famille {$family->value}.");
+            }
+            if (isset($input['rules']['cashback']) && is_array($input['rules']['cashback'])) {
+                $unexpected = array_diff(array_keys($input['rules']['cashback']), ['enabled', 'rate_bps', 'max_yem', 'rounding']);
+                foreach ($unexpected as $key) {
+                    $validator->errors()->add("rules.cashback.{$key}", 'Paramètre de cashback inconnu.');
+                }
             }
 
             // Merchant rights belong to legal entities only, regardless of
