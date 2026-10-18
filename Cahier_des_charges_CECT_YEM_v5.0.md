@@ -64,6 +64,56 @@ Obtenir les fichiers de logos des opérateurs manquants auprès des marques et v
 
 Les conditions de recette fonctionnelle (authentification complète et simulateurs de paiements dans un navigateur réel) restent applicables ; la disponibilité HTTP n'est pas une validation de l'expérience utilisateur.
 
+## 13. ADDENDUM V5.1 — Gouvernance et espace SuperAdmin (18 octobre 2026)
+
+Cette section est la dernière décision retenue pour le SuperAdmin et **prévaut** sur les formulations contradictoires de v4 ou du début de v5. Toute modification future des fonctionnalités SuperAdmin doit être portée ici, sur `custum`, puis testée avant déploiement.
+
+### 13.1 Gouvernance RBAC consolidée
+
+- Rôles internes effectifs : **SuperAdmin, Administrateur, Comptabilité**. Le rôle indépendant « Validateur » est retiré de l'application et de la base ; ses titulaires éventuels sont transférés vers Comptabilité, avec contrôle de migration.
+- Vendeur/Consommateur/Personnel/Marchand désignent les **familles de packs et droits métier**, et non quatre rôles internes supplémentaires à attribuer arbitrairement aux comptes.
+- Comptabilité détient les droits de réception/confirmation/rejet/litige YEM, de validation des paiements manuels et de suivi des payouts, sous les règles métier. Les validations et les paiements continuent à générer une piste d'audit.
+- Les opérations nécessitant un second décideur (maker-checker) refusent toujours l'approbation par l'auteur initial, **même si le même rôle Comptabilité** couvre la validation et le règlement.
+- Le rôle SuperAdmin ne peut être assigné, réassigné, supprimé ou suspendu depuis l'interface standard de gestion des agents.
+
+### 13.2 Centre de gouvernance et paramétrage
+
+- Le SuperAdmin dispose d'un **centre de gouvernance** dédié, alimenté par les données de l'API et donnant accès aux domaines : frais d'adhésion PF/PM, cours YEM, packs et quotas, cashback, pays et méthodes, membres, équipe, vérifications et Comptabilité, finance, paiements, supervision, rapports, exports, audit et sécurité.
+- Les trois cours de référence sont réservés au SuperAdmin : achat vendeur **510 FCFA/YEM**, vente consommateur **650 FCFA/YEM**, cession Marchand **610 FCFA/YEM** en attente de ratification des conditions économiques. Leur application reste gérée en versions, avec date d'effet ; pas de recalcul rétroactif.
+- Les tarifs d'adhésion PF/PM, cashback, taux, seuils et plafonds critiques sont gouvernés par versions immuables avec **motif obligatoire**, identité de l'auteur, valeur et date d'effet.
+- Chaque paramètre de Configuration doit offrir une **consultation de l'historique**. Les secrets sensibles restent masqués côté API et interface.
+- Le SuperAdmin gère les packs versionnés des quatre familles, prix, niveaux, éligibilités PF/PM, quotas mensuels et limites de cumul, sans codage en dur du frontend.
+
+### 13.3 Sécurité SuperAdmin
+
+- En recette, endpoint `https://admin.13-49-203-235.sslip.io/superadmin/connexion` protégé côté Nginx : sans certificat client X.509 reconnu, HTML et API répondent 403. La migration vers un sous-domaine HTTPS mTLS dédié reste la cible production.
+- Première inscription : certificat mTLS + trois adresses e-mail personnelles différentes, chacune vérifiée par un OTP distinct, puis activation d'une clé personnelle `.cectkey` au moyen d'une signature cryptographique.
+- Connexion ordinaire : certificat + clé active + signature de défi + **un seul OTP commun envoyé aux trois adresses**. Aucune rotation automatique lors des connexions normales.
+- Renouvellement/récupération de clé : trois OTP distincts, nouvelle clé téléchargée et activée, ancienne révoquée lorsque la nouvelle est prouvée.
+- Gestion des trois adresses seulement sous session cryptographiquement validée. En recette les clés restent exportables, ne conviennent pas à un système financier de production ; ajout de chiffrement du `.cectkey` et/ou FIDO2 matériel avant go-live.
+
+### 13.4 Référence financière et données de recette
+
+- Les paiements issus du prestataire `fake` sont des simulations et ne doivent jamais être présentés comme de l'argent encaissé : les KPI financiers réels excluent ces tentatives.
+- Une **remise à zéro transactionnelle des données métier de démo** préserve obligatoirement le SuperAdmin, ses clés, ses trois adresses, les catalogues packs, prix, rôles, configurations et journaux de sécurité/audit ; elle nécessite une sauvegarde PostgreSQL préalable.
+- Le 18 octobre, la recette a été réinitialisée à **0 membre, 0 paiement, 0 FCFA collecté, 0 YEM**. Les 25 packs ont été préservés.
+
+### 13.5 État de recette du 18 octobre 2026
+
+| Sous-ensemble | Implémentation / vérification | Limite restante |
+| --- | --- | --- |
+| mTLS et authentification SuperAdmin | Nginx 403 sans certificat ; OTP et clé, interface disponible | Parcours de réauthentification à recetter en navigateur après changement |
+| Gestion rôles internes | 3 rôles en DB, Comptabilité réunit validation YEM + opérations de paiement | Recette des scénarios multi-acteurs et maker-checker |
+| Centre gouvernance | `/admin/gouvernance`, valeurs API et accès aux écrans existants | Vérifier l'ergonomie et les permissions de chaque écran avec comptes non privilégiés |
+| Paramètres financiers | Tarifs critiques, 510/650/610, motifs, dates et historique | Ratification des conditions de cession et modèle économique final |
+| Packs / quotas | Catalogue et versions, droits PF/PM, 25 packs conservés | Recette complète vendeur/consommateur/marchand et des plafonds mensuels |
+| Cashback | Configuration côté SuperAdmin et aperçu calculé | Formaliser et tester le barème métier définitif, notamment les éventuels paliers |
+| Moyens de paiement africains | Catalogue et simulation de recette | Finaliser les logos officiels et leur provenance |
+| Finance / exports / audit | Routes et interfaces accessibles sous permissions | Recette intégrée des cas complexes, transactions externes exclues de la démo |
+| Sécurité préproduction | Historique, mTLS, OTP, contrôle de sessions | Rotation CRL avant le 24 octobre, clé privée chiffrée, red-team/pentest avant production |
+
+**Ne jamais qualifier la plateforme de « totalement conforme et prête en production » sans les tests et validations encore ouverts.**
+
 ---
 # ANNEXE HISTORIQUE : Cahier des charges v4.0 intégral
 Attention : les décisions v5.0 ci-dessus prévalent sur les anciennes formulations contradictoires.
