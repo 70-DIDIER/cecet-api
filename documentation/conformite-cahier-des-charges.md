@@ -1,6 +1,26 @@
+# État de conformité SuperAdmin v5.1 — 18 octobre 2026
+
+**Référence active :** `Cahier_des_charges_CECT_YEM_v5.0.md`, addendum §13 ; branches `custum` des dépôts `70-DIDIER` uniquement.
+
+| Exigence | Constat vérifié | Reste à recetter |
+| --- | --- | --- |
+| Trois rôles internes | SuperAdmin, Administrateur, Comptabilité dans PostgreSQL ; Validateur retiré | Paiements et validations avec comptes Comptabilité réels |
+| Gouvernance | Écran `/admin/gouvernance` alimenté par API et navigation vers modules | Exercer tous les boutons avec des permissions minimales |
+| Tarifs et cours YEM | 510/650/610 FCFA/YEM, frais PF/PM configurables, réservations SuperAdmin | Ratification des conditions économiques |
+| Paramètres versionnés | Éditeur + motif + date d'effet ; historique consultable | Vérifier répercussion immédiate sur inscription et achats |
+| Packs et cashback | Catalogue géré par API, 25 packs conservés, configuration de bonus YEM | Barèmes définitifs, quotas et cas limite d'utilisation |
+| Accès privilégié | mTLS + RSA + OTP, 403 sans certificat ; SuperAdmin conservé | E2E navigateur, renouvellement CRL et clé chiffrée |
+| Économie financière | Paiements `fake` exclus du KPI encaissé ; démo vidée | Recette paiement, payouts, contrôles d'intégrité |
+| Sécurité et sauvegarde | Journalisation et sauvegarde PostgreSQL préalable | Test de restauration, audit indépendant |
+
+**État : conformité fonctionnelle partielle ; pas de go-live production validé.**
+
+---
+
+## Archives antérieures (non normatives)
 # Matrice de conformité — Cahier des charges CECT/YEM
 
-Dernière revue : 11 octobre 2026.
+Dernière revue historique : 11 octobre 2026. **Mise à jour de gouvernance du 18 octobre 2026 ci-dessous : les lignes anciennes « Validateur » et la branche `joseph` ne sont plus des références opérationnelles.**
 
 Ce document relie les exigences du cahier des charges fonctionnel à l'implémentation de la branche `joseph`. Il complète le changelog et sert de checklist de non-régression.
 
