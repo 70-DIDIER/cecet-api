@@ -17,6 +17,26 @@
 
 ---
 
+## Revue Packs et Adhésion — 18 octobre 2026 (v5.3)
+
+| Exigence | Code sur `custum` | Vérification à compléter |
+|---|---|---|
+| 4 familles, 25 plans préservés | Tableau de bord Packs, filtres et indicateurs publiés / brouillons | Confirmer l’affichage final avec session SuperAdmin |
+| Création de formule | Formulaire (code, famille, nom, niveau, description), route `POST /admin/packs/plans` | Créer une formule de test, vérifier absence de publication |
+| Modifier nom/niveau/description | Route `PUT /admin/packs/plans/{plan}`, autorisation `packs.manage`, `step-up`, motif et audit | Tester autorisations et journal des modifications |
+| Versionnement des conditions | Prix, cycles, quotas, cumul, expiration, min/max, délai, éligibilité, règles selon famille | Confirmer création et publication en session navigateur |
+| Publication initiale | Publier la version puis passer automatiquement le plan DRAFT à PUBLISHED | Vérifier transaction et comportement en cas d’échec de la 2e étape |
+| Pack Marchand | Refus API d’éligibilité personne physique même si la requête est forgée | Ajouter test d’intégration backend |
+| Gestion complète du cycle de vie | Suspendre / réactiver / retirer / archiver avec motif | Vérifier l’état des souscriptions existantes |
+| Frais d’adhésion PF/PM | Panneau SuperAdmin, modification directe via paramètres critiques versionnés | Tester modification, propagation publique et refus des rôles non autorisés |
+| Référentiel Joseph | API `custum` est en avance sur `joseph`; comparaison de référence sans écrasement | Ne pas synchroniser automatiquement des anciennes règles contradictoires |
+
+**État de livraison :** fichiers commités sur `70-DIDIER/cecet-api:custum` et `70-DIDIER/cect-admin:custum`, cahier cumulatif v5.3 mis à jour. La publication serveur et les tests de recette navigables restent à confirmer (agent Desktop Commander sans réponse au moment de cette revue). Le catalogue et ses valeurs n’ont pas été modifiés.
+
+**Décision commerciale à confirmer :** V1 à 100 000 FCFA / 125 YEM par mois selon la grille héritée, ou à 100 000 FCFA / 500 YEM par mois selon une instruction ultérieure. Ne pas imposer l’un sans arbitrage du SuperAdmin et du CA.
+
+---
+
 ## Archives antérieures (non normatives)
 # Matrice de conformité — Cahier des charges CECT/YEM
 
