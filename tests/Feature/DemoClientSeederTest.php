@@ -37,8 +37,8 @@ it('builds a complete, consistent history for the demonstration client', functio
     expect($statuses)->toBe(['awaiting_transfer', 'completed', 'declared_sent', 'yem_received']);
 
     $payouts = PayoutBatch::query()->where('beneficiary_id', $client->id)->get()->keyBy('total_amount');
-    expect($payouts[20000]->status->value)->toBe('paid')
-        ->and($payouts[15000]->status->value)->toBe('awaiting_dispatch');
+    expect($payouts[20400]->status->value)->toBe('paid')
+        ->and($payouts[15300]->status->value)->toBe('awaiting_dispatch');
 
     expect(PaymentAttempt::query()->where('provider', 'manual')->where('status', 'pending')->count())->toBe(1)
         ->and(MerchantPayment::query()->pluck('status')->map(fn ($status) => $status->value)->sort()->values()->all())->toBe(['confirmed', 'declared_sent'])
