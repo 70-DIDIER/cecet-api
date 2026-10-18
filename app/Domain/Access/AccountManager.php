@@ -53,7 +53,8 @@ class AccountManager
                     'last_name' => $identity['last_name'],
                     'email' => $identity['email'],
                     'phone' => $identity['phone'] ?? null,
-                    'status' => UserStatus::PendingActivation,
+                    'status' => UserStatus::Active,
+                    'email_verified_at' => now(), // identity pre-validated by SuperAdmin; guardian OTP gates login
                 ]);
                 $user->syncRoles($roles);
 
@@ -66,7 +67,9 @@ class AccountManager
                     'roles' => $roleNames,
                 ]);
 
-                $this->otp->issue($user, OtpPurpose::AccountActivation);
+                if (! config('staff_guardian.enabled')) {
+                    $this->otp->issue($user, OtpPurpose::AccountActivation);
+                }
 
                 return $user;
             });
