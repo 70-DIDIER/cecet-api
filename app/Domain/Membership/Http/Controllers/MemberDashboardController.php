@@ -2,10 +2,12 @@
 
 namespace App\Domain\Membership\Http\Controllers;
 
+use App\Domain\Catalog\Enums\PackFamily;
 use App\Domain\Exchange\Enums\ExchangeStatus;
 use App\Domain\Exchange\Models\ExchangeRequest;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Merchant\Enums\MerchantPaymentStatus;
+use App\Domain\Merchant\Models\MerchantAccount;
 use App\Domain\Merchant\Models\MerchantPayment;
 use App\Domain\Payment\Enums\PaymentAttemptStatus;
 use App\Domain\Payment\Http\Resources\PaymentAttemptResource;
@@ -26,6 +28,9 @@ use Illuminate\Support\Facades\DB;
 /**
  * The member area home page in one call: profile, membership, YEM balance and totals, active packs, the latest
  * movements with a readable label, and the payments still awaiting an action.
+ *
+ * The balance, totals and movements only cover the packs used to spend or sell YEM: a Pack Marchand quota is a redemption
+ * ceiling, not YEM held (cahier v4.0 §6.2-6.3), so its collected balance is given per pack in "merchant_balance".
  */
 class MemberDashboardController
 {
@@ -37,7 +42,7 @@ class MemberDashboardController
         abort_unless($user instanceof User, 401);
 
         $membership = Membership::query()->where('user_id', $user->id)->first();
-        $packIds = UserPack::query()->where('user_id', $user->id)->select('id');
+        $walletPackIds = UserPack::query()->where('user_id', $user->id)->where('family', '!=', PackFamily::Marchand)->select('id');
 
         $packs = UserPack::query()
             ->where('user_id', $user->id)
@@ -46,14 +51,20 @@ class MemberDashboardController
             ->orderBy('activated_at')
             ->get();
 
+        $walletPacks = $packs->reject(fn (UserPack $pack): bool => $pack->family === PackFamily::Marchand);
+        $merchantAccounts = MerchantAccount::query()
+            ->whereIn('user_pack_id', $packs->where('family', PackFamily::Marchand)->pluck('id'))
+            ->get()
+            ->keyBy('user_pack_id');
+
         $totals = QuotaLedgerEntry::query()
-            ->whereIn('user_pack_id', $packIds)
+            ->whereIn('user_pack_id', $walletPackIds)
             ->selectRaw("COALESCE(SUM(available_delta) FILTER (WHERE type IN ('credit', 'cashback_credit') OR (type = 'adjust' AND available_delta > 0)), 0) AS credited")
             ->selectRaw("COALESCE(SUM(consumed_delta) FILTER (WHERE type = 'consume'), 0) AS spent")
             ->first();
 
         $movements = QuotaLedgerEntry::query()
-            ->whereIn('user_pack_id', $packIds)
+            ->whereIn('user_pack_id', $walletPackIds)
             ->with(['userPack.plan', 'period'])
             ->orderByDesc('created_at')
             ->orderByDesc('id')
@@ -83,8 +94,8 @@ class MemberDashboardController
                 'member_since' => $membership->activated_at?->toIso8601ZuluString(),
             ],
             'yem' => [
-                'balance' => YemQuantity::of($packs->reduce(fn (string $sum, UserPack $pack): string => YemQuantity::add($sum, $pack->account->available ?? '0'), '0')),
-                'reserved' => YemQuantity::of($packs->reduce(fn (string $sum, UserPack $pack): string => YemQuantity::add($sum, $pack->account->reserved ?? '0'), '0')),
+                'balance' => YemQuantity::of($walletPacks->reduce(fn (string $sum, UserPack $pack): string => YemQuantity::add($sum, $pack->account->available ?? '0'), '0')),
+                'reserved' => YemQuantity::of($walletPacks->reduce(fn (string $sum, UserPack $pack): string => YemQuantity::add($sum, $pack->account->reserved ?? '0'), '0')),
                 'total_credited' => YemQuantity::of((string) ($totals?->getAttribute('credited') ?? '0')),
                 'total_spent' => YemQuantity::of((string) ($totals?->getAttribute('spent') ?? '0')),
             ],
@@ -106,6 +117,11 @@ class MemberDashboardController
                 'reserved' => $pack->account?->reserved,
                 ...$this->packCredits($pack),
                 'consumed' => $pack->account?->consumed,
+                'merchant_balance' => $pack->family === PackFamily::Marchand ? [
+                    'eligible' => $merchantAccounts->get($pack->id)->eligible ?? YemQuantity::zero(),
+                    'reserved' => $merchantAccounts->get($pack->id)->reserved ?? YemQuantity::zero(),
+                    'redeemed' => $merchantAccounts->get($pack->id)->redeemed ?? YemQuantity::zero(),
+                ] : null,
                 'period' => $this->currentPeriod($pack),
                 'monthly' => $this->monthly($pack),
                 'activated_at' => $pack->activated_at?->toIso8601ZuluString(),
@@ -120,7 +136,7 @@ class MemberDashboardController
                 'quantity' => $this->magnitude($entry),
                 'user_pack_id' => $entry->user_pack_id,
             ])->all(),
-            'monthly_activity' => $this->monthlyActivity($packIds),
+            'monthly_activity' => $this->monthlyActivity($walletPackIds),
             'operations' => $this->openOperations($user),
             'payments_awaiting_action' => PaymentAttemptResource::collection($awaiting)->resolve($request),
         ]]);
