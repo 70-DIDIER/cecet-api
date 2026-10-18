@@ -225,6 +225,44 @@ L'écran de modification d'un pack explique le prix payé, les YEM par période,
 
 La recette comporte la compilation du frontend, le contrôle du certificat mTLS, des tests d'accès et de gouvernance, puis des essais de cashback positif sur Consommateur/Personnel et nul sur Vendeur/Marchand.
 
+## 18. ADDENDUM V5.6 — Cashback configurable directement dans les packs (18 octobre 2026)
+
+Cette décision remplace l'onglet séparé de cashback de v5.5 pour toutes les nouvelles versions de packs. L'administration SuperAdmin doit refléter le fonctionnement économique réel plutôt que des paramètres techniques disparates.
+
+### Parcours du SuperAdmin
+
+- Dans **Packs, quotas et avantages**, sélectionner une famille puis une formule et cliquer **Paramétrer**.
+- La modification s'effectue dans un guide compréhensible, au sein d'une seule fenêtre : **1. Prix et quantité de YEM**, **2. Bonus YEM** (uniquement Consommateur/Personnel), **3. Paramètres avancés** (facultatifs), **Validation et publication**.
+- Le formulaire calcule un **aperçu indicatif** : FCFA payés, YEM achetés, YEM offerts et total, sans afficher de jargon lié à la base de données. Les calculs effectifs sont réalisés par l'API avec 6 décimales.
+- Aucun écran autonome « Cashback », ni réglage global du cashback pour les nouveaux packs : la configuration concerne **chaque version commerciale de pack**. Les anciennes versions sans nouvelle règle restent compatibles avec la politique générale historique, conservée en lecture et calculs legacy.
+- Les fiches de packs et l'historique précisent le cashback effectif de la version : « Sans cashback », un taux de bonus YEM ou « Règle historique ».
+
+### Comment les familles fonctionnent
+
+**Consommateur :** le membre achète un pack pour un prix déterminé en FCFA. Le tarif de vente YEM est défini par le SuperAdmin. La version du pack fixe le quota de YEM par période et le nombre de périodes, ou propose un calcul à partir de la valeur totale payée et du cours de vente. Les YEM achetés, plus un éventuel cashback, sont distribués sur les périodes du pack ; ils permettent de payer chez les Marchands suivant les limites métier. Le cashback est calculé à la souscription et figé, puis réparti dans les périodes.
+
+**Personnel :** le membre ouvre un pack rechargeable, sans quota mensuel ni durée fixe ; il peut recharger en FCFA à partir du minimum de sa formule. Chaque rechargement confirmé est converti en YEM au cours de vente alors applicable. Un cashback éventuel est calculé sur **ce rechargement**, crédité séparément, et son montant est figé au moment de la demande de rechargement. Le taux et le plafond du bonus proviennent des règles immuables de la **version du pack achetée** ; les changements futurs de formule n'impactent pas les rechargements des packs déjà souscrits.
+
+**Vendeur et Marchand :** aucun cashback. Le Vendeur dispose d'un quota de YEM à céder par période. Le Marchand doit recevoir les YEM issus des achats de ses clients et peut les remettre à la coopérative selon ses limites et ses frais. Leur fonctionnement détaillé et les éventuels plafonds périodiques restent à recetter séparément.
+
+### Règles et implémentation
+
+La table des versions `pack_versions` reste la source contractuelle. Pour les seules familles `CONSOMMATEUR` et `PERSONNEL`, le champ JSON `rules.cashback` peut contenir `enabled` (booléen), `rate_bps` (entier 0 à 9999 points de base), `max_yem` (chaîne décimale ou null) et `rounding` (`down` ou `half_up`). Le backend valide tous ces paramètres, rejette les clés inattendues et interdit ce champ sur les familles Vendeur et Marchand.
+
+- Un taux de **5 %** se stocke comme **500 points de base** ; le bonus est **ajouté en YEM**, sans réduction du prix en FCFA.
+- Le plafond est appliqué au **bonus total sur un pack Consommateur** et au **bonus de chaque rechargement Personnel**.
+- Les versions publiées sont immuables. Le calcul des YEM bonus est figé lors de la création de la souscription Consommateur ou de la demande de rechargement Personnel, avec traçabilité séparée du crédit acheté et du bonus.
+- L'ancienne propriété versionnée `cashback.rules` reste uniquement une **politique de compatibilité** pour les packs historiques ne possédant pas `rules.cashback` ; elle n'est plus exposée comme une deuxième façon de créer des bonus dans le tableau de bord.
+- L'interface offre une option explicite « Conserver la règle historique » lors du reparamétrage d'un ancien pack sans politique de bonus locale ; une version neuve commence sans bonus tant que le SuperAdmin ne l'active pas.
+- L'API calcule l'activation, vérifie la famille éligible, le taux, le plafond et la preuve de paiement. L'interface sert d'aide à la décision et non de registre comptable.
+
+### Recette et migration
+
+- Aucun des 25 packs historiques n'a été modifié ou republié automatiquement. Pas de nouvelle migration de table : les termes sont stockés dans les règles JSON versionnées existantes.
+- Tests unitaires : validité et calcul du bonus local, refus du bonus Vendeur et Marchand, rejet d'un taux invalide et de clés inconnues ; contrôles de gouvernance et mTLS.
+- Recette navigateur à effectuer : créer une nouvelle version de pack Consommateur avec 5 % et vérifier la distribution et les crédits YEM après simulation ; configurer un pack Personnel avec 5 %, effectuer deux rechargements et vérifier les crédits de cashback distincts ; vérifier l'absence de bonus sur Vendeur/Marchand ; vérifier qu'un ancien contrat n'est pas recalculé.
+- La configuration financière réelle et les taux définitifs doivent être ratifiés par la coopérative avant toute production.
+
 ---
 # ANNEXE HISTORIQUE : Cahier des charges v4.0 intégral
 Attention : les décisions v5.0 ci-dessus prévalent sur les anciennes formulations contradictoires.
