@@ -27,7 +27,8 @@ use InvalidArgumentException;
  */
 class MerchantRedemptionService
 {
-    private const DEFAULT_RATE_KEY = 'rates.purchase_xof_per_yem';
+    // Marchands surrender to the configured merchant cession rate, not the seller purchase rate.
+    private const DEFAULT_RATE_KEY = 'rates.transfer_xof_per_yem';
 
     public function __construct(
         private readonly MerchantQrService $merchants,
