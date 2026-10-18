@@ -105,6 +105,9 @@ class PackPlanAdminController
         )->load('currentVersion'));
     }
 
+    /**
+     * Create a new immutable commercial version.
+     */
     public function storeVersion(Request $request, PackPlan $plan): JsonResponse
     {
         $version = $this->catalog->createVersion($this->actor($request), $plan, $request->all());
