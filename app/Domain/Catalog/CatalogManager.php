@@ -56,6 +56,32 @@ class CatalogManager
      *
      * @param  array<string, mixed>  $terms  raw API input, validated according to the family of the plan
      */
+    public function updatePlanMetadata(User $actor, PackPlan $plan, string $name, ?int $level, ?string $description, string $reason): PackPlan
+    {
+        $this->assertMutable($plan);
+
+        return DB::transaction(function () use ($actor, $plan, $name, $level, $description, $reason): PackPlan {
+            $plan = PackPlan::query()->lockForUpdate()->findOrFail($plan->id);
+            $this->assertMutable($plan);
+            $before = $plan->only(['name', 'level', 'description']);
+            $plan->forceFill([
+                'name' => trim($name),
+                'level' => $level,
+                'description' => $description !== null ? trim($description) : null,
+            ])->save();
+
+            $this->auditLogger->record(
+                'packs.plan_metadata_updated',
+                $plan,
+                before: $before,
+                after: $plan->only(['name', 'level', 'description']),
+                reason: $reason,
+                actor: $actor,
+            );
+            return $plan->refresh();
+        });
+    }
+
     public function createVersion(User $actor, PackPlan $plan, array $terms): PackVersion
     {
         $this->assertMutable($plan);
