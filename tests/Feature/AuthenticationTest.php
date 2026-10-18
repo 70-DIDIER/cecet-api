@@ -92,7 +92,7 @@ it('always requires an email code for internal accounts', function () {
         'challenge_id' => $response->json('data.challenge_id'),
         'code' => lastOtpCode($staff->email),
         'device_name' => 'tests',
-    ])->assertOk()->assertJsonPath('data.user.roles', [PermissionCatalog::VALIDATOR]);
+    ])->assertOk()->assertJsonPath('data.user.roles', [PermissionCatalog::ACCOUNTING]);
 });
 
 it('requires an email code for members when configured', function () {
