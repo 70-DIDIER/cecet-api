@@ -37,6 +37,22 @@
 
 ---
 
+## Packs, quotas et cashback intégrés — v5.5
+
+| Contrôle | Implémentation commitée | Statut |
+| --- | --- | --- |
+| Navigation | Un module Packs & avantages, sections Formules/Bonus/Adhésion. Ancien lien Cashback redirigé | Compilation React réussie |
+| Formules | Conditions principales clairement expliquées ; options avancées repliées ; calcul pédagogique total YEM | Compilation React réussie, tests navigateur restant |
+| Cashback | Familles autorisées uniquement `CONSOMMATEUR` / `PERSONNEL`, validation `cashback.rules` et seconde barrière dans `CashbackCalculator` | Syntaxe PHP réussie, tests de recette API en attente |
+| Comptabilisation | Consommateur : bonus à l'achat réparti sur la durée ; Personnel : bonus au rechargement ; paiement FCFA non réduit | Implémenté par services Subscription existants, intégration à recetter |
+| Pays de paiement | Gestion distincte `/admin/pays`, pas d'imbrication avec la politique commerciale | Compilation réussie |
+| Données historiques | Aucune modification des tarifs, packs ou transactions ; cashback actuellement désactivé | Vérification de base et recette à reprendre après reconnexion serveur |
+| Documentation | Cahier cumulatif §17 v5.5 mis à jour, code synchronisé sur `custum` API/Admin | Commits enregistrés |
+
+**Déploiement serveur :** en attente de tests d'intégration et reprise de l'agent Desktop Commander ; ne pas présenter ces changements comme en production tant que le nouvel artefact compilé n'a pas été installé et testé, notamment 403 mTLS sans certificat.
+
+---
+
 ## Archives antérieures (non normatives)
 # Matrice de conformité — Cahier des charges CECT/YEM
 
