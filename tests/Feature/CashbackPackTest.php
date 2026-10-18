@@ -129,5 +129,7 @@ it('lets a Vendeur sell only once a month has passed since the subscription', fu
 it('rejects an incoherent cashback rule from the Superadmin', function () {
     expect(fn () => setCashback(['rate_bps' => 10000]))->toThrow(SettingException::class)
         ->and(fn () => setCashback(['rounding' => 'banker']))->toThrow(SettingException::class)
-        ->and(fn () => setCashback(['families' => ['AUTRE']]))->toThrow(SettingException::class);
+        ->and(fn () => setCashback(['families' => ['AUTRE']]))->toThrow(SettingException::class)
+        ->and(fn () => setCashback(['families' => ['VENDEUR']]))->toThrow(SettingException::class)
+        ->and(fn () => setCashback(['families' => ['MARCHAND']]))->toThrow(SettingException::class);
 });
