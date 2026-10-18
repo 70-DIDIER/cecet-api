@@ -56,7 +56,7 @@ describe('login by Pernum or e-mail', function () {
 
         $this->postJson('/api/v1/auth/mfa/verify', ['challenge_id' => $challengeId, 'code' => lastOtpCode($staff->email)])
             ->assertOk()
-            ->assertJsonPath('data.user.roles', ['validateur']);
+            ->assertJsonPath('data.user.roles', ['comptabilite']);
     });
 });
 
@@ -84,7 +84,7 @@ describe('cookie sessions for the React site', function () {
     });
 
     it('confirms a step-up on the session itself', function () {
-        $admin = User::factory()->staff(PermissionCatalog::ADMIN)->create();
+        $admin = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
         $challengeId = $this->withHeaders(fromReactSite())->postJson('/api/v1/auth/login', ['identifier' => $admin->email, 'password' => 'Password123'])->json('data.challenge_id');
         $this->withHeaders(fromReactSite())->postJson('/api/v1/auth/mfa/verify', ['challenge_id' => $challengeId, 'code' => lastOtpCode($admin->email)])->assertJsonPath('data.mode', 'session');
 
