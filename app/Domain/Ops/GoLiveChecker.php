@@ -39,7 +39,7 @@ class GoLiveChecker
             $this->item('cect_pernum', filled($this->settings->string('yem.cect_pernum')), 'yem.cect_pernum (Pernum de réception de la CECT) n\'est pas configuré.'),
             $this->item('alert_emails', $this->settings->array('ops.alert_emails') !== [], 'ops.alert_emails est vide : personne ne recevra les alertes.'),
             $this->item('superadmin', $this->activeStaffWith(PermissionCatalog::SUPERADMIN) >= 1, 'Aucun compte Superadmin actif (php artisan cect:create-superadmin).'),
-            $this->item('staff_roles', $this->activeStaffWith(PermissionCatalog::VALIDATOR) >= 1 && $this->activeStaffWith(PermissionCatalog::ACCOUNTING) >= 1, 'Il faut au moins un Validateur et un compte Comptabilité nominatifs actifs.'),
+            $this->item('staff_roles', $this->activeStaffWith(PermissionCatalog::ACCOUNTING) >= 1, 'Il faut au moins un compte Comptabilité nominatif actif, doté des permissions de validation YEM et de gestion des paiements.'),
             $this->item('hash_driver', config('hashing.driver') === 'argon2id', 'HASH_DRIVER doit rester argon2id.'),
         ];
     }
