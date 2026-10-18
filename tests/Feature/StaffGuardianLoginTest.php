@@ -11,6 +11,7 @@ beforeEach(function () {
     seedCatalogs();
     config(['staff_guardian.enabled' => true]);
     $superadmin = User::factory()->staff('superadmin')->create();
+    config(['superadmin.user_id' => $superadmin->id]);
     $this->accountant = User::factory()->staff('comptabilite')->create(['status' => UserStatus::Active]);
     DB::table('superadmin_security_profiles')->insert([
         'user_id' => $superadmin->id, 'cert_sha256' => str_repeat('a', 64),
@@ -61,6 +62,12 @@ it('does not allow the SuperAdmin or an unactivated staff identity through the s
     $this->postJson('/api/v1/auth/staff/login/start', ['email' => $superadmin->email])->assertForbidden();
     $this->accountant->forceFill(['status' => UserStatus::PendingActivation])->save();
     $this->postJson('/api/v1/auth/staff/login/start', ['email' => $this->accountant->email])->assertForbidden();
+    expect($this->delivered->messages)->toBeEmpty();
+});
+
+it('refuses staff without Administrator or Accounting roles even when the identity is active', function () {
+    $outsider = User::factory()->staff()->create(['status' => UserStatus::Active]);
+    $this->postJson('/api/v1/auth/staff/login/start', ['email' => $outsider->email])->assertForbidden();
     expect($this->delivered->messages)->toBeEmpty();
 });
 
