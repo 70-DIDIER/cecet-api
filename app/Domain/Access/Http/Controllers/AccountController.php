@@ -111,6 +111,18 @@ class AccountController
         return new UserResource($this->accounts->reactivate($this->actor($request), $user, $this->reason($request)));
     }
 
+    /**
+     * Close, rather than physically delete, an adhesion. Accounting evidence,
+     * existing subscriptions, YEM entries and security events remain intact.
+     */
+    public function closeMember(Request $request, User $user): UserResource
+    {
+        $this->assertKind($user, UserKind::Member);
+        return new UserResource($this->accounts->closeMember(
+            $this->actor($request), $user, $this->reason($request),
+        ));
+    }
+
     private function reason(Request $request): string
     {
         return $request->validate(['reason' => ['required', 'string', 'min:5', 'max:1000']])['reason'];
