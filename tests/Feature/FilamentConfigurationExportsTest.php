@@ -61,7 +61,7 @@ describe('configuration', function () {
     });
 
     it('refuses a value that breaks the rules of the setting', function () {
-        $this->actingAs($this->admin, 'web')->withSession(stepUpOpen());
+        $this->actingAs($this->superadmin, 'web')->withSession(stepUpOpen());
 
         Livewire::test(ListSettings::class)->callTableAction('edit', $this->fee, ['value' => -5, 'reason' => 'Valeur absurde']);
 
