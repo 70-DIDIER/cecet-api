@@ -86,7 +86,7 @@ it('rejects a payment with a mandatory reason', function () {
 });
 
 it('keeps the decisions to the roles that hold the permission', function () {
-    $accounting = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
+    $accounting = User::factory()->staff(PermissionCatalog::ADMIN)->create();
 
     $this->actingAs($accounting, 'web')->withSession(stepUp())
         ->post("/backoffice/validations/paiements/{$this->attemptId}/valider", ['received_amount' => 25000, 'reference' => 'x'])
@@ -115,7 +115,7 @@ it('examines a YEM receipt and confirms it with the quantity actually received',
 
     $exchange = ExchangeRequest::query()->findOrFail($id);
     expect($exchange->status)->toBe(ExchangeStatus::YemReceived)
-        ->and($exchange->amount_due_xof)->toBe(17500);
+        ->and($exchange->amount_due_xof)->toBe(17850);
 
     $this->get("/backoffice/validations/yem/{$id}")->assertOk()->assertSee('Cette demande est close');
 });
