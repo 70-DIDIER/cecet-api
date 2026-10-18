@@ -111,8 +111,8 @@ final class SettingsCatalog
     private function rates(): array
     {
         return [
-            new SettingDefinition('rates.purchase_xof_per_yem', 'rates', SettingType::Integer, 500,
-                'Cours d\'achat d\'un YEM par la CECT (XOF) — à ratifier par le CA (PO-01).', rules: ['value' => ['required', 'min:1']]),
+            new SettingDefinition('rates.purchase_xof_per_yem', 'rates', SettingType::Integer, 510,
+                'Cours d\'achat d\'un YEM par la CECT (XOF) — valeur paramétrable par le Superadmin.', SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:1']]),
             new SettingDefinition('rates.sale_xof_per_yem', 'rates', SettingType::Integer, 650,
                 'Cours de vente d\'un YEM par la CECT (XOF) — à ratifier par le CA (PO-01).', rules: ['value' => ['required', 'min:1']]),
             new SettingDefinition('rates.transfer_xof_per_yem', 'rates', SettingType::Integer, 610,
