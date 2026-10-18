@@ -29,11 +29,11 @@ function createStaff(User $actor, array $roles, string $email = 'agent@cect.tg')
     ], ['Idempotency-Key' => (string) Str::ulid()]);
 }
 
-it('creates an internal account that activates itself with an email code', function () {
-    createStaff($this->admin, [PermissionCatalog::VALIDATOR])
+it('maintains the legacy activation only before the guardian feature is enabled', function () {
+    createStaff($this->admin, [PermissionCatalog::ACCOUNTING])
         ->assertCreated()
         ->assertJsonPath('data.status', 'pending_activation')
-        ->assertJsonPath('data.roles', [PermissionCatalog::VALIDATOR]);
+        ->assertJsonPath('data.roles', [PermissionCatalog::ACCOUNTING]);
 
     $this->postJson('/api/v1/auth/staff/activate', [
         'email' => 'agent@cect.tg',
@@ -51,13 +51,30 @@ it('lets only a Superadmin grant the Superadmin role', function () {
         ->assertForbidden()
         ->assertJsonPath('code', 'SUPERADMIN_PROTECTED');
 
-    createStaff($this->superadmin, [PermissionCatalog::SUPERADMIN])->assertCreated();
+    createStaff($this->superadmin, [PermissionCatalog::SUPERADMIN])
+        ->assertForbidden()
+        ->assertJsonPath('code', 'SUPERADMIN_PROTECTED');
 });
 
-it('refuses role combinations that break segregation of duties', function () {
+it('refuses the retired Validator role after its duties were merged into Accounting', function () {
     createStaff($this->superadmin, [PermissionCatalog::VALIDATOR, PermissionCatalog::ACCOUNTING])
         ->assertStatus(422)
-        ->assertJsonPath('code', 'SEGREGATION_OF_DUTIES_VIOLATION');
+        ->assertJsonPath('code', 'CUSTOM_ROLES_DISABLED');
+});
+
+it('creates an immediately active named Accounting user without legacy activation when guardian login is enabled', function () {
+    config(['staff_guardian.enabled' => true]);
+    createStaff($this->superadmin, [PermissionCatalog::ACCOUNTING], 'accountant-new@cect.test')
+        ->assertCreated()
+        ->assertJsonPath('data.status', 'active')
+        ->assertJsonPath('data.roles', [PermissionCatalog::ACCOUNTING]);
+    expect(User::where('email', 'accountant-new@cect.test')->sole()->email_verified_at)->not->toBeNull();
+    $this->postJson('/api/v1/auth/staff/activate', [
+        'email' => 'accountant-new@cect.test',
+        'code' => '123456',
+        'password' => 'Activation2026',
+        'password_confirmation' => 'Activation2026',
+    ])->assertNotFound();
 });
 
 it('forbids changing your own roles', function () {
