@@ -4,6 +4,8 @@ use App\Domain\Access\PermissionCatalog;
 use App\Domain\Settings\Enums\SettingEditLevel;
 use App\Domain\Settings\SettingsCatalog;
 
+uses(Tests\TestCase::class);
+
 it('keeps precisely the three internal roles of CECT governance v5', function () {
     $catalog = new PermissionCatalog();
     expect(array_keys($catalog->systemRoles()))->toBe([
