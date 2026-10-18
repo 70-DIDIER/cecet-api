@@ -29,7 +29,11 @@ class CashbackCalculator
         $rounding = ($rules['rounding'] ?? 'down') === 'half_up' ? 'half_up' : 'down';
         $rateBps = is_int($rules['rate_bps'] ?? null) ? $rules['rate_bps'] : 0;
         $families = array_map('strval', is_array($rules['families'] ?? null) ? $rules['families'] : []);
-        $applies = ($rules['enabled'] ?? false) === true && $rateBps > 0 && in_array($family->value, $families, true);
+        // Defense in depth: ignore legacy or corrupted settings granting cashback
+        // to Vendeur/Marchand. Eligibility is a fixed product policy, not a UI hint.
+        $eligibleFamily = in_array($family, [PackFamily::Consommateur, PackFamily::Personnel], true);
+        $applies = $eligibleFamily && ($rules['enabled'] ?? false) === true && $rateBps > 0
+            && in_array($family->value, $families, true);
 
         $cashback = YemQuantity::zero();
 
