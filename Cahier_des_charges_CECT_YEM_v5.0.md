@@ -213,6 +213,18 @@ Une simulation pédagogique rappelle le sens économique de chaque famille et mo
 - Vérifications indispensables avant la mise en service : build React, tests backend rejetant Vendeur/Marchand, validité des simulations Consommateur et Personnel, conservation des paramètres existants, routes mTLS (403 sans certificat), Admin/ API (200), sauvegarde de la release précédente et rollback.
 - **État au moment de rédaction :** changements enregistrés sur GitHub, build React réussi ; recette serveur intégrée et déploiement encore à confirmer lors du rétablissement de l'agent distant.
 
+## Addendum v5.5 — Gestion unifiée des packs (18 octobre 2026)
+
+Le SuperAdmin dispose d'un module unique Packs, quotas et avantages, avec trois onglets : Formules et quotas, Bonus cashback, Adhésion et règles. L'ancienne route Cashback doit renvoyer vers l'onglet correspondant.
+
+Les packs Vendeur et Marchand ne bénéficient jamais de cashback. Seuls les packs Consommateur et Personnel sont éligibles. Pour Consommateur, les YEM offerts sont répartis selon les périodes du pack. Pour Personnel, ils sont ajoutés aux rechargements. Le prix payé en FCFA ne diminue jamais.
+
+Le SuperAdmin configure activation, taux, plafond YEM, arrondi, familles autorisées, motif et date d'effet. Le backend vérifie les familles éligibles indépendamment de l'interface. Les anciennes souscriptions gardent leurs règles figées.
+
+L'écran de modification d'un pack explique le prix payé, les YEM par période, la durée et les options avancées. La section Adhésion regroupe frais PF/PM et limite de packs structurés. Les 25 formules existantes restent inchangées.
+
+La recette comporte la compilation du frontend, le contrôle du certificat mTLS, des tests d'accès et de gouvernance, puis des essais de cashback positif sur Consommateur/Personnel et nul sur Vendeur/Marchand.
+
 ---
 # ANNEXE HISTORIQUE : Cahier des charges v4.0 intégral
 Attention : les décisions v5.0 ci-dessus prévalent sur les anciennes formulations contradictoires.
