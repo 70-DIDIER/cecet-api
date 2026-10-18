@@ -87,6 +87,24 @@ class PackPlanAdminController
     /**
      * Add an unpublished version. The terms are validated according to the family of the plan.
      */
+    /**
+     * Update the commercial label, level and description, without touching
+     * existing contracts, version terms or the permanent plan code.
+     */
+    public function update(Request $request, PackPlan $plan): PackPlanResource
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'level' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+        return new PackPlanResource($this->catalog->updatePlanMetadata(
+            $this->actor($request), $plan, $data['name'],
+            $data['level'] ?? null, $data['description'] ?? null, $data['reason'],
+        )->load('currentVersion'));
+    }
+
     public function storeVersion(Request $request, PackPlan $plan): JsonResponse
     {
         $version = $this->catalog->createVersion($this->actor($request), $plan, $request->all());
