@@ -63,6 +63,10 @@ class AuthenticateUser
             throw IdentityException::invalidCredentials();
         }
 
+        if ($user->isStaff() && ! $user->isSuperadmin() && config('staff_guardian.enabled')) {
+            throw IdentityException::invalidCredentials();
+        }
+
         RateLimiter::clear($throttleKey);
 
         $this->ensureCanAuthenticate($user);
