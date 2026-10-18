@@ -103,7 +103,12 @@ class RequestPackTopup
         if ($topup === null) {
             $rateKey = is_string($rules['rate_setting_key'] ?? null) ? $rules['rate_setting_key'] : self::DEFAULT_RATE_KEY;
             $rate = $this->settings->integer($rateKey);
-            $quote = $this->cashback->quote($pack->family, bcdiv((string) $amount, (string) $rate, YemQuantity::SCALE));
+            $quote = $this->cashback->quote(
+                $pack->family,
+                bcdiv((string) $amount, (string) $rate, YemQuantity::SCALE),
+                is_array($rules['cashback'] ?? null) ? $rules['cashback'] : null,
+                $pack->version->published_at?->toIso8601String(),
+            );
 
             if (! YemQuantity::isPositive($quote->yemBase)) {
                 throw QuotaException::invalidQuantity();
