@@ -1,6 +1,6 @@
 # CECT — SuperAdmin isolé : spécification et installation
 
-**Statut : code applicatif ajouté sur `custum`. Activation production différée et sécurisée.** Aucun certificat personnel, CA privée, adresse réelle ou clé d'accès ne doit être commité.
+**Statut de la démonstration :** endpoint SuperAdmin mTLS activé sur le domaine `admin.13-49-203-235.sslip.io` ; mode sous-domaine dédié reste l'architecture cible. Version PHP de démo activée le 18 octobre 2026. Les trois OTP distincts sont réservés à l'initialisation/récupération/renouvellement, pas aux connexions ordinaires. Aucun certificat personnel, CA privée, adresse réelle ou clé d'accès ne doit être commité.
 
 ## Comportement requis
 
@@ -8,7 +8,7 @@
 2. **Premier accès :** le SuperAdmin provisionné dans `SUPERADMIN_USER_ID`, détenteur du certificat épinglé `SUPERADMIN_BOOTSTRAP_CERT_SHA256`, configure **trois e-mails distincts** et entre **trois codes différents**. Le navigateur crée un couple RSA-3072 puis prépare un fichier privé `.cectkey`.
 3. **Activation :** la clé privée signe un défi à usage unique ; le backend n'en conserve que la clé publique. Le fichier est téléchargé **avant** l'activation.
 4. **Connexion ordinaire :** certificat navigateur + fichier `.cectkey` + défi signé, puis **le même code OTP transmis aux trois e-mails**, saisi **une fois**.
-5. **Rotation après connexion :** trois OTP **différents**, un par e-mail. Nouvelle clé `.cectkey`, téléchargement et confirmation de possession ; l'ancienne clé est alors révoquée de façon atomique. Aucune route métier n'est disponible avant la confirmation.
+5. **Renouvellement exceptionnel de la clé :** la connexion quotidienne ne remplace **plus** automatiquement la clé. En cas de perte, d'expiration ou de renouvellement de sécurité, trois OTP **différents** sont nécessaires pour obtenir et activer un nouveau `.cectkey`. L'ancienne clé est révoquée à l'activation de la nouvelle.
 6. **Fichier expiré/perdu :** la récupération n'est permise qu'avec le certificat mTLS toujours valide et **trois OTP différents** sur les e-mails préalablement configurés.
 7. **Changement des trois e-mails :** seulement depuis une session SuperAdmin cryptographiquement validée, avec confirmation **des trois nouvelles adresses** par OTP distincts.
 
@@ -47,7 +47,7 @@ SUPERADMIN_KEY_DAYS=30
 - Ajouter le sous-domaine SuperAdmin à `SANCTUM_STATEFUL_DOMAINS` ; sur ce sous-domaine, les appels React sont same-origin, et le cookie Laravel doit être `HttpOnly`, `Secure` et de préférence host-only. Définir `SESSION_SECURE_COOKIE=true`. Éviter un `SESSION_DOMAIN=.domaine` partagé qui faciliterait des transferts de sessions inter-domaines.
 - Déployer la migration `2026_10_18_000000_create_superadmin_security_tables.php` et le frontend Admin (incluant la route `/superadmin/connexion`).
 - Vérifier qu'aucun autre virtual host, route PHP-FPM ou proxy ne transmet `CECT_MTLS_VERIFY`/`CECT_MTLS_CERT` depuis le réseau public, et que l'accès public direct à l'API SuperAdmin est rejeté.
-- Tester en préproduction : sans certificat, certificat non autorisé, expiré, clé révoquée, échecs OTP, récupération, rotation après connexion et changement d'e-mails.
+- Tester en préproduction : sans certificat, certificat non autorisé, expiré, clé révoquée, échecs OTP, récupération, renouvellement exceptionnel et changement d'e-mails.
 - **Ensuite seulement**, renseigner `SUPERADMIN_MTLS_ENABLED=true`, vider la configuration Laravel, vérifier `nginx -t` et recharger Nginx. Garder un rollback documenté, sans désactiver silencieusement les contrôles en exploitation.
 
 ### Vérifications Nginx (après configuration, pas avant)
@@ -73,3 +73,14 @@ Les commandes curl avec la clé privée non chiffrée doivent être exécutées 
 ## Contrôle anti-régression
 
 Le frontend public `CECT-frontend` ne doit pas contenir d'identifiants ou de secrets SuperAdmin. Le site d'administration normal `cect-admin` reste disponible pour les autres rôles ; l'espace SuperAdmin n'est servi qu'après mTLS par le sous-domaine isolé. Les branches Git utilisées sont **`custum`**.
+
+## Mise à jour du 18 octobre 2026 — Parcours et remise à zéro de démonstration
+
+- Le SuperAdmin a été provisionné sans mot de passe et avec certificat client épinglé. Seul l'hôte Admin HTTPS présente les routes SuperAdmin et l'API de même origine via mTLS, sans perturber le rôle Administrateur ordinaire.
+- **Connexion récurrente :** certificat X.509 + fichier .cectkey + signature RSA du défi + **un OTP commun** aux trois adresses, saisi une seule fois. Le backend appelle directement `authenticated()` et n'exige plus de renouvellement de clé à chaque session.
+- **Clé expirée/perdue :** la récupération nécessite toujours trois codes distincts. Le modèle de menace distingue émission de clé et authentification quotidienne.
+- **KPI :** les tableaux financiers doivent présenter seulement les opérations monétaires confirmées par un fournisseur non fictif ; les transactions `provider=fake` servent uniquement au test et ne constituent aucun encaissement réel.
+- **Réinitialisation de la démonstration :** exécuter `cect:reset-demo-activity` en préproduction après `pg_dump` sécurisé. Cette commande supprime membres, paiements, adhésions, exports et opérationnels de test ; elle préserve SuperAdmin, certificats/clés actives, profils de sécurité, journaux d'audit/sécurité, packs, rôles, prix, paramètres et migrations. Le script demande un token explicite et un fichier de sauvegarde vérifié.
+- **Constat de recette après la remise à zéro du 18 octobre :** 0 membre, 0 paiement, 0 adhésion, 0 FCFA collecté, 25 packs, 1 SuperAdmin et 1 clé active. Copie PostgreSQL archivée localement avec permissions restreintes.
+
+**Attention :** le compte SuperAdmin et l'historique de sécurité **ne doivent pas** être purgés par une recette métier. La CA et la CRL de démonstration ne conviennent pas à une mise en production ; la CRL actuelle doit être renouvelée avant le 24 octobre 2026, 22:36 UTC.
