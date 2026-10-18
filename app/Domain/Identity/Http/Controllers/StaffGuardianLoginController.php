@@ -26,10 +26,15 @@ final class StaffGuardianLoginController
         $data = $request->validate(['email' => ['required', 'email:rfc', 'max:255']]);
         $user = User::query()->where('email', mb_strtolower(trim($data['email'])))
             ->where('kind', UserKind::Staff)->first();
-        abort_unless($user && ! $user->isSuperadmin() && $user->status === UserStatus::Active, 403, 'Accès interne non autorisé.');
+        abort_unless(
+            $user && ! $user->isSuperadmin()
+                && $user->hasAnyRole(['administrateur', 'comptabilite'])
+                && $user->status === UserStatus::Active,
+            403, 'Accès interne non autorisé.'
+        );
         abort_unless($schedule->allows($user), 403, 'Connexion indisponible hors des horaires autorisés.');
 
-        $security = DB::table('superadmin_security_profiles')->latest('updated_at')->first();
+        $security = DB::table('superadmin_security_profiles')->where('user_id', config('superadmin.user_id'))->first();
         abort_unless($security, 503, 'Les trois adresses de sécurité doivent être configurées par le SuperAdmin.');
         $recipients = array_values(array_unique([$security->email_1, $security->email_2, $security->email_3]));
         abort_unless(count($recipients) === 3, 503);
@@ -65,6 +70,8 @@ final class StaffGuardianLoginController
     public function verify(Request $request, StaffAccessPolicy $schedule, EstablishAuthentication $establish): JsonResponse
     {
         abort_unless(config('staff_guardian.enabled'), 404);
+        // Reject non-browser clients BEFORE consuming a valid one-time challenge.
+        abort_unless($request->hasSession(), 403, 'Connexion depuis la console sécurisée requise.');
         $data = $request->validate([
             'challenge_id' => ['required', 'uuid'],
             'code' => ['required', 'digits:6'],
@@ -85,6 +92,7 @@ final class StaffGuardianLoginController
         abort_unless($userId, 422, 'Code invalide, expiré ou déjà utilisé.');
         $user = User::query()->find($userId);
         abort_unless($user && $user->isStaff() && ! $user->isSuperadmin()
+            && $user->hasAnyRole(['administrateur', 'comptabilite'])
             && $user->status === UserStatus::Active && $schedule->allows($user),
             403, 'Connexion refusée par les règles d’accès du personnel.');
         // Staff guardian login is cookie-only. No long-lived bearer credentials.
