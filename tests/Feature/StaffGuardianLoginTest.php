@@ -45,6 +45,33 @@ it('refuses invalid OTP codes and never accepts the same challenge twice', funct
     expect(DB::table('staff_guardian_challenges')->where('id', $id)->value('attempts'))->toBe(1);
 });
 
+it('creates a usable browser-only Accounting session and rejects reuse of the consumed code', function () {
+    $this->withHeaders([
+        'Origin' => 'http://localhost:5173',
+        'Referer' => 'http://localhost:5173/equipe/connexion',
+    ])->withSession(['qa_browser' => true]);
+
+    $id = $this->postJson('/api/v1/auth/staff/login/start', ['email' => $this->accountant->email])
+        ->assertStatus(202)->json('data.challenge_id');
+
+    preg_match('/Code de connexion : ([0-9]{6})/', $this->delivered->messages[0], $matched);
+    expect($matched[1] ?? null)->toMatch('/^[0-9]{6}$/');
+
+    $this->postJson('/api/v1/auth/staff/login/verify', [
+        'challenge_id' => $id, 'code' => $matched[1],
+    ])->assertOk()->assertJsonPath('data.mode', 'session')
+        ->assertJsonPath('data.user.id', $this->accountant->id);
+
+    $this->withHeaders([
+        'Origin' => 'http://localhost:5173',
+        'Referer' => 'http://localhost:5173/equipe/connexion',
+    ])->getJson('/api/v1/me')->assertOk()->assertJsonPath('data.id', $this->accountant->id);
+
+    $this->postJson('/api/v1/auth/staff/login/verify', [
+        'challenge_id' => $id, 'code' => $matched[1],
+    ])->assertStatus(422);
+});
+
 it('refuses requests outside an individually configured work window before sending OTP', function () {
     $today = (int) now('Africa/Lome')->dayOfWeekIso;
     DB::table('staff_access_windows')->insert([
