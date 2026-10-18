@@ -46,8 +46,13 @@ class MemberDashboardController
             ->orderBy('activated_at')
             ->get();
 
+        // A Vendeur quota is permission to sell YEM to the cooperative;
+        // it is NOT a spendable consumer balance.
+        $spendablePacks = $packs->filter(fn (UserPack $pack): bool =>
+            in_array($pack->family->value, ['CONSOMMATEUR', 'PERSONNEL'], true));
+
         $totals = QuotaLedgerEntry::query()
-            ->whereIn('user_pack_id', $packIds)
+            ->whereIn('user_pack_id', $spendablePacks->pluck('id'))
             ->selectRaw("COALESCE(SUM(available_delta) FILTER (WHERE type IN ('credit', 'cashback_credit') OR (type = 'adjust' AND available_delta > 0)), 0) AS credited")
             ->selectRaw("COALESCE(SUM(consumed_delta) FILTER (WHERE type = 'consume'), 0) AS spent")
             ->first();
@@ -83,8 +88,8 @@ class MemberDashboardController
                 'member_since' => $membership->activated_at?->toIso8601ZuluString(),
             ],
             'yem' => [
-                'balance' => YemQuantity::of($packs->reduce(fn (string $sum, UserPack $pack): string => YemQuantity::add($sum, $pack->account->available ?? '0'), '0')),
-                'reserved' => YemQuantity::of($packs->reduce(fn (string $sum, UserPack $pack): string => YemQuantity::add($sum, $pack->account->reserved ?? '0'), '0')),
+                'balance' => YemQuantity::of($spendablePacks->reduce(fn (string $sum, UserPack $pack): string => YemQuantity::add($sum, $pack->account->available ?? '0'), '0')),
+                'reserved' => YemQuantity::of($spendablePacks->reduce(fn (string $sum, UserPack $pack): string => YemQuantity::add($sum, $pack->account->reserved ?? '0'), '0')),
                 'total_credited' => YemQuantity::of((string) ($totals?->getAttribute('credited') ?? '0')),
                 'total_spent' => YemQuantity::of((string) ($totals?->getAttribute('spent') ?? '0')),
             ],
