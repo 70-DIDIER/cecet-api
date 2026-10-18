@@ -213,6 +213,38 @@ class CatalogManager
         });
     }
 
+    /**
+     * An unused, never-published draft may be removed physically.
+     * Every published or subscribed pack is archived instead, preserving
+     * contracts, audit evidence and accounting references.
+     *
+     * @return 'deleted'|'archived'
+     */
+    public function removePlan(User $actor, PackPlan $plan, string $reason): string
+    {
+        return DB::transaction(function () use ($actor, $plan, $reason): string {
+            $plan = PackPlan::query()->lockForUpdate()->findOrFail($plan->id);
+            $subscribed = DB::table('user_packs')->where('pack_plan_id', $plan->id)->exists();
+            $everPublished = $plan->published_at !== null || $plan->versions()->whereNotNull('published_at')->exists();
+            if ($subscribed || $everPublished) {
+                $before = $plan->status->value;
+                $plan->forceFill(['status' => PackPlanStatus::Archived])->save();
+                $this->auditLogger->record('packs.plan_archived', $plan,
+                    before: ['status' => $before],
+                    after: ['status' => 'archived', 'used' => $subscribed],
+                    reason: $reason, actor: $actor);
+                return 'archived';
+            }
+            $details = ['id' => $plan->id, 'code' => $plan->code, 'family' => $plan->family->value];
+            // All remaining versions are drafts (never purchased nor published).
+            $plan->versions()->delete();
+            $this->auditLogger->record('packs.plan_deleted', $plan,
+                before: $details, reason: $reason, actor: $actor);
+            $plan->delete();
+            return 'deleted';
+        });
+    }
+
     private function assertMutable(PackPlan $plan): void
     {
         if ($plan->status === PackPlanStatus::Archived) {
