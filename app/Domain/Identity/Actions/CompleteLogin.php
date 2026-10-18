@@ -24,6 +24,10 @@ class CompleteLogin
             throw IdentityException::invalidCredentials();
         }
 
+        if ($user->isStaff() && ! $user->isSuperadmin() && config('staff_guardian.enabled')) {
+            throw IdentityException::invalidCredentials();
+        }
+
         if (! $user->status->canAuthenticate()) {
             throw IdentityException::accountDisabled();
         }
