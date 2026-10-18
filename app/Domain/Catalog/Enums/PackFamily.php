@@ -42,6 +42,7 @@ enum PackFamily: string
                 'reference_value_xof' => ['integer', 'min:1'],
                 'rate_setting_key' => ['string', 'in:rates.purchase_xof_per_yem,rates.sale_xof_per_yem,rates.transfer_xof_per_yem'],
                 'rate_xof_per_yem' => ['integer', 'min:1'],
+                'cashback' => ['array'],
             ],
             self::Vendeur => [
                 'first_credit_delay_periods' => ['integer', 'min:0', 'max:12'],
@@ -53,6 +54,7 @@ enum PackFamily: string
             ],
             self::Personnel => [
                 'min_topup_xof' => ['integer', 'min:1'],
+                'cashback' => ['array'],
                 'rate_setting_key' => ['string', 'in:rates.purchase_xof_per_yem,rates.sale_xof_per_yem,rates.transfer_xof_per_yem'],
             ],
         };
