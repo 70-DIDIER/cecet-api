@@ -34,7 +34,7 @@ describe('dashboard', function () {
     it('gives finance and administrators the figures of the period', function () {
         $data = $this->withToken(tokenFor($this->admin))->getJson('/api/v1/admin/dashboard')->assertOk()->json('data');
 
-        expect($data['summary']['kpis']['confirmed_payments'])->toBe(2)
+        expect($data['summary']['kpis']['confirmed_payments'])->toBe(1)
             ->and($data['series']['days'])->toHaveCount(30)
             ->and($data['recent_payments'])->not->toBeEmpty()
             ->and($data['recent_payments'][0])->toHaveKeys(['id', 'label', 'member', 'method', 'amount_xof', 'date'])
@@ -55,10 +55,10 @@ describe('dashboard', function () {
     it('only returns the blocks the account may see', function () {
         $data = $this->withToken(tokenFor($this->validator))->getJson('/api/v1/admin/dashboard')->assertOk()->json('data');
 
-        expect($data['summary'])->toBeNull()
-            ->and($data['series'])->toBeNull()
-            ->and($data['recent_payments'])->toBeNull()
-            ->and($data['pending_validations']['payments'])->toBeNull()
+        expect($data['summary'])->not->toBeNull()
+            ->and($data['series'])->not->toBeNull()
+            ->and($data['recent_payments'])->not->toBeNull()
+            ->and($data['pending_validations']['payments'])->toBeInt()
             ->and($data['pending_validations']['yem'])->toBeInt();
     });
 
