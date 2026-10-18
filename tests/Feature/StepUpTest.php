@@ -8,7 +8,7 @@ use Illuminate\Testing\TestResponse;
 beforeEach(function () {
     seedCatalogs();
     Mail::fake();
-    $this->admin = User::factory()->staff(PermissionCatalog::ADMIN)->create();
+    $this->admin = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
 });
 
 function updateSalesRate(string $token, int $value = 640): TestResponse
