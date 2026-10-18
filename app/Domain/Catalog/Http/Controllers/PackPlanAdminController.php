@@ -106,6 +106,20 @@ class PackPlanAdminController
     }
 
     /**
+     * Only unused, unpublished drafts are physically deleted. Historical
+     * packs are archived so existing YEM and payments remain traceable.
+     */
+    public function destroy(Request $request, PackPlan $plan): JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+        $mode = $this->catalog->removePlan($this->actor($request), $plan, $data['reason']);
+
+        return response()->json(['data' => ['mode' => $mode, 'code' => $plan->code]]);
+    }
+
+    /**
      * Create a new immutable commercial version.
      */
     public function storeVersion(Request $request, PackPlan $plan): JsonResponse
