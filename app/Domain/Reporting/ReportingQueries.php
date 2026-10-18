@@ -549,9 +549,12 @@ class ReportingQueries
 
     private function yemInCirculation(): string
     {
+        // Seller quotas are permissions to offer YEM, not YEM owned or
+        // circulated. Merchant entitlements likewise are not minted funds.
         $sum = DB::table('quota_accounts as qa')
             ->join('user_packs as up', 'up.id', '=', 'qa.user_pack_id')
             ->where('up.status', 'active')
+            ->whereIn('up.family', ['CONSOMMATEUR', 'PERSONNEL'])
             ->sum('qa.available');
 
         return YemQuantity::of((string) $sum);
