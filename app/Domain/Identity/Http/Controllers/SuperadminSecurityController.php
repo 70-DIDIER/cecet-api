@@ -3,6 +3,8 @@
 namespace App\Domain\Identity\Http\Controllers;
 
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Identity\Actions\ConfirmStepUp;
+use App\Domain\Settings\SettingsService;
 use App\Domain\Identity\Http\Middleware\RequireSuperadminMtls;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -177,6 +179,10 @@ class SuperadminSecurityController
         $request->session()->forget('superadmin_pending_rotation');
         $request->session()->put('superadmin_verified_cert', $fp);
         $request->session()->put('superadmin_verified_key', $keyId);
+        // A fresh mTLS + RSA + OTP login also opens the normal short
+        // step-up window. Later critical actions require fresh triple-mail OTP.
+        $request->session()->put(ConfirmStepUp::SESSION_KEY,
+            now()->addSeconds(app(SettingsService::class)->integer('otp.step_up_validity_seconds'))->getTimestamp());
         $user->forceFill(['last_login_at' => now()])->save();
         Log::notice('superadmin.login_success', ['user_id' => $user->id, 'key_id' => $keyId, 'cert_sha256' => $fp]);
     }
@@ -344,6 +350,41 @@ class SuperadminSecurityController
         $pem = $this->validatedKey($request);
         $this->take($user, $fp, 'recover', $data['challenge_id'], $data['codes']);
         return $this->respond(['key_id' => $this->pendingKey($user, $fp, $pem), 'activation_required' => true]);
+    }
+
+    /**
+     * Elevated confirmation of a privileged governance change.
+     * Sent to all three verified addresses, never to the demo identity
+     * superadmin-demo@cect.invalid used for initial provisioning.
+     */
+    public function stepUpStart(Request $request): JsonResponse
+    {
+        [$user, $fp, $profile] = $this->identity($request);
+        $this->requireVerified($request, $user, $fp);
+
+        return $this->respond([
+            'challenge_id' => $this->issue($user, $fp, 'step_up', $this->savedAddresses($profile), false),
+        ]);
+    }
+
+    public function stepUpVerify(Request $request, SettingsService $settings): JsonResponse
+    {
+        [$user, $fp] = $this->identity($request);
+        $this->requireVerified($request, $user, $fp);
+        $data = $request->validate([
+            'challenge_id' => ['required', 'uuid'],
+            'code' => ['required', 'digits:6'],
+        ]);
+
+        $this->take($user, $fp, 'step_up', $data['challenge_id'], [
+            $data['code'], $data['code'], $data['code'],
+        ]);
+
+        $until = now()->addSeconds($settings->integer('otp.step_up_validity_seconds'));
+        $request->session()->put(ConfirmStepUp::SESSION_KEY, $until->getTimestamp());
+        Log::notice('superadmin.step_up_verified', ['user_id' => $user->id, 'cert_sha256' => $fp]);
+
+        return $this->respond(['step_up_until' => $until->toIso8601ZuluString()]);
     }
 
     public function security(Request $request): JsonResponse
