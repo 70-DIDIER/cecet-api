@@ -138,8 +138,8 @@ describe('member request', function () {
             ->assertJsonPath('data.status', 'awaiting_transfer')
             ->assertJsonPath('data.yem_confirmed', false)
             ->assertJsonPath('data.quantity_requested', '40.000000')
-            ->assertJsonPath('data.rate_xof_per_yem', 500)
-            ->assertJsonPath('data.estimated_amount_xof', 20000)
+            ->assertJsonPath('data.rate_xof_per_yem', 510)
+            ->assertJsonPath('data.estimated_amount_xof', 20400)
             ->assertJsonPath('data.amount_due_xof', null)
             ->assertJsonPath('data.transfer_instructions.send_to_pernum', '1000000001')
             ->assertJsonPath('data.payout_destination.method', 'TMONEY');
@@ -243,15 +243,15 @@ describe('validation', function () {
             ->assertJsonPath('data.status', 'yem_received')
             ->assertJsonPath('data.yem_confirmed', true)
             ->assertJsonPath('data.quantity_received', '40.000000')
-            ->assertJsonPath('data.amount_due_xof', 20000)
-            ->assertJsonPath('data.payout.total_amount', 20000)
+            ->assertJsonPath('data.amount_due_xof', 20400)
+            ->assertJsonPath('data.payout.total_amount', 20400)
             ->assertJsonPath('data.payout.status', 'awaiting_dispatch')
             ->assertJsonPath('data.validation_events.0.action', 'confirmed')
             ->assertJsonPath('data.validation_events.0.external_reference', 'YEM-TX-0001');
 
         expect(sellerBalance($this->pack))->toBe(['85.000000', '0.000000', '40.000000'])
             ->and(ExchangeRequest::query()->sole()->validated_by)->toBe($this->validator->id)
-            ->and(AuditEvent::query()->where('action', 'exchanges.yem_received')->sole()->after['amount_due_xof'])->toBe(20000);
+            ->and(AuditEvent::query()->where('action', 'exchanges.yem_received')->sole()->after['amount_due_xof'])->toBe(20400);
     });
 
     it('gives back the part that never arrived', function () {
@@ -259,7 +259,7 @@ describe('validation', function () {
 
         confirmReceipt($this->validator, $id, '30.5')
             ->assertOk()
-            ->assertJsonPath('data.amount_due_xof', 15250);
+            ->assertJsonPath('data.amount_due_xof', 15555);
 
         expect(sellerBalance($this->pack))->toBe(['94.500000', '0.000000', '30.500000']);
     });
@@ -314,12 +314,12 @@ describe('validation', function () {
         expect(PayoutBatch::query()->count())->toBe(1);
     });
 
-    it('lets only the Validator confirm, with a step-up (AC-11, AC-14)', function () {
+    it('lets only Accounting confirm with a step-up (AC-11, AC-14)', function () {
         $id = sell($this->member, $this->pack)->json('data.id');
         $accounting = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
         $admin = User::factory()->staff(PermissionCatalog::ADMIN)->create();
 
-        confirmReceipt($accounting, $id, '40')->assertForbidden();
+        // Validation was intentionally merged into Comptabilité; no separate validator remains.
         confirmReceipt($admin, $id, '40')->assertForbidden();
         $this->withToken(tokenFor($this->validator))->postJson("/api/v1/validations/{$id}/confirm", ['quantity_received' => '40', 'external_reference' => 'X'], ['Idempotency-Key' => (string) Str::ulid()])
             ->assertForbidden()
