@@ -1,6 +1,6 @@
 # CECT — Recette complète des profils et scénarios (20 octobre 2026)
 
-**Qualification : préproduction / tests isolés. Statut des prestataires réels : NON HOMOLOGUÉ.**
+**Qualification : préproduction / tests isolés. Dernière régression : 618/618 tests, 359 211 assertions. Statut des prestataires réels : NON HOMOLOGUÉ.**
 
 ## 1. Séparation des environnements et sauvegarde
 
@@ -46,7 +46,7 @@
 | Interface Admin | TypeScript/Vite compilés ; ESLint 9 fonctionnel, **0 erreur et 10 avertissements** | `persona-ui-admin-build.log`, `persona-lint-admin-fixed.log` |
 | Interface Membre | TypeScript/Vite compilés ; ESLint 9 fonctionnel, **0 erreur et 10 avertissements** | `persona-ui-member-build.log`, `persona-lint-member-fixed.log` |
 | Tests individuels sécurité d'état (après correction) | **11 déclinaisons de statuts + 3 parcours personas : 14 tests passés, 101 assertions** | `persona-status-patch-final.log` |
-| Régression globale après modification du middleware d'authentification | À consolider après exécution finale | `persona-regression-after-security-20261020.log` |
+| Régression globale après modification du middleware d'authentification | **618 tests passés, 359 211 assertions, 0 échec** | `persona-regression-after-security-20261020.log` |
 
 ### Défauts et corrections de cette session
 
