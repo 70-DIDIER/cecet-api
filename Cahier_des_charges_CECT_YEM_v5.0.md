@@ -3,6 +3,25 @@ Date : 17 octobre 2026
 Statut : référence fonctionnelle de recette et développement évolutif.
 Référentiel : cette version 5.0 reprend intégralement le cahier v4.0 en annexe historique ; les nouvelles dispositions v5.0 priment sur toute ancienne formulation contradictoire.
 
+## ADDENDUM V5.11 — Politique de rachat Marchand pilotée par le SuperAdmin (20 octobre 2026)
+
+**Aucun taux de rééchange ou pourcentage de frais Marchand ne doit être considéré comme une valeur définitivement codée.** Le SuperAdmin gère un paramètre métier versionné `merchant_redemption.pricing` dans **Admin → Configuration → Politique de rachat des YEM Marchands**, accessible également depuis l'onglet **Packs → Marchand**.
+
+Deux modèles paramétrables sont pris en charge :
+
+1. **Taux fixe :** prix de base récupéré à chaque nouvelle demande via le paramètre critique `rates.transfer_xof_per_yem`. Le taux existant en staging (610 FCFA/YEM) n'est qu'une **valeur actuelle**, modifiable à tout moment par le SuperAdmin. Les packs Marchands autorisés à personnaliser la clé de taux ne peuvent utiliser que des sources de taux connues.
+2. **Cours de vente moins frais :** prix de base récupéré via `rates.sale_xof_per_yem`, moins les **frais de gestion en pourcentage (0 à 99,99 %, exprimés en basis points)** et les **frais fixes supplémentaires (FCFA)**. Mode d'arrondi des frais : inférieur ou supérieur, paramétrable par le SuperAdmin. Cette politique permet par exemple « cours 650, frais 3 % », mais **3 % ne constitue pas une obligation codée**.
+
+**Formule contractuelle :** sur la quantité YEM réellement confirmée par Comptabilité, le brut en FCFA est `troncature(YEM reçus × cours de base)`. Les frais variables sont `arrondi(brut × bps / 10 000)`, auxquels s'ajoutent les frais fixes configurés. Les frais retenus sont limités au brut (le net ne devient jamais négatif). Le **net à payer au Marchand** est `brut − frais retenus`, en FCFA entiers. Les anciennes demandes sans photographie de frais gardent l'ancien calcul au taux affiché, sans frais supplémentaires.
+
+**Historique/immutabilité :** le SuperAdmin doit fournir un motif de modification et peut fixer une entrée en vigueur future. Les versions ne sont jamais écrasées. Lors de la création de chaque rééchange, le backend enregistre **le modèle, la clé de taux, le cours appliqué, le taux des frais, les frais fixes, l'arrondi et la version temporelle**. Toute modification ultérieure du SuperAdmin est appliquée **uniquement aux nouvelles demandes** ; la confirmation d'une demande déjà créée conserve le calcul initial, même si le taux de vente ou les frais ont changé entre-temps.
+
+**Transparence :** l'API et la console doivent afficher pour chaque demande Marchand le **brut estimé, les frais estimés, le net estimé**, puis le brut/frais/net confirmés après vérification de la quantité réellement reçue. Les rapports financiers doivent afficher **les frais de gestion retenus** séparément du montant reversé. L'interface SuperAdmin fournit un exemple de rééchange pour 100 YEM et l'historique des décisions.
+
+**Sécurité et compatibilité :** seuls les rôles possédant les permissions critiques du SuperAdmin peuvent modifier la politique et les cours. Validation stricte des modes et limites, historique/audit des versions, calcul arithmétique décimal sans nombres flottants dans le backend. Les anciens rééchanges au taux prévu lors de leur création et les quotas existants restent inchangés. Les paramètres de cashback des packs Consommateur et Personnel restent distincts.
+
+**Validation de recette :** tests E2E backend pour taux fixe, changement de cours, modèle 650 moins 3 % et frais fixes, réception partielle, maintien des anciens engagements, frais remontés dans les rapports, refus de modification par Administrateur et validation d'entrées incorrectes. La rentabilité globale reste à approuver séparément : rendre les frais modifiables n'assure pas qu'ils soient économiquement soutenables.
+
 ## ADDENDUM V5.10 — Recette métier, finances et prestataires externes (20 octobre 2026)
 
 **Statut : backend fonctionnel testé ; exploitation financière réelle non homologuée.** Ce contrôle est documenté dans `docs/RECETTE_AGRESSIVE_METIER_FINANCE_INTEGRATIONS_2026-10-20.md`. Il ne remplace pas la validation contractuelle des cours, du cashback, de la trésorerie et de la preuve des transferts Foundation.
