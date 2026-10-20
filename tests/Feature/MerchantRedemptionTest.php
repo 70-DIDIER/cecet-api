@@ -153,6 +153,41 @@ it('accepts rate changes from SuperAdmin and keeps all earlier merchant quotes u
         ->assertOk()->assertJsonPath('data.estimated_amount_xof', 5800);
 });
 
+it('blocks a merchant redemption when the configured fee leaves zero net FCFA', function () {
+    app(SettingsService::class)->set('merchant_redemption.pricing', [
+        'mode' => 'sale_minus_fee', 'fee_bps' => 300,
+        'fixed_fee_xof' => 40000, 'fee_rounding' => 'down',
+    ], 'Borne de test : refuser les versements nuls');
+
+    redeem($this->merchant, $this->merchantPack, '50')
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'MERCHANT_NET_PAYOUT_ZERO');
+
+    expect(merchantBalance($this->merchantPack))->toBe(['60.000000', '0.000000', '0.000000'])
+        ->and($this->merchantPack->account()->first()->reserved)->toBe('0.000000');
+    $this->artisan('ledger:verify')->assertSuccessful();
+});
+
+it('refuses a tiny partial YEM confirmation whose fees exceed the value without consuming the reservation', function () {
+    app(SettingsService::class)->set('merchant_redemption.pricing', [
+        'mode' => 'sale_minus_fee', 'fee_bps' => 300,
+        'fixed_fee_xof' => 75, 'fee_rounding' => 'down',
+    ], 'Borne de test : confirmation partielle et frais fixes');
+    $request = redeem($this->merchant, $this->merchantPack, '50')->assertCreated()->json('data');
+
+    $this->withToken(tokenFor($this->validator, withStepUp: true))
+        ->postJson("/api/v1/validations/{$request['id']}/confirm",
+            ['quantity_received' => '0.1', 'external_reference' => 'YEM-PARTIAL-VERY-SMALL'],
+            ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'MERCHANT_NET_PAYOUT_ZERO');
+
+    expect(merchantBalance($this->merchantPack))->toBe(['10.000000', '50.000000', '0.000000'])
+        ->and($this->merchantPack->account()->first()->reserved)->toBe('50.000000')
+        ->and(PayoutBatch::query()->count())->toBe(0);
+    $this->artisan('ledger:verify')->assertSuccessful();
+});
+
 it('cannot redeem more than the confirmed collections', function () {
     redeem($this->merchant, $this->merchantPack, '60.000001')->assertStatus(422)->assertJsonPath('code', 'INSUFFICIENT_MERCHANT_BALANCE');
 });
