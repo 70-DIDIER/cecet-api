@@ -248,6 +248,8 @@ class ReportingQueries
                 'YEM reçus' => $row->quantity_received,
                 'Cours FCFA/YEM' => $row->rate_xof_per_yem,
                 'Montant dû (FCFA)' => $row->amount_due_xof,
+                'Frais de gestion retenus (FCFA)' => $row->kind === 'merchant_redemption' && $row->amount_due_xof !== null
+                    ? max(0, YemQuantity::toXof((string) $row->quantity_received, (int) $row->rate_xof_per_yem) - (int) $row->amount_due_xof) : 0,
                 'Statut' => $row->status,
                 'Référence transfert membre' => $row->member_transfer_reference,
                 'Déclaré le' => $row->declared_at,
@@ -358,6 +360,7 @@ class ReportingQueries
             ->selectRaw("COALESCE(SUM(amount_due_xof) FILTER (WHERE kind = 'seller'), 0) AS sold_xof")
             ->selectRaw("COALESCE(SUM(quantity_received) FILTER (WHERE kind = 'merchant_redemption'), 0) AS redeemed")
             ->selectRaw("COALESCE(SUM(amount_due_xof) FILTER (WHERE kind = 'merchant_redemption'), 0) AS redeemed_xof")
+            ->selectRaw("COALESCE(SUM(floor(quantity_received * rate_xof_per_yem) - amount_due_xof) FILTER (WHERE kind = 'merchant_redemption'), 0) AS management_fees")
             ->first();
 
         $merchantPayments = DB::table('merchant_payments')
@@ -375,6 +378,7 @@ class ReportingQueries
             'merchants_paid' => (int) ($merchantPayments->merchants ?? 0),
             'redeemed_by_merchants' => YemQuantity::of((string) ($exchanges->redeemed ?? '0')),
             'redeemed_by_merchants_xof' => (int) ($exchanges->redeemed_xof ?? 0),
+            'merchant_management_fees_xof' => (int) ($exchanges->management_fees ?? 0),
             'active_merchants' => DB::table('user_packs')->where('family', 'MARCHAND')->where('status', 'active')->distinct()->count('user_id'),
         ];
     }
