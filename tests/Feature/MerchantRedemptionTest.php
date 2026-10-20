@@ -120,6 +120,12 @@ it('freezes the configurable sale-minus-fee contract even after SuperAdmin chang
 
     expect(PayoutBatch::query()->sole()->total_amount)->toBe(28298);
 
+    $this->withToken(tokenFor(User::factory()->staff(PermissionCatalog::ADMIN)->create()))
+        ->getJson('/api/v1/admin/reports/summary')
+        ->assertOk()
+        ->assertJsonPath('data.yem_activity.merchant_management_fees_xof', 952)
+        ->assertJsonPath('data.yem_activity.redeemed_by_merchants_xof', 28298);
+
     $future = redeem($this->merchant, $this->merchantPack, '10')
         ->assertCreated()
         ->assertJsonPath('data.rate_xof_per_yem', 610)
