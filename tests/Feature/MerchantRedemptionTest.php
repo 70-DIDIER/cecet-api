@@ -83,6 +83,70 @@ it('redeems collected YEM: reservation, transfer to the CECT, Accounting confirm
     $this->artisan('ledger:verify')->assertSuccessful();
 });
 
+it('freezes the configurable sale-minus-fee contract even after SuperAdmin changes rates and policy', function () {
+    $settings = app(SettingsService::class);
+    $settings->set('merchant_redemption.pricing', [
+        'mode' => 'sale_minus_fee',
+        'fee_bps' => 300,
+        'fixed_fee_xof' => 75,
+        'fee_rounding' => 'down',
+    ], 'Barème de cession Marchand : 3 % et frais fixes');
+
+    $request = redeem($this->merchant, $this->merchantPack, '50')
+        ->assertCreated()
+        ->assertJsonPath('data.rate_xof_per_yem', 650)
+        ->assertJsonPath('data.estimated_amount_xof', 31450)
+        ->assertJsonPath('data.merchant_pricing.estimated.gross_amount_xof', 32500)
+        ->assertJsonPath('data.merchant_pricing.estimated.management_fee_xof', 1050)
+        ->assertJsonPath('data.merchant_pricing.policy.mode', 'sale_minus_fee')
+        ->assertJsonPath('data.merchant_pricing.policy.fee_bps', 300)
+        ->json('data');
+
+    // Future pricing changes must not rewrite the reserved member's quotation.
+    $settings->set('rates.sale_xof_per_yem', 700, 'Nouveau cours de vente à venir');
+    $settings->set('merchant_redemption.pricing', [
+        'mode' => 'fixed', 'fee_bps' => 0, 'fixed_fee_xof' => 0, 'fee_rounding' => 'down',
+    ], 'Retour au taux fixe pour les prochaines demandes');
+
+    $this->withToken(tokenFor($this->validator, withStepUp: true))
+        ->postJson("/api/v1/validations/{$request['id']}/confirm",
+            ['quantity_received' => '45', 'external_reference' => 'CONFIRMED-YEM-45'],
+            ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertOk()
+        ->assertJsonPath('data.amount_due_xof', 28298)
+        ->assertJsonPath('data.merchant_pricing.confirmed.gross_amount_xof', 29250)
+        ->assertJsonPath('data.merchant_pricing.confirmed.management_fee_xof', 952)
+        ->assertJsonPath('data.merchant_pricing.confirmed.net_amount_xof', 28298);
+
+    expect(PayoutBatch::query()->sole()->total_amount)->toBe(28298);
+
+    $future = redeem($this->merchant, $this->merchantPack, '10')
+        ->assertCreated()
+        ->assertJsonPath('data.rate_xof_per_yem', 610)
+        ->assertJsonPath('data.estimated_amount_xof', 6100)
+        ->assertJsonPath('data.merchant_pricing.policy.mode', 'fixed')
+        ->json('data');
+
+    expect($request['id'])->not->toBe($future['id']);
+    $this->artisan('ledger:verify')->assertSuccessful();
+});
+
+it('accepts rate changes from SuperAdmin and keeps all earlier merchant quotes unchanged', function () {
+    $settings = app(SettingsService::class);
+    $first = redeem($this->merchant, $this->merchantPack, '10')
+        ->assertCreated()->assertJsonPath('data.estimated_amount_xof', 6100)->json('data');
+
+    $settings->set('rates.transfer_xof_per_yem', 580, 'Cours Marchand rectifié par le SuperAdmin');
+
+    $second = redeem($this->merchant, $this->merchantPack, '10')
+        ->assertCreated()->assertJsonPath('data.estimated_amount_xof', 5800)->json('data');
+
+    $this->withToken(tokenFor($this->merchant))->getJson("/api/v1/me/exchange-requests/{$first['id']}")
+        ->assertOk()->assertJsonPath('data.estimated_amount_xof', 6100);
+    $this->withToken(tokenFor($this->merchant))->getJson("/api/v1/me/exchange-requests/{$second['id']}")
+        ->assertOk()->assertJsonPath('data.estimated_amount_xof', 5800);
+});
+
 it('cannot redeem more than the confirmed collections', function () {
     redeem($this->merchant, $this->merchantPack, '60.000001')->assertStatus(422)->assertJsonPath('code', 'INSUFFICIENT_MERCHANT_BALANCE');
 });
