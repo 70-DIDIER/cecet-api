@@ -3,6 +3,31 @@ Date : 17 octobre 2026
 Statut : référence fonctionnelle de recette et développement évolutif.
 Référentiel : cette version 5.0 reprend intégralement le cahier v4.0 en annexe historique ; les nouvelles dispositions v5.0 priment sur toute ancienne formulation contradictoire.
 
+## ADDENDUM V5.10 — Recette métier, finances et prestataires externes (20 octobre 2026)
+
+**Statut : backend fonctionnel testé ; exploitation financière réelle non homologuée.** Ce contrôle est documenté dans `docs/RECETTE_AGRESSIVE_METIER_FINANCE_INTEGRATIONS_2026-10-20.md`. Il ne remplace pas la validation contractuelle des cours, du cashback, de la trésorerie et de la preuve des transferts Foundation.
+
+**Exigences vérifiées par automatisation :**
+- Les adhésions PF/PM, achat de packs, vente de YEM, packs Consommateur et Personnel, cashback, répartition mensuelle, transactions QR Marchand, rééchange, gestion Comptabilité, paiements fictifs, reporting, autorisations et idempotence sont couverts par **595 tests backend passés / 6 511 assertions**.
+- **5 tests de concurrence multiprocessus PostgreSQL / 84 assertions** vérifient notamment l'absence de double réservation du quota et l'impossibilité de racheter deux fois les mêmes YEM encaissés.
+- **5 000 jeux de données aléatoires de cashback et de répartition / 352 518 assertions**, et **1 000 000 calculs synthétiques SQL** sur 100 000 identifiants de comptes. Les tests SQL sont sur tables temporaires annulées : ce n'est pas un million de transactions réelles.
+- Contrôle HTTP non authentifié : **14 endpoints sensibles renvoient 401** ; les chemins mTLS SuperAdmin continuent d'interdire les requêtes sans certificat.
+- Aucun membre ni pack du staging n'a été effacé ou reparamétré pour cette campagne.
+
+**Politique économique à valider (aucun ajustement automatisé des tarifs) :**
+- Prix de vente Consommateur : `650 FCFA/YEM`. Prix d'achat Vendeur : `510 FCFA/YEM`. Taux de cession Marchand configuré : `610 FCFA/YEM`.
+- Le cashback d'un pack Consommateur/Personnel est exprimé **en YEM ajoutés**, pas une réduction du montant FCFA. Pour 100 000 FCFA au cours 650 et 5 % de bonus : `153,846153` YEM achetés + `7,692307` offerts = `161,538460 YEM`.
+- Si la totalité des YEM (achetés et bonus) est cédée par le Marchand à **610 FCFA/YEM**, les 100 000 FCFA versés par le Consommateur laissent **1 461,54 FCFA** après cette cession, **avant** les frais de PSP, stockage, autres coûts et risques. Cashback théorique d'équilibre : **6,5574 %** avant charges.
+- Dans l'autre hypothèse historique **650 FCFA moins 3 % de gestion = 630,50 FCFA/YEM**, le même lot produit **−1 850 FCFA** ; seuil théorique d'équilibre : **3,0928 %**, avant charges. Le couple cashback 5 % + cession 630,50 ne peut pas être présenté comme financièrement viable sur ce cycle sans recettes externes dûment justifiées.
+- La cession à **610**, la variante **650 moins 3 %**, les frais supplémentaires, les règles de report et le taux maximal de cashback sont des **décisions commerciales distinctes** et doivent être ratifiés par la coopérative avant mise en exploitation. Ne pas figer le plafond de cashback à partir de la seule marge simplifiée.
+- Toutes les simulations doivent distinguer **flux cumulés** et **trésorerie réellement requise** ; les rotations de stock et délais de règlement doivent être modélisés.
+
+**Préconditions incompressibles aux intégrations externes :**
+- **FedaPay :** identité de sandbox réellement autorisée, secret de signature webhook installé, validation des callbacks, preuve de statut et de référence du paiement, remboursements, réconciliation et essais de décaissement sandbox contrôlés. Dernière vérification non destructive : l'API sandbox est joignable mais la requête authentifiée `GET /v1/currencies` renvoie **401** ; `GET /v1/payment_methods` **404**. Aucun paiement/décaissement réel n'a été créé. L'outil `ops:golive` signale maintenant explicitement le **secret webhook absent même avec le prestataire fictif actif**.
+- **YEM Foundation :** ne jamais assimiler une déclaration de transfert ou une référence Pernum à une attestation externe irrévocable. Il faut formaliser l'interface Foundation, la source de confiance, la finalité, la détection de doublons, les erreurs/réconciliations et l'archivage cryptographique de la preuve.
+- **CECT staging :** les prestataires de collecte et de reversement sont encore `fake` ; le catalogue ne propose qu'un pack Vendeur publié (aucun Consommateur/Personnel/Marchand publié), et aucun compte Comptabilité/Administrateur ordinaire actif. L'OTP personnel à trois e-mails n'est pas encore activé. La plateforme ne peut donc pas faire sa démonstration intégrale sur les données de staging, même si les tests isolés passent.
+- **Règle de sécurité :** ne pas envoyer d'argent réel ni de YEM Foundation depuis une campagne de charge, ne pas configurer de clés de production pour un test destructif, ne pas supprimer les données staging sans validation explicite et sauvegarde.
+
 ## 1. Dépôts et gouvernance du développement
 Trois seules sources actives : 70-DIDIER/cecet-api ; 70-DIDIER/CECT-frontend ; 70-DIDIER/cect-admin. Développements exclusivement sur les branches custum. Les branches main Didier ne sont pas modifiées pour nos personnalisations. Chaque déploiement en recette exige compilation, tests, sauvegarde, vérification de provenance et possibilité de rollback.
 
