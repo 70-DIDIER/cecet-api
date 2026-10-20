@@ -30,6 +30,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $quantity_received
  * @property string $rate_setting_key
  * @property int $rate_xof_per_yem
+ * @property array<string,mixed>|null $pricing_snapshot
  * @property int|null $amount_due_xof
  * @property string $source_pernum
  * @property string $cect_pernum
@@ -47,7 +48,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'reference', 'kind', 'user_id', 'user_pack_id', 'status', 'quantity_requested', 'quantity_received', 'rate_setting_key',
-    'rate_xof_per_yem', 'amount_due_xof', 'source_pernum', 'cect_pernum', 'payout_destination', 'member_transfer_reference',
+    'rate_xof_per_yem', 'pricing_snapshot', 'amount_due_xof', 'source_pernum', 'cect_pernum', 'payout_destination', 'member_transfer_reference',
     'expires_at', 'declared_at', 'validated_at', 'validated_by', 'closed_at',
 ])]
 class ExchangeRequest extends Model implements PayoutPayable
@@ -105,6 +106,7 @@ class ExchangeRequest extends Model implements PayoutPayable
             'kind' => ExchangeKind::class,
             'status' => ExchangeStatus::class,
             'rate_xof_per_yem' => 'integer',
+            'pricing_snapshot' => 'array',
             'amount_due_xof' => 'integer',
             'payout_destination' => 'array',
             'expires_at' => 'datetime',
