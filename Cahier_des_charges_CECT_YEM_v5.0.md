@@ -3,6 +3,19 @@ Date : 17 octobre 2026
 Statut : référence fonctionnelle de recette et développement évolutif.
 Référentiel : cette version 5.0 reprend intégralement le cahier v4.0 en annexe historique ; les nouvelles dispositions v5.0 priment sur toute ancienne formulation contradictoire.
 
+## ADDENDUM V5.13 — Décision métier validée : opération 01, inscription PF (20 octobre 2026)
+
+**PRIORITÉ FONCTIONNELLE : ces quatre décisions du maître d'ouvrage prévalent sur les dispositions anciennes contradictoires des sections v5 et des annexes historiques.** Le détail des choix et de leurs écarts d'implémentation est conservé dans `docs/DECISIONS_METIER_CECT_2026-10-20.md`.
+
+1. **Création immédiate** : après soumission d'un formulaire valide, créer le dossier de personne physique (PF) et envoyer un OTP à son adresse e-mail. Statut : `pending_email_verification`.
+2. **Vérification e-mail** : si l'OTP est valide, passer à `pending_payment` ; cela ne vaut pas encore activation du compte.
+3. **Affichage des droits d'adhésion** : le membre ne voit le montant **qu'après vérification réussie de son e-mail**, sur l'espace d'adhésion/paiement. **Ne pas afficher les frais pendant l'inscription**, même si le prix est configurable et disponible côté serveur. Le formulaire d'inscription ne contient aucune étape de paiement.
+4. **Accès `pending_payment` restreint** : seules la consultation du dossier d'adhésion et l'interface de règlement des frais sont disponibles (ainsi que les appels strictement techniques nécessaires à ces deux fonctions et à la déconnexion). Aucun tableau de bord commercial, aucune liste commerciale de packs, aucune souscription, aucun achat ou vente de YEM, aucun paiement QR Marchand ou rééchange n'est autorisé tant que l'adhésion n'est pas activée. Contrôler ces restrictions **dans le backend**, et pas seulement en masquant des boutons.
+
+**Écarts actuellement identifiés, à corriger lorsque toutes les décisions du parcours seront recueillies :** l'API d'inscription inclut encore un objet `membership_fee` dans la réponse initiale et le frontend doit être audité pour supprimer tout affichage anticipé ; la matrice des routes accessibles à `pending_payment` doit être revue. Les 19 tests actuels du processus initial passent (95 assertions), mais ils ne prouvent pas le respect des nouvelles règles 3 et 4.
+
+**En attente de décision :** opération 02 « paiement des frais et activation », notamment moyens de paiement, gel du prix, vérification du succès, rôle Comptabilité et gestion des échecs/doublons. Aucun changement non approuvé ne doit être présumé.
+
 ## ADDENDUM V5.12 — Recette multi-profils et sécurisation de la suspension (20 octobre 2026)
 
 **Périmètre et principes :** le système reconnaît les trois fonctions internes `superadmin`, `administrateur`, `comptabilite` et les personnes physiques/morales qui utilisent les fonctions **Vendeur, Consommateur, Personnel, Marchand** selon leur éligibilité. Les statuts membre possibles sont : `active`, `pending_email_verification`, `pending_payment`, `pending_activation`, `suspended`, `closed`. Un membre peut jouer plusieurs fonctions par packs autorisés ; cela ne lui confère jamais les permissions d'un employé. Le rôle historique Validateur demeure supprimé : ses fonctions relèvent de Comptabilité.
@@ -76,7 +89,7 @@ Rôles applicatifs cibles : Superadmin, Administrateur, Comptabilité, Vendeur p
 ## 3. Inscription et adhésion
 Inscription PF/PM avec Pernum, e-mail, numéro de téléphone international, acceptation des engagements et validation OTP. Le formulaire d'inscription ne contient PLUS d'étape Paiement. Après vérification de l'adresse e-mail, l'utilisateur règle ses frais d'adhésion dans son espace membre. Le téléphone saisi à l'inscription est prérempli au paiement, avec indicatif du pays et bouton crayon permettant de le changer uniquement pour cette transaction.
 
-Les montants affichés à l'inscription et dans les présentations publiques proviennent obligatoirement de la configuration versionnée de l'API ; jamais de valeurs codées en dur. Valeurs initiales de référence : personne physique 25 000 FCFA et personne morale 200 000 FCFA. Le serveur calcule toujours les frais réellement applicables au moment de la création du paiement. Aucun changement rétroactif des paiements déjà créés.
+**Décision validée v5.13 : les frais d'adhésion ne sont affichés au candidat qu'APRÈS sa vérification e-mail, sur l'écran de règlement, jamais pendant le formulaire d'inscription.** Le tarif affiché alors provient obligatoirement de la configuration versionnée de l'API, jamais de valeurs codées en dur. Les anciennes valeurs PF 25 000 FCFA / PM 200 000 FCFA constituent des références historiques, **non des tarifs actuels imposés**. Le montant de la tentative de paiement doit être calculé côté serveur selon la règle de gel à confirmer à l'opération 02 ; aucun changement rétroactif d'un paiement déjà créé.
 
 ## 4. Superadmin : modification des frais d'adhésion
 Les deux paramètres de prix sont membership.fee.natural_person et membership.fee.legal_person, exprimés en entier FCFA non négatif. La permission réservée settings.update_critical est requise. Le Superadmin doit pouvoir modifier les tarifs depuis Configuration, en précisant un motif obligatoire et éventuellement une date d'entrée en vigueur. Auteur, valeur, motif et effet sont historisés. Administrateur et autres rôles ne peuvent pas changer les tarifs. Le site public et l'inscription reflètent la valeur serveur en vigueur sans reconstruction du frontend.
@@ -101,7 +114,7 @@ Packs Vendeur, Consommateur, Personnel, Marchand paramétrables (prix, quota men
 
 ## 10. Critères d'acceptation v5
 V5-01 : inscription personne physique et morale sans étape paiement.
-V5-02 : tarif PF et PM de la configuration serveur visible pendant inscription.
+V5-02 (remplacé par décision v5.13) : tarif PF et PM calculé depuis la configuration serveur, mais **visible au membre uniquement après vérification de son e-mail** ; aucun prix affiché pendant le formulaire d'inscription.
 V5-03 : seul le Superadmin est autorisé à créer une nouvelle version des tarifs avec motif et date d'effet.
 V5-04 : Togo, Burkina Faso et chaque pays UEMOA affichent opérateurs locaux ET Autres moyens de paiement — Carte bancaire.
 V5-05 : France/Canada et pays africains sans réseau reconnu affichent uniquement carte simulée.
