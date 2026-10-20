@@ -21,6 +21,10 @@ final class EnsureStaffGuardianSession
         if (! $user instanceof User) {
             return $next($request);
         }
+        // Do not rely on an authenticated User object cached earlier in a
+        // long-running worker or between requests in an SPA session.
+        // Suspension/closure must take effect immediately without logout.
+        $user->refresh();
         // A previously issued cookie or bearer token must not grant access
         // after suspension/closure; this applies even with guardian mode OFF.
         // Pending-payment members may authenticate solely to complete their
