@@ -60,6 +60,11 @@ class MerchantRedemptionService
         $destination = PayoutDestination::query()->where('user_id', $merchant->id)->first() ?? throw PayoutException::destinationRequired();
         $pricing = $this->pricing->snapshot($pack->version->rules['rate_setting_key'] ?? null);
         $rateKey = $pricing['rate_setting_key'];
+        // Never reserve or accept a YEM transfer that would yield zero FCFA
+        // for the merchant under the SuperAdmin-configured fee policy.
+        if (MerchantRedemptionPricing::quote($quantity, $pricing)['net_amount_xof'] <= 0) {
+            throw ExchangeException::merchantNetNonPositive();
+        }
         $onPackQuota = $this->settings->boolean('merchant_redemption.limit_by_pack_quota');
 
         return DB::transaction(function () use ($merchant, $pack, $quantity, $cectPernum, $sourcePernum, $destination, $rateKey, $pricing, $onPackQuota): ExchangeRequest {
