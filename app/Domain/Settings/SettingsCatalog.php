@@ -117,6 +117,19 @@ final class SettingsCatalog
                 'Cours de vente d\'un YEM par la CECT (XOF) — à ratifier par le CA (PO-01).', SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:1']]),
             new SettingDefinition('rates.transfer_xof_per_yem', 'rates', SettingType::Integer, 610,
                 'Cours de cession d\'un YEM (XOF) — à ratifier par le CA (PO-01).', SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:1']]),
+            new SettingDefinition('merchant_redemption.pricing', 'rates', SettingType::Json, [
+                'mode' => 'fixed',
+                'fee_bps' => 0,
+                'fixed_fee_xof' => 0,
+                'fee_rounding' => 'down',
+            ], 'Politique de rachat Marchand gérée exclusivement par le SuperAdmin : taux fixe du cours Marchand ou cours de vente CECT diminué de frais de gestion. Les règles sont versionnées ; chaque demande garde sa photographie contractuelle.',
+                SettingEditLevel::Superadmin, rules: [
+                    'value' => ['required', 'array:mode,fee_bps,fixed_fee_xof,fee_rounding'],
+                    'value.mode' => ['required', 'in:fixed,sale_minus_fee'],
+                    'value.fee_bps' => ['required', 'integer', 'min:0', 'max:9999'],
+                    'value.fixed_fee_xof' => ['required', 'integer', 'min:0', 'max:10000000'],
+                    'value.fee_rounding' => ['required', 'in:down,up'],
+                ]),
         ];
     }
 
