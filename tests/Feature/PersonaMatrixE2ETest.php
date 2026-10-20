@@ -181,8 +181,11 @@ it('registers twelve new PF/PM identities with separate emails and Pernum, witho
             $data['legal_name'] = sprintf('Société QA %d SARL', $i);
             $data['legal_form'] = 'SARL';
         }
-        $this->postJson('/api/v1/auth/register', $data,
-            ['Idempotency-Key' => (string) Str::ulid()])
+        // Registration is rate-limited by client IP: each identity in this
+        // population test represents a distinct simulated device/network.
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.'.(10 + $i)])
+            ->postJson('/api/v1/auth/register', $data,
+                ['Idempotency-Key' => (string) Str::ulid()])
             ->assertCreated()
             ->assertJsonPath('data.user.person_type', $legal ? 'legal' : 'natural')
             ->assertJsonPath('data.user.status', 'pending_email_verification');
