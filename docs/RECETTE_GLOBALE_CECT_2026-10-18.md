@@ -70,3 +70,41 @@
 6. **Point à reprendre en priorité dès retour du serveur** : récupérer `/tmp/cect-qa-fullsuite-v2-20261018.log` et le code retour, exécuter à nouveau les suites, mettre à jour le schéma/les builds sans modifier les clés mTLS, vérifier `ledger:verify`, relever les packs réellement publiables, puis seulement décider de la remise à zéro sous backup.
 
 **Aucune approbation fonctionnelle ou financière n'est déduite du simple commit.** Cette section documente l'avancement et les blocages réels.
+
+
+## Validation du 20 octobre 2026 — bilan mesuré, sécurité et décisions en attente
+
+### Résultats réellement obtenus
+- **Suite backend complète : 593 tests réussis, 0 échec, 6 494 assertions**, exécutée avec PHPUnit/Pest contre la base `cectapi_test` (preuve locale persistante : `/home/ubuntu/cect-qa-results/full-20261020.log` ; exit code 0).
+- Le test supplémentaire de disponibilité de présentation `tests/Feature/DemoReadinessTest.php` a réussi (1 test, 9 assertions), après la grande campagne. Il garantit que le diagnostic n'altère ni utilisateurs, ni paiements, ni données d'audit.
+- Tests cryptographiques complémentaires dans `70-DIDIER/cect-admin/scripts/test-superadmin-key-crypto.cjs` : génération d'une clé RSA, export privé au format **.cectkey v2 chiffré**, déchiffrement après phrase secrète, rejet des phrases fausses et fichiers modifiés, signature vérifiable par RSA, conversion d'un ancien .cectkey v1 conservant la même paire de clés et le même identifiant. Compilations TypeScript et Vite réussies.
+- Révisions UI Admin et Espace membre publiées sur les chemins HTTPS existants ; dernier Admin chiffré `/home/ubuntu/cect-releases/admin-qa-v63-encrypted-superadmin-20261020`. Vérifications `200` pour portail, inscription, API et bundles, `403` pour endpoints SuperAdmin **sans certificat client**.
+- Base de démonstration non réinitialisée : chaîne d'audit cohérente (**131 événements**) et comptes marchands/quotas cohérents (**1 marchand, 6 comptes de quota**) selon les commandes `audit:verify` et `ledger:verify`.
+
+### Corrections métier confirmées
+1. **Cession Marchand :** l'API de rééchange utilise désormais par défaut `rates.transfer_xof_per_yem` = **610 FCFA/YEM** ; ne pas confondre avec `rates.purchase_xof_per_yem` = **510 FCFA/YEM** réservé au Vendeur. Le taux appliqué est figé dans chaque demande créée : **ne pas recalculer rétroactivement** les cessions précédentes. L'option `650 moins 3 %` n'est **pas** validée.
+2. **Circulation des YEM :** seules les disponibilités des familles Consommateur et Personnel sont prises en compte dans l'indicateur de circulation du tableau de bord ; les quotas des Vendeurs ne constituent pas des YEM disponibles pour payer.
+3. **Encaissements :** différencier explicitement paiements confirmés **réels** et paiements de packs validés par **passerelle fictive** ; ne pas gonfler le total des FCFA collectés avec les simulations.
+4. **Permissions :** suppression fonctionnelle du rôle Validateur, missions fusionnées dans Comptabilité ; modifications des cours et frais d'adhésion réservées au SuperAdmin ; un deuxième SuperAdmin ne peut pas être créé via le module du personnel.
+5. **Certificat et clé :** mTLS demeure obligatoire sur les chemins SuperAdmin. La nouvelle clé `.cectkey` (version 2) protège sa clé privée avec **AES-256-GCM** et PBKDF2-SHA256 (600 000 itérations ; phrase secrète au moins 14 caractères). L'ancien fichier version 1 en clair reste pris en charge **uniquement pour assurer la compatibilité et permettre une migration locale**. L'utilisateur doit télécharger la version chiffrée, vérifier son fonctionnement, puis détruire les copies anciennes non chiffrées. Aucun secret ni clé privée n'a été déposé dans Git.
+6. **Horaires et OTP personnel :** backend codé/testé mais **non encore activé** sur la démonstration tant qu'il n'existe pas de comptes professionnels actifs pour les deux rôles et que les trois boîtes sécurisées n'ont pas été validées. Ne jamais rendre le nouveau login obligatoire en l'absence d'identités capables de l'utiliser.
+
+### État de préparation du serveur (contrôle en lecture seule)
+Commande : `php artisan cect:demo-check --json` (le code 1 signifie **présentation incomplète**, pas une panne).
+- **4 membres** dans la base de staging au moment du relevé (non supprimés) ;
+- **1 SuperAdmin**, 1 profil de sécurité et 1 clé active ;
+- **10 fiches de pack au total**, dont 1 publiée : Vendeur **V15**. **0** Consommateur, **0** Personnel et **0** Marchand publiés ; 
+- **0 Administrateur ordinaire actif**, **0 Comptable actif** ; `staff_guardian.enabled = false` ;
+- états exacts du catalogue : 8 archives, 1 brouillon, 1 publiée.
+
+**Blocages métier à arbitrer par le SuperAdmin** : choix et publication des niveaux/quotas/prix des packs Consommateur, Personnel et Marchand ; validation des identité/horaire/boîtes e-mail professionnelles ; décision sur les frais Marchand ; moment approprié du reset. Ne pas publier automatiquement de packs archivés, activer des comptes inconnus ou supprimer quatre membres sans assurance sur les données récemment saisies.
+
+### Commandes utiles
+- `php artisan cect:demo-check --json` : lecture seule, signale les familles de packs, les profils de sécurité et les rôles manquants ;
+- `php artisan ledger:verify` et `php artisan audit:verify` : intégrité ;
+- `APP_ENV=testing php artisan test --compact --no-ansi` : batterie fonctionnelle complète isolée par `phpunit.xml` sur `cectapi_test` ;
+- `node scripts/test-superadmin-key-crypto.cjs` dans `cect-admin` : chiffrement/crypto du fichier ;
+- `cect:reset-demo-activity` : **ne pas exécuter** avant une sauvegarde récente, une coupure du trafic et validation du catalogue à présenter. La commande de suppression demeure strictement protégée ; la visite de diagnostic ne modifie aucune donnée.
+
+### Non homologué à ce stade
+Une suite automatisée verte n'atteste pas un transfert monétaire réel, une liquidation via YEM Foundation, un règlement avec un PSP externe ou la rentabilité intrinsèque des packages et cashback. Les simulations volumétriques en tables temporaires ne sont pas une preuve d'aptitude à la charge de millions de transactions HTTP en production.
