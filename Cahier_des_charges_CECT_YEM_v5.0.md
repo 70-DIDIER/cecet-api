@@ -19,7 +19,7 @@ Référentiel : cette version 5.0 reprend intégralement le cahier v4.0 en annex
 
 **Limites de sortie :** la recette n'utilise aucun compte ni virement financier réel. Elle ne valide pas FedaPay live, la signature du webhook fournisseur, la finalité des transferts Foundation YEM ou les packagings non publiés sur staging. Les utilisateurs de test ne sont jamais laissés dans la base de présentation. Les fonds fictifs et réceptions de test ne doivent pas entrer dans le reporting des recettes réelles.
 
-**Rapport de recette :** `docs/RECETTE_TOTALE_PROFILS_CECT_2026-10-20.md`. La recette backend complète initiale de cette session a donné 607 tests réussis, 359 198 assertions. Une seconde batterie d'authentification avec les six états et les transitions de suspension a confirmé 14 tests supplémentaires réussis, 101 assertions, puis une régression globale a été relancée sur la dernière version de code.
+**Rapport de recette :** `docs/RECETTE_TOTALE_PROFILS_CECT_2026-10-20.md`. La recette backend complète initiale de cette session a donné 607 tests réussis, 359 198 assertions. Une seconde batterie d'authentification avec les six états et les transitions de suspension a confirmé 14 tests supplémentaires réussis, 101 assertions, et la dernière régression globale a confirmé **618 tests réussis, 359 211 assertions, sans échec** sur la version corrigée du middleware.
 
 ## ADDENDUM V5.11 — Politique de rachat Marchand pilotée par le SuperAdmin (20 octobre 2026)
 
