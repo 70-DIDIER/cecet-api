@@ -8,6 +8,7 @@ use App\Domain\Exchange\Enums\ExchangeStatus;
 use App\Domain\Exchange\Exceptions\ExchangeException;
 use App\Domain\Exchange\ExchangeReservations;
 use App\Domain\Exchange\Models\ExchangeRequest;
+use App\Domain\Merchant\MerchantRedemptionPricing;
 use App\Domain\Payout\Exceptions\PayoutException;
 use App\Domain\Payout\Models\PayoutDestination;
 use App\Domain\Quota\Exceptions\QuotaException;
@@ -27,13 +28,11 @@ use InvalidArgumentException;
  */
 class MerchantRedemptionService
 {
-    // Marchands surrender to the configured merchant cession rate, not the seller purchase rate.
-    private const DEFAULT_RATE_KEY = 'rates.transfer_xof_per_yem';
-
     public function __construct(
         private readonly MerchantQrService $merchants,
         private readonly ExchangeReservations $reservations,
         private readonly SettingsService $settings,
+        private readonly MerchantRedemptionPricing $pricing,
         private readonly AuditLogger $auditLogger,
     ) {}
 
@@ -59,10 +58,11 @@ class MerchantRedemptionService
 
         $sourcePernum = $this->merchants->merchantPernum($merchant);
         $destination = PayoutDestination::query()->where('user_id', $merchant->id)->first() ?? throw PayoutException::destinationRequired();
-        $rateKey = (string) ($pack->version->rules['rate_setting_key'] ?? self::DEFAULT_RATE_KEY);
+        $pricing = $this->pricing->snapshot($pack->version->rules['rate_setting_key'] ?? null);
+        $rateKey = $pricing['rate_setting_key'];
         $onPackQuota = $this->settings->boolean('merchant_redemption.limit_by_pack_quota');
 
-        return DB::transaction(function () use ($merchant, $pack, $quantity, $cectPernum, $sourcePernum, $destination, $rateKey, $onPackQuota): ExchangeRequest {
+        return DB::transaction(function () use ($merchant, $pack, $quantity, $cectPernum, $sourcePernum, $destination, $rateKey, $pricing, $onPackQuota): ExchangeRequest {
             $exchange = ExchangeRequest::query()->create([
                 'reference' => 'RD-'.str_pad((string) DB::scalar("select nextval('exchange_reference_seq')"), 7, '0', STR_PAD_LEFT),
                 'kind' => ExchangeKind::MerchantRedemption,
@@ -71,7 +71,8 @@ class MerchantRedemptionService
                 'status' => ExchangeStatus::AwaitingTransfer,
                 'quantity_requested' => $quantity,
                 'rate_setting_key' => $rateKey,
-                'rate_xof_per_yem' => $this->settings->integer($rateKey),
+                'rate_xof_per_yem' => $pricing['rate_xof_per_yem'],
+                'pricing_snapshot' => $pricing,
                 'source_pernum' => $sourcePernum,
                 'cect_pernum' => trim($cectPernum),
                 'payout_destination' => $destination->snapshot(),
@@ -85,6 +86,8 @@ class MerchantRedemptionService
                 'reference' => $exchange->reference,
                 'quantity_requested' => $quantity,
                 'rate_xof_per_yem' => $exchange->rate_xof_per_yem,
+                'pricing_snapshot' => $pricing,
+                'estimated_net_xof' => MerchantRedemptionPricing::quote($quantity, $pricing)['net_amount_xof'],
                 'limited_by_pack_quota' => $onPackQuota,
             ], actor: $merchant);
 
