@@ -3,6 +3,7 @@
 namespace App\Domain\Identity\Http\Middleware;
 
 use App\Domain\Identity\StaffAccessPolicy;
+use App\Domain\Identity\Enums\UserStatus;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
@@ -17,11 +18,21 @@ final class EnsureStaffGuardianSession
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        if (! config('staff_guardian.enabled') || ! $user instanceof User
-            || ! $user->isStaff() || $user->isSuperadmin()) {
+        if (! $user instanceof User) {
             return $next($request);
         }
+        // A previously issued cookie or bearer token must not grant access
+        // after suspension/closure; this applies even with guardian mode OFF.
+        // Pending-payment members may authenticate solely to complete their
+        // membership, but staff must be fully active.
         if ($request->is('api/v1/auth/logout')) {
+            return $next($request);
+        }
+        if (! $user->status->canAuthenticate()
+            || ($user->isStaff() && $user->status !== UserStatus::Active)) {
+            abort(401, 'Compte suspendu, non activé ou clôturé.');
+        }
+        if (! config('staff_guardian.enabled') || ! $user->isStaff() || $user->isSuperadmin()) {
             return $next($request);
         }
         abort_unless($request->hasSession()
