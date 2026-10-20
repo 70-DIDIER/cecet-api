@@ -60,6 +60,15 @@ class ValidationDesk
             }
 
             $before = $exchange->status;
+            $merchantBreakdown = $exchange->kind === ExchangeKind::MerchantRedemption
+                ? MerchantRedemptionPricing::forExchange($exchange, $received) : null;
+            if ($merchantBreakdown !== null && $merchantBreakdown['net_amount_xof'] <= 0) {
+                // A partial receipt could be smaller than the fee even when
+                // the original full-quantity quote was positive. Keep the
+                // quota reserved and ask for dispute/correction, never take
+                // merchant YEM for no payout.
+                throw ExchangeException::merchantNetNonPositive();
+            }
 
             $this->reservations->consume($exchange, $received);
 
@@ -70,8 +79,6 @@ class ValidationDesk
             }
 
             // Counter-value truncated to the franc: the cooperative never pays a fraction of a franc it does not owe.
-            $merchantBreakdown = $exchange->kind === ExchangeKind::MerchantRedemption
-                ? MerchantRedemptionPricing::forExchange($exchange, $received) : null;
             $amount = $merchantBreakdown !== null
                 ? $merchantBreakdown['net_amount_xof']
                 : YemQuantity::toXof($received, $exchange->rate_xof_per_yem);
