@@ -33,6 +33,8 @@ function fakeDiditCreation(): void
 }
 function fakeDiditDecision(string $status, bool $active = true): void
 {
+    // Replace the previous fixture rather than appending a competing URL stub.
+    Http::swap(new \Illuminate\Http\Client\Factory());
     Http::fake([
         'verification.didit.me/v3/session/*/decision/' => Http::response([
             'session_id' => '123e4567-e89b-42d3-a456-426614174000',
