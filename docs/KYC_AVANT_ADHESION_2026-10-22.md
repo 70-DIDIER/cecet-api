@@ -1,3 +1,44 @@
+## VERDICT DU DÉPLOIEMENT — 22 OCTOBRE 2026
+
+Demande explicite : « fais tous là et déploie ». Le MCP Didit a servi
+à publier les workflows PF et PM dans l'application CECT-test, tandis que
+la destination webhook reste créée mais volontairement désactivée.
+
+**Résultat de recette GLOBAL actuel : 483 tests réussis, 121 échecs,
+5 936 assertions, 256,86 secondes**, isolée sur `cectapi_test` ;
+les builds frontend membre et admin passent. **NO-GO déploiement.**
+Les erreurs touchent notamment la connexion, backoffice financier,
+paiements, membres, achats de packs, marchands et anciens scénarios
+Validateur. Les statuts HTTP les plus fréquents sont `403` à la place
+de `200`/`201` ou `404` à la place de `200`. Certaines attentes
+appartiennent à l'ancien modèle métier, d'autres demandent une
+analyse de cause réelle. Ne pas désactiver la sécurité pour faire
+passer les tests.
+
+**Obstacles indépendants :** la clé API Didit et le secret HMAC
+n'existent toujours pas dans la configuration privée du serveur ;
+le MCP masque intentionnellement ces valeurs ; aucun profil de
+conformité Didit n'est enregistré et `response_attributes=null`
+autorise un retour de trop nombreuses données sensibles. La liaison
+KYB PM côté API CECT n'est pas validée en situation réelle.
+
+**Aucune mise à jour du service CECT n'a été déployée** :
+checkout backend `/var/www/cect-api` reste sur `b1143de`, base
+`cectapi_live` inchangée, 2 comptes internes, 1 membre, 0 pack,
+une clé d'accès Superadmin. Services API HTTP 200, worker actif,
+journal des quotas cohérent, chaîne d'audit intègre (134 événements).
+Le contrôle Superadmin par certificat n'a pas été modifié.
+
+**Plan de sortie :** installation sécurisée et non exposée des
+secrets depuis la console Didit ; contrôle environnement Sandbox
+et minimisation des attributs retournés ; profil de conformité
+validé par le responsable ; implémentation/corrélation KYB PM ;
+réparation et classification des régressions ; essais caméra/selfie
+avec données synthétiques ; sauvegarde, déploiement coordonné,
+activation du webhook après tests de signature, puis rollback
+si un contrôle d'intégrité échoue.
+
+---
 ## Rapport de préparation au déploiement — 22 octobre 2026 (réel, via MCP Didit)
 
 ### Effectué chez Didit
