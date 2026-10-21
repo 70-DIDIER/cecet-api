@@ -1,3 +1,78 @@
+
+## MISE À JOUR V5.16 — Didit retenu et connecteur développé (22 octobre 2026)
+
+**Décision métier : DIDIT est le prestataire officiel choisi pour le KYC CECT.**
+Cet état remplace les mentions précédentes « prestataire non choisi ».
+
+### Implémentation sur la branche custum (non déployée)
+
+- `KYC_PROVIDER=didit` par défaut dans le nouveau code, échec sécurisé tant que
+  les identifiants sont absents. Ancien mode manuel réservé aux tests isolés.
+- Backend : `app/Domain/Kyc/Didit/DiditGateway.php` crée des sessions hébergées
+  en POST `https://verification.didit.me/v3/session/` avec `workflow_id` et
+  `vendor_data=cect-kyc:<ulid>` ; seul le serveur reçoit `DIDIT_API_KEY`.
+- Frontend : page `/espace/kyc`, bouton Didit ouvrant le parcours hébergé
+  capture documentaire, selfie et liveness actif de Didit ; CECT ne demande
+  pas les enregistrements biométriques en local.
+- Webhook HTTPS : `POST /api/v1/webhooks/kyc/didit`, événement officiel
+  `status.updated`. Vérification HMAC du corps complet `X-Signature-V2`
+  (JSON canonique) ou `X-Signature` (octets bruts), délai de validité de
+  300 secondes, corrélation stricte sur une session stockée dans CECT.
+  `X-Signature-Simple` est volontairement refusé.
+- Réconciliation de secours : `POST /api/v1/me/kyc/didit/refresh` interroge
+  `GET /v3/session/{id}/decision/` avec la clé serveur, débit limité.
+  Un verdict dans l'URL de retour navigateur ou le corps du webhook
+  NE peut pas approuver directement le dossier.
+- Décision CECT : le verdict Didit « Approved » doit aussi posséder
+  ID verification APPROVED, liveness ACTIF 3D ACTION / FLASH APPROVED,
+  face match APPROVED, aucune alerte et environnement correct.
+  Les résultats non documentés/incomplets restent en révision humaine.
+- Personne morale : même traitement du représentant ET une preuve
+  `business_verifications` KYB approuvée ; sans résultat société,
+  le paiement est bloqué.
+- Le Validateur dispose des indicateurs Didit, sans accès aux médias
+  biométriques bruts. `DIDIT_AUTO_APPROVE=false` par défaut ; activation
+  automatique possible uniquement après arbitrage légal/risque.
+- Les historiques Superadmin, paramètres admin, clés mTLS et base
+  `cectapi_live` n'ont pas été modifiés par ce chantier.
+
+### Paramétrage Didit nécessaire (secrets jamais dans GitHub)
+
+1. Dans https://business.didit.me/ créer une application dans le SANDBOX.
+2. Workflow officiel CECT : ID Verification + **3D Action liveness**
+   (ou méthode active certifiée que le contrôle backend reconnaît)
+   + Face Match 1:1 ; KYB pour personnes morales, sous réserve
+   des modules/disponibilités du contrat et des pays couverts.
+3. Copier depuis la console **en environnement serveur sécurisé** :
+   `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`, `DIDIT_WEBHOOK_SECRET`.
+   Configurer `DIDIT_ENVIRONMENT=sandbox` pour les essais,
+   `DIDIT_AUTO_APPROVE=false` et `KYC_PROVIDER=didit`.
+4. Déclarer la destination webhook HTTPS
+   `https://api.13-49-203-235.sslip.io/api/v1/webhooks/kyc/didit`
+   et s'abonner à `status.updated`. Confirmer les signatures
+   `X-Signature` et `X-Signature-V2` exactes avec **Try Webhook**.
+5. Tester avec données fictives en sandbox l'OTP, les documents,
+   la caméra, selfie, liveness vidéo, match, refus/réessai,
+   KYB PM, duplications/replays webhook et paiement bloqué.
+6. Vérifier politique vie privée, transfert international, rétention
+   des données et contrat Didit. Pour activer en conditions réelles,
+   obtenir les identifiants production et repasser la recette complète.
+
+**Tests réalisés en environnement isolé `cectapi_test` : 19 tests ciblés
+réussis (114 assertions), dont vérification HMAC falsifiée et vérification
+des preuves de liveness actif ; frontend membre compilé.**
+Cette preuve technique n'est pas un essai réel des serveurs Didit :
+les appels HTTP Didit ont été simulés. Sans clés sandbox, workflow réel,
+webhook réel, essais UI caméra et suite globale satisfaisante,
+**le déploiement reste BLOQUÉ**.
+
+Références Didit vérifiées :
+https://didit.me/developers/
+https://help.didit.me/integration/webhooks-basics
+https://help.didit.me/liveness-biometrics/how-liveness-works
+https://help.didit.me/verification-sessions/reading-a-verification-result
+
+---
 # CECT — KYC obligatoire avant les frais d'adhésion
 
 Date : 22 octobre 2026. Branches concernées : custum (API, membre, administration).
@@ -188,8 +263,7 @@ Autorité de protection des données du Togo : https://ipdcp.tg/
 
 Le code KYC déjà ajouté sur custum sait recevoir un document chiffré,
 présenter une file Validateur et vérifier une décision manuelle ;
-**IL NE SAIT PAS ENCORE CAPTURER DE SELFIE/VIDEO AVEC LIVENESS CERTIFIE,
-NI INTERROGER UN FOURNISSEUR AUTOMATIQUE.**
+**LE CONNECTEUR DIDIT EST MAINTENANT DEVELOPPE DANS LE CODE, MAIS NON ACTIVE SUR LE SITE ACTIF ET NON TESTE AVEC LES VRAIES API/SDK DIDIT.**
 Le parcours complet document + selfie + vidéo est une EXIGENCE FERME
 de la prochaine phase de développement, pas une fonctionnalité déployée.
 Ne jamais qualifier le KYC précédent de complet ou suffisamment
