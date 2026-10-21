@@ -56,10 +56,10 @@ it('lets only a Superadmin grant the Superadmin role', function () {
         ->assertJsonPath('code', 'SUPERADMIN_PROTECTED');
 });
 
-it('refuses the retired Validator role after its duties were merged into Accounting', function () {
+it('keeps dedicated KYC validation separate from Accounting authority', function () {
     createStaff($this->superadmin, [PermissionCatalog::VALIDATOR, PermissionCatalog::ACCOUNTING])
         ->assertStatus(422)
-        ->assertJsonPath('code', 'CUSTOM_ROLES_DISABLED');
+        ->assertJsonPath('code', 'SEGREGATION_OF_DUTIES_VIOLATION');
 });
 
 it('creates an immediately active named Accounting user without legacy activation when guardian login is enabled', function () {
