@@ -83,3 +83,28 @@ Tests : tests/Feature/MemberKycWorkflowTest.php, base indépendante cectapi_test
 
 Aucun changement n'a été déployé sur la base active cectapi_live durant ce
 chantier de développement. Les tests sont exécutés uniquement sur cectapi_test.
+
+## Rapport de recette du développement — 22 octobre 2026
+
+Les trois dépôts ont été clonés dans un espace de CODE isolé sur le serveur,
+sans nouvelle base et sans modifier cectapi_live, les comptes Superadmin ni
+les paramètres de production. La base de test préexistante cectapi_test
+est utilisée uniquement avec APP_ENV=testing et des justificatifs fictifs.
+
+- Compilation TypeScript/Vite CECT-frontend : **réussie**.
+- Compilation TypeScript/Vite cect-admin : **réussie**.
+- Tests ciblés KYC et administration : **15 réussis, 81 assertions**.
+  Vérifications : dossier et documents privés, chiffrement, autorisation
+  Validateur, séparation de Comptabilité, refus de paiement sans KYC approuvé,
+  approbation, demande de complément et dépôt corrigé.
+- Suite générale de tests fonctionnels sur cette version de développement :
+  **473 réussis, 123 en échec, 5 884 assertions**. Certains cas anciens
+  supposent un paiement sans vérification et le retrait du rôle Validateur ;
+  d'autres échecs portent sur des routes/backoffice non encore qualifiées.
+  **Ne pas attribuer automatiquement tous ces échecs au KYC.**
+- **Déploiement : bloqué** tant que la régression, la protection des pièces
+  et les exigences juridiques ne sont pas satisfaisantes.
+
+Le système KYC manuel est développé dans les trois dépôts mais n'est PAS
+encore accessible sur le site actif. Le KYC automatique ne fonctionne pas
+sans un prestataire d'identité réel et une interface contractuelle sécurisée.
