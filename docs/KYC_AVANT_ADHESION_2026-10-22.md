@@ -1,3 +1,45 @@
+## Accès fournisseur — compte Didit confirmé, console non connectée (22/10/2026)
+
+Le responsable du projet a créé son compte Didit. Un email de bienvenue officiel
+avec objet « Your Didit account is live » confirme l'activation d'une organisation.
+Cela **ne prouve pas** qu'une application Sandbox, un workflow KYC, une destination
+webhook ou une clé API aient déjà été créés.
+
+Le compte a été ouvert via connexion Google, mais la session navigateur Didit
+n'est **pas** partagée automatiquement avec l'agent dans cette conversation.
+L'accès à la console nécessite un navigateur Work autorisé ou une connexion
+OAuth au MCP officiel `https://mcp.didit.me/mcp`. Aucun connecteur Didit
+n'est disponible parmi les connecteurs installés ici.
+
+**Séquence dans la console dès que l'accès est autorisé :**
+1. Sélectionner l'organisation CECT et créer/identifier une application **Sandbox**.
+2. Créer un workflow KYC `CECT-KYC-PF-SANDBOX` avec vérification de document
+   officiel (pays cibles dont Togo), selfie, **liveness actif `ACTIVE_3D`**,
+   face match 1:1, revue humaine pour les signaux de risque ; puis **Publish**.
+3. Prévoir séparément `CECT-KYB-PM-SANDBOX` (registre, société, bénéficiaires
+   effectifs, représentant et liaison des identités), qui exige encore
+   des développements et ne doit pas être présenté comme fonctionnel.
+4. Dans API & Webhooks, créer la clé de l'application et la destination
+   HTTPS `https://api.13-49-203-235.sslip.io/api/v1/webhooks/kyc/didit`
+   pour `status.updated`, récupérer son secret distinct.
+5. Stocker les trois secrets dans une configuration privée du serveur,
+   jamais dans GitHub/ChatGPT ; lancer une recette Sandbox avec médias fictifs.
+6. Conserver `DIDIT_AUTO_APPROVE=false` ; contrôler les signatures V2,
+   résultats `ACTIVE_3D`, face match, cas de refus/réessai et ségrégation
+   des rôles avant un déploiement avec sauvegarde/rollback.
+
+**BLOCAGE ACTUEL :** aucune authentification Didit utilisable par l'agent
+pour créer le workflow, récupérer les secrets et tester l'API réelle.
+Le dépôt `custum` est prêt pour la suite des travaux ; le backend déployé
+sur `cectapi_live` n'a pas été mis à jour pour Didit.
+
+Sources Didit officielles :
+https://docs.didit.me/integration/mcp/overview
+https://help.didit.me/getting-started/understanding-the-console
+https://help.didit.me/workflows/build-a-verification-workflow
+https://docs.didit.me/integration/webhooks
+
+---
 ## Situation vérifiée — 22 octobre 2026 : branche prête, compte Didit manquant
 
 **Actions effectivement réalisées :** étude de la documentation officielle v3,
