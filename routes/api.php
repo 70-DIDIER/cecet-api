@@ -10,6 +10,7 @@ use App\Domain\Exchange\Http\Controllers\ValidationController;
 use App\Domain\Identity\Enums\UserKind;
 use App\Domain\Identity\Http\Controllers\LoginController;
 use App\Domain\Identity\Http\Controllers\SuperadminSecurityController;
+use App\Domain\Kyc\Http\Controllers\KycController;
 use App\Domain\Identity\Http\Controllers\OtpController;
 use App\Domain\Identity\Http\Controllers\PasswordResetController;
 use App\Domain\Identity\Http\Controllers\RegistrationController;
@@ -132,6 +133,10 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::get('me/dashboard', MemberDashboardController::class)->name('me.dashboard');
         Route::get('me/documents', [MemberDocumentController::class, 'index'])->name('me.documents.index');
         Route::get('me/documents/{type}.pdf', [MemberDocumentController::class, 'download'])->middleware('throttle:20,1')->name('me.documents.download');
+        Route::get('me/kyc', [KycController::class, 'mine'])->name('me.kyc.show');
+        Route::post('me/kyc', [KycController::class, 'submit'])
+            ->middleware('throttle:5,1')->name('me.kyc.submit');
+
         Route::get('me/membership', [MembershipController::class, 'show'])->name('me.membership.show');
         Route::post('me/membership/payments', [MembershipController::class, 'startPayment'])->middleware('idempotent')->name('me.membership.payments.store');
         Route::get('me/membership/payments/{attempt}', [MembershipController::class, 'showAttempt'])->name('me.membership.payments.show');
@@ -228,6 +233,15 @@ Route::prefix('v1')->name('v1.')->group(function () {
         /*
          * Back-office: active internal accounts only, fine-grained permissions per route.
          */
+        Route::prefix('kyc')->name('kyc.')->middleware(['staff', 'can:kyc.review'])->group(function () {
+            Route::get('cases', [KycController::class, 'queue'])->name('cases.index');
+            Route::get('cases/{case}', [KycController::class, 'show'])->name('cases.show');
+            Route::get('cases/{case}/documents/{type}', [KycController::class, 'document'])
+                ->middleware('throttle:30,1')->name('cases.documents');
+            Route::post('cases/{case}/decision', [KycController::class, 'decide'])
+                ->middleware(['step-up', 'throttle:10,1'])->name('cases.decision');
+        });
+
         Route::prefix('admin')->name('admin.')->middleware('staff')->group(function () {
             Route::get('permissions', [RoleController::class, 'permissions'])->middleware('can:roles.view')->name('permissions.index');
             Route::get('roles', [RoleController::class, 'index'])->middleware('can:roles.view')->name('roles.index');
