@@ -45,8 +45,9 @@ activer un fournisseur de simulation comme justificatif d'identité réelle.
 ## Protection de données
 
 Les numéros/attributs d'identité sont chiffrés via APP_KEY dans la base.
-Les pièces sont conservées sur le disque privé Laravel, non accessibles
-par URL publique. Seul un personnel actif explicitement autorisé avec
+Les pièces sont conservées sous forme chiffrée sur le disque privé Laravel,
+non accessibles par URL publique. Le déchiffrement n'intervient qu'après
+contrôle d'autorisation et consultation journalisée. Seul un personnel actif explicitement autorisé avec
 kyc.review peut télécharger une pièce. Réponses no-store et nosniff.
 Aucun numéro ni document ne doit figurer dans les logs métier.
 
