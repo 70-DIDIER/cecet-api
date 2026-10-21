@@ -1,14 +1,16 @@
 # API CECT / YEM
 
+> **Développeur invité ?** Pour retrouver en local **les trois composants CECT**, leur connexion, la base PostgreSQL, les paramètres métier de référence et les exigences Superadmin, commencez par le **[guide de reproduction locale complet](https://github.com/70-DIDIER/cecet-api/blob/custum/docs/REPRODUCTION_LOCALE_CECT.md)** (21 octobre 2026). Utilisez **`custum`** dans les trois dépôts `70-DIDIER`, jamais `main` ou les anciennes copies. Attention : les valeurs métier et les données de staging ne sont pas automatiquement incluses dans Git.
+
 API de la plateforme de la coopérative CECT : adhésions, packs (Vendeur, Consommateur, Personnel, Marchand), quotas YEM, ventes et rééchanges à la CECT, paiements marchands par QR, versements en FCFA, validations, comptabilité et reporting.
 
-**Laravel 13 · PHP 8.3 · PostgreSQL 18** — API seule (pas d'interface dans ce dépôt). Spécification : `Cahier_des_charges_CECT_YEM_final_v4.0.docx`.
+**Laravel 13 · PHP 8.3 · PostgreSQL 18** — API seule (pas d'interface dans ce dépôt). Spécifications de travail : [`Cahier_des_charges_CECT_YEM_v5.0.md`](Cahier_des_charges_CECT_YEM_v5.0.md) et registre de décisions métier dans `docs/`.
 
 ## Principes
 
 - **Tout est configurable par le Superadmin** : taux, frais, packs et leurs versions, moyens de paiement, seuils, durées, notifications… (paramètres versionnés, motif obligatoire). Aucune règle économique n'est codée en dur.
 - **Intégrité avant tout** : journaux de quota et de solde marchand en ajout seul (triggers PostgreSQL), journal d'audit chaîné par hachage, contraintes `CHECK`, verrous de ligne (pas de double dépense), idempotence des opérations financières, séparation des tâches (maker-checker).
-- **Les frais de transaction sont à la charge du membre** ; la coopérative perçoit le montant net.
+- **Les frais de transaction sont configurables** : selon les règles et le provider activé, le membre peut les supporter ; le mode recette/simulation n'effectue aucun encaissement réel.
 - **Codes OTP par e-mail** (connexion du personnel, vérification, actions sensibles).
 
 ## Documentation
@@ -55,9 +57,9 @@ Le seeder crée un historique complet (adhésion, packs, ventes, paiements march
 
 | Compte | Identifiant | Mot de passe |
 |---|---|---|
-| Client (membre, personne physique) | `tandemodon55@gmail.com` ou Pernum `1009000055` | `Demo2026cect` |
-| Marchand (personne morale, Pernum `1009000077`) | `marchand.demo@cect.example` | `Demo2026cect` |
-| Personnel (Superadmin), back-office `/backoffice` | `superadmin.demo@cect.example` | `Demo2026cect` |
+| Client (membre, personne physique) | `DEMO_CLIENT_EMAIL` ou Pernum local du seeder | `DEMO_PASSWORD` (local) |
+| Marchand (personne morale) | `DEMO_MERCHANT_EMAIL` | `DEMO_PASSWORD` (local) |
+| Personnel fictif, ancien parcours de démo | `DEMO_STAFF_EMAIL` | `DEMO_PASSWORD` (local) — **ne reproduit pas le vrai accès mTLS** |
 
 - Pernum de réception de la CECT (démonstration) : `1000000001`.
 - La connexion du personnel demande un code OTP envoyé par e-mail : avec `MAIL_MAILER=log`, le code se lit dans `storage/logs/laravel.log`.
@@ -75,7 +77,7 @@ Le seeder crée un historique complet (adhésion, packs, ventes, paiements march
 | `PAYMENT_RETURN_URL` | page de retour du site après un paiement hébergé |
 | `FEDAPAY_ENVIRONMENT`, `FEDAPAY_SECRET_KEY`, `FEDAPAY_WEBHOOK_SECRET` | prestataire de paiement (l'adaptateur n'a pas encore été éprouvé contre le sandbox réel) |
 
-Le prestataire de paiement et celui des versements se choisissent dans les paramètres (`payment.inbound_provider`, `payment.payout_provider`). **FedaPay est le prestataire par défaut hors tests.** Le prestataire `fake` est strictement réservé aux tests automatisés : il n'est résolu ni en recette/staging ni en production, et les routes de démonstration ne sont pas exposées dans ces environnements.
+Le prestataire de paiement et celui des versements se choisissent dans les paramètres (`payment.inbound_provider`, `payment.payout_provider`). **FedaPay est le prestataire par défaut hors tests.** Le prestataire `fake` est autorisé uniquement dans les environnements applicatifs `testing` et `staging` dans la version actuelle du code, **jamais en production**. Pour une reproduction locale des paiements simulés, le guide d'installation utilise `APP_ENV=staging`, une base isolée et aucun secret financier réel.
 
 ## Exécution
 
@@ -131,7 +133,7 @@ Monolithe modulaire sous `app/Domain/` : chaque module regroupe ses modèles, ac
 | `Reporting` | rapports, exports CSV, snapshots, réimports contrôlés |
 | `Notification`, `Ops` | e-mails d'information, supervision, contrôle de mise en production |
 
-Rôles internes : `superadmin`, `administrateur`, `validateur`, `comptabilite` (les permissions sont éditables par le Superadmin, sauf invariants de séparation des tâches).
+Rôles internes actuels : `superadmin`, `administrateur`, `comptabilite` ; le rôle `validateur` a été supprimé et ses responsabilités métier transférées à la Comptabilité. Les accès restent contrôlés par permissions et exigences de sécurité.
 
 ## Mise en production
 
