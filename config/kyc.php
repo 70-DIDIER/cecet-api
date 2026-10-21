@@ -1,8 +1,16 @@
 <?php
 
 return [
-    // Default is ALWAYS manual. Document OCR or matching entered fields does not prove identity.
+    // Manual is for isolated tests only. For CECT production use "didit".
     'provider' => env('KYC_PROVIDER', 'manual'),
-    'webhook_secret' => env('KYC_PROVIDER_WEBHOOK_SECRET'),
     'max_file_kb' => 2048,
+    'didit' => [
+        'base_url' => 'https://verification.didit.me',
+        'api_key' => env('DIDIT_API_KEY'),
+        'workflow_id' => env('DIDIT_WORKFLOW_ID'),
+        'webhook_secret' => env('DIDIT_WEBHOOK_SECRET'),
+        'auto_approve' => filter_var(env('DIDIT_AUTO_APPROVE', false), FILTER_VALIDATE_BOOLEAN),
+        'environment' => env('DIDIT_ENVIRONMENT', 'sandbox'),
+        'allowed_redirect_hosts' => ['verify.didit.me'],
+    ],
 ];
