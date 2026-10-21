@@ -22,6 +22,9 @@ final class DiditDecisionProcessor
         $response = $this->didit->decision($case->provider_reference);
         $status = $response['status'];
         $checks = $this->didit->checks($response);
+        if (isset($response['environment']) && $response['environment'] !== config('kyc.didit.environment')) {
+            abort(409, 'La session Didit provient d’un environnement différent.');
+        }
         if (isset($response['session_id']) && $response['session_id'] !== $case->provider_reference) {
             abort(409, 'Identifiant de session Didit incohérent.');
         }
@@ -31,7 +34,8 @@ final class DiditDecisionProcessor
         // Sandbox never authorizes a real CECT membership outside isolated tests.
         $canApprove = $status === 'Approved' && $checks['complete']
             && ($case->user?->person_type?->value !== 'legal' || $checks['business_verified'])
-            && (config('kyc.didit.environment') === 'production' || app()->environment('testing'));
+            && $case->provider_environment === config('kyc.didit.environment')
+            && (config('kyc.didit.environment') === 'live' || app()->environment('testing'));
         DB::transaction(function () use ($case, $status, $checks, $canApprove): void {
             $locked = MemberKycCase::query()->lockForUpdate()->findOrFail($case->id);
             abort_unless($locked->provider_reference === $case->provider_reference, 409);
