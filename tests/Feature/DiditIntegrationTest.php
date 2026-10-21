@@ -112,9 +112,11 @@ it('verifies the webhook signature and fetches the independent session decision'
     startDidit($member)->assertOk();
     $case = MemberKycCase::where('user_id', $member->id)->sole();
     fakeDiditDecision('In Review');
+    \Illuminate\Support\Facades\Queue::fake();
 
     $body = json_encode([
         'event' => 'status.updated',
+        'environment' => 'sandbox',
         'session_id' => $case->provider_reference,
         'status' => 'Approved', // forged verdict must NOT override independent decision
         'timestamp' => time(),
@@ -129,7 +131,39 @@ it('verifies the webhook signature and fetches the independent session decision'
         'HTTP_X_SIGNATURE' => hash_hmac('sha256', $body, 'test-secret-in-memory'),
     ], $body)->assertOk();
 
+    \Illuminate\Support\Facades\Queue::assertPushed(\App\Domain\Kyc\Jobs\ProcessDiditDecision::class, 1);
+    app(\App\Domain\Kyc\Jobs\ProcessDiditDecision::class, ['caseId' => $case->id])
+        ->handle(app(\App\Domain\Kyc\Didit\DiditDecisionProcessor::class));
     expect($case->refresh()->provider_status)->toBe('In Review');
     expect($case->status)->toBe('submitted');
     expect($member->refresh()->status)->toBe(UserStatus::PendingKyc);
+});
+
+
+it('rejects wrong-environment signed callbacks before queuing and supports full V2 signatures', function () {
+    fakeDiditCreation();
+    $member = User::factory()->status(UserStatus::PendingKyc)->create();
+    startDidit($member)->assertOk();
+    $case = MemberKycCase::where('user_id', $member->id)->sole();
+    \Illuminate\Support\Facades\Queue::fake();
+
+    $wrong = ['timestamp' => time(), 'session_id' => $case->provider_reference,
+        'environment' => 'live', 'event' => 'status.updated'];
+    ksort($wrong, SORT_STRING);
+    $rawWrong = json_encode($wrong, JSON_THROW_ON_ERROR);
+    $this->call('POST', '/api/v1/webhooks/kyc/didit', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_SIGNATURE_V2' => hash_hmac('sha256', $rawWrong, 'test-secret-in-memory'),
+    ], $rawWrong)->assertStatus(409);
+    \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Domain\Kyc\Jobs\ProcessDiditDecision::class);
+
+    $correct = ['timestamp' => time(), 'session_id' => $case->provider_reference,
+        'environment' => 'sandbox', 'event' => 'status.updated'];
+    ksort($correct, SORT_STRING);
+    $rawGood = json_encode($correct, JSON_THROW_ON_ERROR);
+    $this->call('POST', '/api/v1/webhooks/kyc/didit', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_SIGNATURE_V2' => hash_hmac('sha256', $rawGood, 'test-secret-in-memory'),
+    ], $rawGood)->assertOk();
+    \Illuminate\Support\Facades\Queue::assertPushed(\App\Domain\Kyc\Jobs\ProcessDiditDecision::class, 1);
 });
