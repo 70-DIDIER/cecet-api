@@ -12,9 +12,16 @@ final class KycEligibility
 {
     public static function approved(User $member): bool
     {
-        return $member->isMember() && MemberKycCase::query()
-            ->where('user_id', $member->id)
-            ->where('status', 'approved')
-            ->exists();
+        if (! $member->isMember()) return false;
+        $query = MemberKycCase::query()->where('user_id', $member->id)
+            ->where('status', 'approved');
+        if (config('kyc.provider') === 'didit') {
+            // Manual document approval alone must never bypass video+liveness.
+            $query->where('verification_mode', 'didit')
+                ->where('provider_status', 'Approved')
+                ->whereNotNull('provider_verified_at')
+                ->where('provider_environment', config('kyc.didit.environment'));
+        }
+        return $query->exists();
     }
 }
