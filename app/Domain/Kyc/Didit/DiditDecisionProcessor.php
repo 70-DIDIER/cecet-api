@@ -30,6 +30,7 @@ final class DiditDecisionProcessor
         }
         // Sandbox never authorizes a real CECT membership outside isolated tests.
         $canApprove = $status === 'Approved' && $checks['complete']
+            && ($case->user?->person_type?->value !== 'legal' || $checks['business_verified'])
             && (config('kyc.didit.environment') === 'production' || app()->environment('testing'));
         DB::transaction(function () use ($case, $status, $checks, $canApprove): void {
             $locked = MemberKycCase::query()->lockForUpdate()->findOrFail($case->id);
