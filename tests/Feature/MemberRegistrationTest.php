@@ -128,7 +128,7 @@ it('requires an idempotency key', function () {
         ->assertJsonPath('code', 'IDEMPOTENCY_KEY_REQUIRED');
 });
 
-it('moves the account to pending payment once the email is verified', function () {
+it('moves the account to pending KYC once the email is verified', function () {
     $challengeId = register(naturalPersonPayload())->json('data.verification.challenge_id');
 
     $response = $this->postJson('/api/v1/auth/email/verify', [
@@ -139,7 +139,7 @@ it('moves the account to pending payment once the email is verified', function (
 
     $response->assertOk()
         ->assertJsonPath('data.status', 'authenticated')
-        ->assertJsonPath('data.user.status', 'pending_payment');
+        ->assertJsonPath('data.user.status', 'pending_kyc');
 
     $this->withToken($response->json('data.access_token'))->getJson('/api/v1/me')->assertOk();
 });
