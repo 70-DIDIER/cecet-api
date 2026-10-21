@@ -97,3 +97,15 @@ it('requires a written refusal reason and allows a corrected submission', functi
     submitKyc($member)->assertCreated()->assertJsonPath('data.status', 'submitted');
     expect($member->refresh()->status)->toBe(UserStatus::PendingKyc);
 });
+
+
+it('rejects a forged payment-ready status without an approved KYC case', function () {
+    $member = User::factory()->status(UserStatus::PendingPayment)->create();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
+    $this->withToken(tokenFor($member))->postJson('/api/v1/me/membership/payments',
+        ['method' => 'TMONEY'], ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])
+        ->assertForbidden();
+
+    $accountant = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
+    $this->withToken(tokenFor($accountant))->getJson('/api/v1/kyc/cases')->assertForbidden();
+});
