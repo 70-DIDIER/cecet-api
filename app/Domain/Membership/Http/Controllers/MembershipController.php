@@ -39,6 +39,7 @@ class MembershipController
     public function show(Request $request, MembershipFee $fees, PaymentFeeCalculator $feeCalculator, PaymentCheckout $checkout, SettingsService $settings): JsonResponse
     {
         $member = $this->member($request);
+        abort_if($member->status === UserStatus::PendingKyc, 403, 'KYC obligatoire avant le paiement.');
         $membership = Membership::query()->where('user_id', $member->id)->first();
 
         if ($membership !== null) {
