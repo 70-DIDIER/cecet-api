@@ -4,6 +4,22 @@ Date d'ouverture : 21 octobre 2026. Source : branches `custum` des dépôts `70-
 
 ## Statut actuel
 
+## Compte-rendu de vérification serveur — 21 octobre 2026, 19:12–19:20 UTC
+
+**L'agent distant était revenu en ligne. Le serveur visé était bien staging (APP_ENV=staging) avec une base portant le nom technique `cectapi_live`. Aucune réinitialisation de cette base active n'a été exécutée.**
+
+- Inventaire de la base active : `users=6` (4 membres, 2 internes dont 1 Superadmin), `pack_plans=10`, `pack_versions=16`, `user_packs=6`, `memberships=3`, `payment_attempts=10` (9 approved, 1 expired, toutes `provider=fake`), `merchant_payments=1`, `quota_ledger_entries=7`, `audit_events=132`, `security_events=37`, `superadmin_security_profiles=1`, `superadmin_access_keys=1`.
+- Archive réalisée : `/home/ubuntu/cect-private-backups/cect-pre-full-reset-20261021_191409.dump`, format PostgreSQL custom, permissions `0600`, **247 731 octets**, SHA-256 `0fbcf029546c331013f36a3c2b4adfbbb2f4a14237160e1457f9a8cac66dab6a`. Archive confidentielle, **jamais dans Git**.
+- La restauration dans la base **temporaire isolée** `cect_reset_restore_20261021` a réussi ; comptages restaurés : 6 utilisateurs, 10 packs, 132 événements d'audit et 1 clé Superadmin.
+- **Test de la commande `cect:reset-demo-activity` SUR CETTE COPIE UNIQUEMENT : ÉCHEC.** Le trigger PostgreSQL `merchant_ledger_entries_append_only` refuse le DELETE. La commande de nettoyage actuelle est donc inadaptée à cette version de la base ; elle ne pourrait de toute manière pas vider les packs et les versions de packs.
+- La solution envisagée est une **nouvelle base reconstruite propre**, transférant uniquement les référentiels nécessaires, la configuration métier, la sécurité Superadmin et les audits ; il faut une procédure revue et exécutée sous contrôles d'accès adaptés. L'exécution de reconstruction sélective a été **bloquée par les contrôles de l'outil** ; aucun basculement n'a été tenté.
+- Les bases temporaires `cect_reset_restore_20261021` et `cectapi_reset_20261021` ont ensuite été **supprimées**, après confirmation explicite que l'application était toujours connectée à `cectapi_live`. La sauvegarde privée demeure.
+- Contrôles read-only **PASS** : API `/api/v1/health=200`, routes SPA publiques et admin accessibles (HTTP 200), accès `/superadmin/connexion` **403 sans certificat**, `ledger:verify` cohérent (6 comptes quotas + 1 marchand), `audit:verify` chaîne intègre (132 événements), migrations appliquées.
+- Limite de ces tests : un HTTP 200 sur une route SPA ne démontre **pas** que la fonctionnalité authentifiée marche. L'anomalie *frais d'adhésion affichés avant OTP* demeure confirmée à la lecture du code, non corrigée.
+
+**Résultat global : sauvegarde + restauration vérifiées ; contrôles d'intégrité passés ; REMISE À ZÉRO BLOQUÉE / NON EXÉCUTÉE. Les données du site n'ont pas changé.**
+
+
 **Préparation uniquement. Aucun effacement n'a été effectué.** À l'ouverture du chantier, l'agent Desktop Commander du serveur `ip-172-31-25-53` est **hors ligne**. Il est impossible de confirmer les données de base en temps réel, de sauvegarder la base ou de lancer une commande Artisan sur ce serveur. Ce document est un plan d'intervention et un journal de recette, **pas** un rapport affirmant que les vérifications runtime sont passées.
 
 Référence historique consultée le 21/10/2026 lors d'un accès antérieur : Laravel en `APP_ENV=staging`, `APP_DEBUG=false`, mTLS Superadmin actif, PostgreSQL, frontend/admin accessibles. Il y avait 10 plans en base dont 1 Vendeur `V15` publié, 1 Consommateur en brouillon et 8 archivés. **Recompter au moment de l'intervention.**
