@@ -41,7 +41,7 @@ function fakeDiditDecision(string $status, bool $active = true): void
             'status' => $status,
             'decision' => [
                 'id_verifications' => [['status' => 'Approved']],
-                'liveness_checks' => [['status' => 'Approved', 'method' => $active ? '3D_ACTION' : 'PASSIVE']],
+                'liveness_checks' => [['status' => 'Approved', 'method' => $active ? 'ACTIVE_3D' : 'PASSIVE']],
                 'face_matches' => [['status' => 'Approved']],
             ],
         ], 200),
@@ -124,11 +124,13 @@ it('verifies the webhook signature and fetches the independent session decision'
     $this->call('POST', '/api/v1/webhooks/kyc/didit', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
         'HTTP_X_SIGNATURE' => 'bad-signature',
+        'HTTP_X_TIMESTAMP' => (string) time(),
     ], $body)->assertUnauthorized();
 
     $this->call('POST', '/api/v1/webhooks/kyc/didit', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
         'HTTP_X_SIGNATURE' => hash_hmac('sha256', $body, 'test-secret-in-memory'),
+        'HTTP_X_TIMESTAMP' => (string) time(),
     ], $body)->assertOk();
 
     \Illuminate\Support\Facades\Queue::assertPushed(\App\Domain\Kyc\Jobs\ProcessDiditDecision::class, 1);
@@ -154,6 +156,7 @@ it('rejects wrong-environment signed callbacks before queuing and supports full 
     $this->call('POST', '/api/v1/webhooks/kyc/didit', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
         'HTTP_X_SIGNATURE_V2' => hash_hmac('sha256', $rawWrong, 'test-secret-in-memory'),
+        'HTTP_X_TIMESTAMP' => (string) $wrong['timestamp'],
     ], $rawWrong)->assertStatus(409);
     \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Domain\Kyc\Jobs\ProcessDiditDecision::class);
 
@@ -164,6 +167,57 @@ it('rejects wrong-environment signed callbacks before queuing and supports full 
     $this->call('POST', '/api/v1/webhooks/kyc/didit', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
         'HTTP_X_SIGNATURE_V2' => hash_hmac('sha256', $rawGood, 'test-secret-in-memory'),
+        'HTTP_X_TIMESTAMP' => (string) $correct['timestamp'],
     ], $rawGood)->assertOk();
     \Illuminate\Support\Facades\Queue::assertPushed(\App\Domain\Kyc\Jobs\ProcessDiditDecision::class, 1);
+});
+
+
+it('recognizes Didit documented ACTIVE_3D result and canonical V2 with empty JSON objects', function () {
+    $gateway = app(\App\Domain\Kyc\Didit\DiditGateway::class);
+    $decision = [
+        'decision' => [
+            'id_verifications' => [['status' => 'Approved', 'verification_method' => 'document', 'warnings' => []]],
+            'liveness_checks' => [['status' => 'Approved', 'method' => 'ACTIVE_3D', 'warnings' => []]],
+            'face_matches' => [['status' => 'Approved', 'warnings' => []]],
+            'risk_view' => ['countries' => ['risk_scores' => new \stdClass()]],
+        ],
+    ];
+    expect($gateway->checks($decision)['complete'])->toBeTrue();
+    $obj = json_decode('{"timestamp":1774950000,"session_id":"test-session","environment":"sandbox","metadata":{},"risk_view":{"countries":{"risk_scores":{}}},"display_name":"José"}');
+    $json = json_encode($obj, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $canonical = '{"display_name":"José","environment":"sandbox","metadata":{},"risk_view":{"countries":{"risk_scores":{}}},"session_id":"test-session","timestamp":1774950000}';
+    $sig = hash_hmac('sha256', $canonical, 'test-secret-in-memory');
+    expect($gateway->signatureValid($json, $sig, null))->toBeTrue();
+    expect($gateway->signatureValid($json, str_repeat('0', 64), null))->toBeFalse();
+});
+
+it('does not allow a console Try Webhook to enqueue a session and rejects a mismatched timestamp header', function () {
+    fakeDiditCreation();
+    $member = User::factory()->status(UserStatus::PendingKyc)->create();
+    startDidit($member)->assertOk();
+    $case = MemberKycCase::where('user_id', $member->id)->sole();
+    \Illuminate\Support\Facades\Queue::fake();
+    $timestamp = time();
+    $payload = [
+        'webhook_type' => 'status.updated',
+        'timestamp' => $timestamp,
+        'session_id' => $case->provider_reference,
+        'environment' => 'sandbox',
+    ];
+    $raw = json_encode($payload, JSON_THROW_ON_ERROR);
+    $sig = hash_hmac('sha256', $raw, 'test-secret-in-memory');
+
+    $this->call('POST', '/api/v1/webhooks/kyc/didit', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_SIGNATURE' => $sig,
+        'HTTP_X_TIMESTAMP' => (string) ($timestamp - 120),
+    ], $raw)->assertUnauthorized();
+    $this->call('POST', '/api/v1/webhooks/kyc/didit', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_SIGNATURE' => $sig,
+        'HTTP_X_TIMESTAMP' => (string) $timestamp,
+        'HTTP_X_DIDIT_TEST_WEBHOOK' => 'true',
+    ], $raw)->assertOk()->assertJsonPath('test', true);
+    \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Domain\Kyc\Jobs\ProcessDiditDecision::class);
 });
