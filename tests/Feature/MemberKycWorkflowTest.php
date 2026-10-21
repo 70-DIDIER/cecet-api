@@ -25,8 +25,8 @@ function submitKyc(User $member): \Illuminate\Testing\TestResponse
         'document_country' => 'TG',
         'date_of_birth' => '1994-06-15',
         'address' => 'Lomé, quartier administratif, rue 12',
-        'document_front' => UploadedFile::fake()->image('recto.jpg', 600, 400),
-        'document_back' => UploadedFile::fake()->image('verso.jpg', 600, 400),
+        'document_front' => UploadedFile::fake()->create('recto.pdf', 100, 'application/pdf'),
+        'document_back' => UploadedFile::fake()->create('verso.pdf', 100, 'application/pdf'),
         'privacy_notice_accepted' => true,
     ], ['Accept' => 'application/json']);
 }
@@ -39,7 +39,7 @@ it('enforces email then KYC before accessing any payment or commercial endpoint'
     $this->withToken(tokenFor($member))->getJson('/api/v1/me/kyc')->assertOk()
         ->assertJsonPath('data.kyc', null);
     $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
-    $this->withToken(tokenFor($member))->postJson('/api/v1/me/membership/payments', ['method' => 'TMONEY'])->assertForbidden();
+    $this->withToken(tokenFor($member))->postJson('/api/v1/me/membership/payments', ['method' => 'TMONEY'], ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])->assertForbidden();
     $this->withToken(tokenFor($member))->getJson('/api/v1/me/dashboard')->assertForbidden();
     $this->withToken(tokenFor($member))->getJson('/api/v1/me/packs')->assertForbidden();
     $this->withToken(tokenFor($member))->getJson('/api/v1/me/merchant-payments')->assertForbidden();
