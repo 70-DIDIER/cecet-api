@@ -19,6 +19,7 @@ beforeEach(function () {
     config()->set('kyc.didit.environment', 'sandbox');
     config()->set('kyc.didit.auto_approve', false);
     config()->set('staff_guardian.enabled', false);
+    $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
 });
 
 function fakeDiditCreation(): void
