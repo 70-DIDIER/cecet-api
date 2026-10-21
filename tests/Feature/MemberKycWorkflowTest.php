@@ -58,6 +58,8 @@ it('stores encrypted identity fields, private documents, and approves only throu
         ->not->toContain('TG-1234567890');
     expect($case->document_front_path)->toStartWith('kyc/'.$member->id.'/');
     Storage::disk('local')->assertExists($case->document_front_path);
+    expect($case->document_front_path)->toEndWith('.enc');
+    expect(Storage::disk('local')->get($case->document_front_path))->toStartWith('eyJ');
 
     // The member can neither review themselves nor resubmit an undecided dossier.
     $this->withToken(tokenFor($member))->getJson('/api/v1/kyc/cases')->assertForbidden();
@@ -68,6 +70,7 @@ it('stores encrypted identity fields, private documents, and approves only throu
     $this->withToken(tokenFor($validator))->getJson('/api/v1/kyc/cases/'.$case->id)->assertOk()
         ->assertJsonPath('data.identity.document_number', 'TG-1234567890');
     $this->withToken(tokenFor($validator))->get('/api/v1/kyc/cases/'.$case->id.'/documents/front')->assertOk();
+    expect(\Illuminate\Support\Facades\DB::table('audit_events')->where('action', 'kyc.document_accessed')->count())->toBe(1);
 
     $this->withToken(tokenFor($validator, withStepUp: true))
         ->postJson('/api/v1/kyc/cases/'.$case->id.'/decision', ['decision' => 'approved'])
