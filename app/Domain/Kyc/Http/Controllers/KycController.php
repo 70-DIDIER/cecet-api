@@ -49,6 +49,9 @@ class KycController
         $old = MemberKycCase::query()->where('user_id', $member->id)->first();
         abort_if($old && ! in_array($old->status, ['rejected', 'needs_information'], true), 409, 'Dossier déjà soumis.');
         $case = $old ?? new MemberKycCase(['user_id' => $member->id]);
+        $previousPaths = $old ? array_filter([
+            $old->document_front_path, $old->document_back_path, $old->company_document_path,
+        ]) : [];
         $case->id ??= (string) \Illuminate\Support\Str::ulid();
 
         $paths = [];
@@ -97,6 +100,16 @@ class KycController
                 Storage::disk('local')->delete($path);
             }
             throw $e;
+        }
+        // Resubmissions must not leave superseded identity documents indefinitely.
+        // Deletion occurs after the transaction commits; a failed deletion is logged
+        // without invalidating the new committed case or erasing its new documents.
+        foreach ($previousPaths as $oldPath) {
+            try {
+                Storage::disk('local')->delete($oldPath);
+            } catch (\Throwable $error) {
+                report($error);
+            }
         }
 
         return response()->json(['data' => $this->memberSummary($case->refresh())], 201)
