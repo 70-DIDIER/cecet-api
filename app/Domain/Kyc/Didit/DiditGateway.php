@@ -4,7 +4,6 @@ namespace App\Domain\Kyc\Didit;
 
 use App\Domain\Kyc\Models\MemberKycCase;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Server-side only. No API key, session creation or decision is exposed to a browser.
@@ -73,12 +72,14 @@ final class DiditGateway
         );
         $docs = $pass((array) ($payload['id_verifications'] ?? []));
         $face = $pass((array) ($payload['face_matches'] ?? []));
-        $business = $pass((array) ($payload['business_verifications'] ?? []));
+        // KYB requires a separate linked business session with registry checks.
+        // Until that correlation exists, never treat a KYC session as verified KYB.
+        $business = false;
         $liveness = collect((array) ($payload['liveness_checks'] ?? []))->contains(
             static fn ($row) => is_array($row)
                 && ($row['status'] ?? null) === 'Approved'
                 && in_array(strtoupper(str_replace([' ', '-'], '_', (string) ($row['method'] ?? ''))),
-                    ['3D_ACTION', 'ACTION', 'ACTIVE', '3D_FLASH', 'FLASH'], true)
+                    ['ACTIVE_3D', '3D_ACTION', 'ACTION', 'ACTIVE', '3D_FLASH', 'FLASH'], true)
         );
         $warnings = array_merge(
             (array) ($payload['warnings'] ?? []),
@@ -105,20 +106,37 @@ final class DiditGateway
         $secret = config('kyc.didit.webhook_secret');
         if (! is_string($secret) || $secret === '') return false;
         if ($v2) {
-            $payload = json_decode($raw, true);
-            if (! is_array($payload)) return false;
-            $canonical = json_encode($this->canonicalize($payload),
-                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-            return hash_equals(hash_hmac('sha256', $canonical, $secret), strtolower($v2));
+            try {
+                // Didit V3 canonical JSON preserves {} distinct from [].
+                // json_decode(..., true) breaks otherwise valid signed payloads.
+                $payload = json_decode($raw, false, 512, JSON_THROW_ON_ERROR);
+                if ($payload instanceof \stdClass) {
+                    $canonical = json_encode($this->canonicalize($payload),
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                    if (hash_equals(hash_hmac('sha256', $canonical, $secret), strtolower($v2))) {
+                        return true;
+                    }
+                }
+            } catch (\JsonException $e) {
+                return false;
+            }
         }
+        // Strong raw-body fallback; never accept weak X-Signature-Simple.
         return is_string($v1) && hash_equals(hash_hmac('sha256', $raw, $secret), strtolower($v1));
     }
 
     private function canonicalize(mixed $value): mixed
     {
-        if (! is_array($value)) return $value;
-        if (array_is_list($value)) return array_map($this->canonicalize(...), $value);
-        ksort($value, SORT_STRING);
-        return array_map($this->canonicalize(...), $value);
+        if ($value instanceof \stdClass) {
+            $properties = get_object_vars($value);
+            ksort($properties, SORT_STRING);
+            $object = new \stdClass();
+            foreach ($properties as $name => $item) {
+                $object->{$name} = $this->canonicalize($item);
+            }
+            return $object;
+        }
+        if (is_array($value)) return array_map($this->canonicalize(...), $value);
+        return $value;
     }
 }
