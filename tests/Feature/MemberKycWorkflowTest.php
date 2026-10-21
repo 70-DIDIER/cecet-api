@@ -8,10 +8,12 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
+    // Pest/Laravel initializes the application as part of the first catalog seed.
+    // phpunit.xml forces the isolated test DB regardless of the staging .env.
+    seedCatalogs();
     if (\Illuminate\Support\Facades\DB::connection()->getDatabaseName() !== 'cectapi_test') {
         throw new RuntimeException('KYC tests may only run on cectapi_test.');
     }
-    seedCatalogs();
     Storage::fake('local');
 });
 
