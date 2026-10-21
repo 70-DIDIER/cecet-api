@@ -94,12 +94,12 @@ est utilisée uniquement avec APP_ENV=testing et des justificatifs fictifs.
 
 - Compilation TypeScript/Vite CECT-frontend : **réussie**.
 - Compilation TypeScript/Vite cect-admin : **réussie**.
-- Tests ciblés KYC et administration : **15 réussis, 81 assertions**.
+- Tests ciblés KYC et administration : **15 réussis, 84 assertions**.
   Vérifications : dossier et documents privés, chiffrement, autorisation
   Validateur, séparation de Comptabilité, refus de paiement sans KYC approuvé,
   approbation, demande de complément et dépôt corrigé.
 - Suite générale de tests fonctionnels sur cette version de développement :
-  **473 réussis, 123 en échec, 5 884 assertions**. Certains cas anciens
+  **473 réussis, 123 en échec, 5 884 assertions** (exécution précédente, avant les dernières corrections ciblées). Certains cas anciens
   supposent un paiement sans vérification et le retrait du rôle Validateur ;
   d'autres échecs portent sur des routes/backoffice non encore qualifiées.
   **Ne pas attribuer automatiquement tous ces échecs au KYC.**
