@@ -4,6 +4,7 @@ namespace App\Domain\Payment\Actions;
 
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Kyc\KycEligibility;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\MembershipFee;
 use App\Domain\Membership\Models\Membership;
@@ -48,6 +49,10 @@ class StartMembershipPayment
             throw PaymentException::notPayable();
         }
 
+        if (! KycEligibility::approved($member)) {
+            throw PaymentException::notPayable();
+        }
+
         $channel = $this->router->route($member, $method, $paymentPhone);
 
         ['attempt' => $attempt, 'reused' => $reused] = DB::transaction(fn (): array => $this->prepare($member, $channel['provider'], $channel['method']));
@@ -74,6 +79,9 @@ class StartMembershipPayment
     private function prepare(User $member, string $providerName, string $method): array
     {
         User::query()->lockForUpdate()->findOrFail($member->id);
+        if (! KycEligibility::approved($member)) {
+            throw PaymentException::notPayable();
+        }
 
         $fee = $this->fees->for($member);
 
