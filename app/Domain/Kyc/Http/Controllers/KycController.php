@@ -27,6 +27,7 @@ class KycController
 
         return response()->json(['data' => [
             'account_status' => $member->status->value,
+            'provider' => config('kyc.provider'),
             'kyc' => $case ? $this->memberSummary($case) : null,
         ]])->header('Cache-Control', 'no-store');
     }
@@ -35,6 +36,8 @@ class KycController
     {
         $member = $this->member($request);
         abort_unless($member->status === UserStatus::PendingKyc, 403, 'Vérification KYC non disponible pour ce statut.');
+        abort_unless(config('kyc.provider') === 'manual', 403,
+            'Utilisez le parcours Didit avec capture biométrique en direct.');
 
         $data = $request->validate([
             'document_type' => ['required', Rule::in(['national_id', 'passport', 'residence_permit'])],
@@ -192,6 +195,15 @@ class KycController
             $member = User::query()->lockForUpdate()->findOrFail($locked->user_id);
             abort_unless($member->status === UserStatus::PendingKyc, 409, 'Le membre a changé de statut.');
             $decision = $data['decision'];
+            if (config('kyc.provider') === 'didit' && $decision === 'approved') {
+                $checks = $locked->provider_checks ?? [];
+                abort_unless($locked->verification_mode === 'didit'
+                    && $locked->provider_status === 'Approved'
+                    && $locked->provider_verified_at
+                    && ($checks['complete'] ?? false)
+                    && $locked->provider_environment === config('kyc.didit.environment'),
+                    409, 'Contrôles Didit document, vidéo et visage requis.');
+            }
             $locked->forceFill([
                 'status' => $decision,
                 'reviewed_by' => $actor->id,
@@ -227,6 +239,10 @@ class KycController
         return [
             'id' => $case->id,
             'status' => $case->status,
+            'verification_mode' => $case->verification_mode,
+            'provider_status' => $case->provider_status,
+            'provider_checks' => $case->provider_checks,
+            'can_resume' => $case->verification_mode === 'didit' && in_array($case->status, ['provider_pending','submitted'], true),
             'submitted_at' => $case->submitted_at?->toIso8601String(),
             'reviewed_at' => $case->reviewed_at?->toIso8601String(),
             'review_reason' => $case->status === 'approved' ? null : $case->review_reason,
