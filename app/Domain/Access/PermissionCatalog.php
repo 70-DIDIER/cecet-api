@@ -88,10 +88,12 @@ final class PermissionCatalog
      */
     public function incompatiblePairs(): array
     {
-        // Comptabilité now carries the former Validator duties (v5).
-        // Conflict control is per-operation (e.g. maker/checker IDs on payouts),
-        // not a blanket prohibition on holding accounting/validation permissions.
-        return [];
+        // KYC identity approval and financial validation are different functions.
+        // The Superadmin remains governed by its own explicit security controls.
+        return [
+            ['kyc.review', 'payments.validate_manual'],
+            ['kyc.review', 'yem_validations.confirm'],
+        ];
     }
 
     public function exists(string $permission): bool
