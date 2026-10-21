@@ -95,10 +95,17 @@ final class DiditController
         $data = json_decode($raw, true);
         abort_unless(is_array($data), 400);
         $timestamp = $data['timestamp'] ?? null;
-        abort_unless(is_numeric($timestamp) && abs(time() - (int) $timestamp) <= 300, 401,
+        $headerTime = $request->header('X-Timestamp');
+        abort_unless(is_numeric($timestamp) && is_string($headerTime)
+            && ctype_digit($headerTime) && (int) $headerTime === (int) $timestamp
+            && abs(time() - (int) $timestamp) <= 300, 401,
             'Notification Didit périmée.');
         abort_unless(($data['environment'] ?? null) === config('kyc.didit.environment'), 409,
             'Événement d’un environnement Didit différent.');
+        // Official console sample webhooks must not mutate real member identities.
+        if ($request->header('X-Didit-Test-Webhook') === 'true') {
+            return response()->json(['received' => true, 'test' => true]);
+        }
         $event = $data['webhook_type'] ?? $data['event_type'] ?? $data['event'] ?? null;
         if ($event !== 'status.updated') {
             return response()->json(['received' => true]);
