@@ -1,3 +1,63 @@
+## COMPTE MCP DIDIT EFFECTIVEMENT CONNECTÉ — opérations réelles (22 oct 2026)
+
+**Cette section remplace l'ancien blocage OAuth et les mentions selon lesquelles
+aucune application/workflow n'aurait été créée dans Didit.**
+
+- Organisation : `CECT-test`, UUID `38472d7c-adb4-4a07-9eaf-a70e85856f5f`.
+- Application choisie : `CECT-test (Sandbox)`, UUID
+  `3d71e41c-317b-49d8-ba1c-c220866328f5`. Une autre application
+  `My Application` existe ; elle est restée intacte.
+- **Workflow PF créé dans Didit, DRAFT NON PUBLIÉ** :
+  `635693e0-768a-45fe-ad42-e7bae9c649b8`,
+  `CECT | KYC PF | Test biométrique` avec étapes OCR caméra,
+  LIVENESS `ACTIVE_3D`, FACE_MATCH, IP_ANALYSIS. 3 tentatives, contrôle
+  des fichiers suspects et revue manuelle ; pas de mise en défaut,
+  pas de branding blanc payant. Prix théorique affiché 0,15–0,38 USD
+  selon usages/quotas et options. **Ce tarif n'est pas une facture**.
+- **Workflow PM KYB créé dans Didit, DRAFT NON PUBLIÉ** :
+  `96d81562-e65f-4694-b7a5-c2552d92c83c`,
+  `CECT | KYB PM | Entreprises test` : registre d'entreprise, pièces
+  présence légale/structure d'actionnariat, personnes clés UBO + dirigeants
+  liées au KYC PF ci-dessus ; workflow distinct car KYB ≠ KYC. Prix
+  théorique console 2 USD, sans débit constaté.
+- **Destination webhook créée mais DÉSACTIVÉE** :
+  UUID `2112dabd-33d4-4025-a32f-d78962d51627`, version v3,
+  seulement `status.updated`,
+  `https://api.13-49-203-235.sslip.io/api/v1/webhooks/kyc/didit`.
+  Secret de destination présent chez Didit et masqué par le MCP ;
+  **non injecté sur notre serveur** ; activer uniquement après le
+  déploiement sécurisé de l'API et un test signé réussi.
+- Balance Didit consultée : 0 USD, auto-recharge désactivée,
+  500 utilisations gratuites ID/Passive/Face match/IP encore disponibles ;
+  attention `ACTIVE_3D` est une option payante sur une application LIVE.
+- Clé API : application `api_key_set=true` chez Didit, mais valeur
+  brute **REDACTED** dans ce MCP. Aucune clé copiée dans GitHub.
+- **Aucune session KYC créée**, aucun selfie/vidéo capturé et
+  aucune facturation lancée.
+
+### Étapes bloquantes toujours ouvertes
+
+1. Vérifier **la véritable valeur du champ environnement/mode de l'application**
+   dans la console Didit (le nom `Sandbox` n'est pas une preuve suffisante).
+2. Confirmer les paramètres et les données minimales retournées à CECT.
+   La configuration Didit `response_attributes=null` signifie que
+   **tous les champs sont retournés**, potentiellement incluant documents
+   biométriques et vidéo ; limiter dans la console avant tout usage réel.
+3. Publier seulement lorsque mode Sandbox, données retournées, règle
+   de vérification et coûts ont été revus.
+4. Lier de façon sûre le secret webhook et la clé application au
+   backend sans les exposer aux logs, ChatGPT ou Git ; valider les vrais
+   formats Didit de réponses/vérifications contre la documentation.
+5. Tester sessions fictives, webhooks, interface, refus, rejoués, liveness
+   vidéo et PM avec KYB, puis refaire les tests globaux de régression.
+6. **Ne pas déployer le connecteur ni activer la collecte biométrique réelle**
+   tant que les contrôles sécurité et conformité ne sont pas terminés.
+
+Résultat : création réelle de 2 workflows Didit et d'une destination webhook
+non activée. Les historiques de CECT `cectapi_live` et tous les comptes
+internes n'ont pas été modifiés.
+
+---
 ## Accès fournisseur — compte Didit confirmé, console non connectée (22/10/2026)
 
 Le responsable du projet a créé son compte Didit. Un email de bienvenue officiel
