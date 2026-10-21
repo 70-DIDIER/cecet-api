@@ -36,6 +36,21 @@ final class EnsureStaffGuardianSession
             || ($user->isStaff() && $user->status !== UserStatus::Active)) {
             abort(401, 'Compte suspendu, non activé ou clôturé.');
         }
+        // Only KYC and adhesion are allowed before account activation.
+        if ($user->isMember() && $user->status !== UserStatus::Active) {
+            $path = $request->path();
+            $allow = ['api/v1/me', 'api/v1/me/kyc', 'api/v1/me/membership'];
+            $payment = str_starts_with($path, 'api/v1/me/membership/payments')
+                || preg_match('#^api/v1/me/payments/[^/]+/(declare|simulate)$#', $path);
+            if (! in_array($path, $allow, true)
+                && ! ($user->status === UserStatus::PendingPayment && $payment)) {
+                abort(403, 'Finalisez votre vérification KYC et votre adhésion.');
+            }
+            if ($user->status === UserStatus::PendingKyc && $path === 'api/v1/me/membership') {
+                abort(403, 'KYC obligatoire avant le paiement.');
+            }
+        }
+
         if (! config('staff_guardian.enabled') || ! $user->isStaff() || $user->isSuperadmin()) {
             return $next($request);
         }
