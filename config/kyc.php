@@ -1,8 +1,9 @@
 <?php
 
 return [
-    // Manual is for isolated tests only. For CECT production use "didit".
-    'provider' => env('KYC_PROVIDER', 'manual'),
+    // Didit selected by CECT. No API credentials means fail closed.
+    // Manual mode is ONLY for isolated legacy tests.
+    'provider' => env('KYC_PROVIDER', 'didit'),
     'max_file_kb' => 2048,
     'didit' => [
         'base_url' => 'https://verification.didit.me',
