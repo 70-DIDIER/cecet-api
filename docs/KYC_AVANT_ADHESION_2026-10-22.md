@@ -1,3 +1,75 @@
+## Rapport de préparation au déploiement — 22 octobre 2026 (réel, via MCP Didit)
+
+### Effectué chez Didit
+
+- Application ciblée : `CECT-test (Sandbox)` (UUID
+  `3d71e41c-317b-49d8-ba1c-c220866328f5`) ; mode technique
+  `sandbox` doit encore être confirmé par l'information mode
+  (le nom ne constitue pas une preuve).
+- Workflow PF `635693e0-768a-45fe-ad42-e7bae9c649b8` : **PUBLISHED** ;
+  documents caméra (incluant les documents togolais dans le catalogue),
+  liveness `ACTIVE_3D`, face match, IP analyse ; vérification complète
+  de son graphe **validée** après correction de l'allow-list documentaire.
+- Workflow PM `96d81562-e65f-4694-b7a5-c2552d92c83c` : **PUBLISHED** ;
+  registre KYB, documents de société, contrôle UBO/dirigeants lié au
+  KYC PF. Graphe **validé**.
+- Les workflows prédéfinis de la société et `My Application` n'ont
+  pas été modifiés. Aucun workflow CECT publié n'a été défini comme
+  workflow global par défaut.
+- Destination webhook `2112dabd-33d4-4025-a32f-d78962d51627`, v3
+  vers `https://api.13-49-203-235.sslip.io/api/v1/webhooks/kyc/didit`
+  : **CREATED, DISABLED**, tant que le secret n'est pas déployé.
+- Solde affiché lors du contrôle : 0 USD, recharge automatique OFF ;
+  les 500 usages gratuits de certains contrôles demeurent disponibles.
+  Le liveness actif est facturable hors Sandbox réel ; aucune session
+  ni commande de recharge lancée dans ces opérations.
+
+### État du déploiement CECT
+
+**Non déployé / gate de release BLOQUÉ** pour les raisons suivantes :
+
+1. Le MCP Didit renvoie `api_key_set=true`, mais masque de façon
+   permanente la valeur de la clé API et celle du secret webhook.
+   L'API Laravel n'a ni `DIDIT_API_KEY` ni
+   `DIDIT_WEBHOOK_SECRET` configurés. Ne pas contourner cette protection.
+2. La suite de tests fonctionnels globale conserve plusieurs échecs
+   de scénarios historiques sans KYC ; ne pas publier un parcours
+   cassant inscription/paiements/administration.
+3. Le compte Didit n'a aucun **compliance profile** enregistré,
+   donc `didit_compliance_check_workflow` ne peut pas statuer ;
+   l'utilisation réelle de biométrie doit recevoir une revue formelle.
+4. La diffusion de données Didit au client est trop large par défaut :
+   `response_attributes=null` signale la transmission de tous les
+   attributs, potentiellement vidéos et documents. Réduire avant trafic.
+5. L'ancien compte existant dans `cectapi_live` doit être traité par
+   une règle de migration KYC explicite avant une bascule générale.
+6. L'identité KYB doit être corrélée de façon probante à la PM dans
+   notre base Laravel ; pour l'instant `business_verified=false`
+   tant que la session société réelle n'est pas liée et contrôlée.
+
+### Vérifications du code et précautions
+
+- Tests KYC/Didit/OTP/admin ciblés : **41 réussis / 223 assertions**
+  dans la base indépendante `cectapi_test` ; API Laravel `cectapi_live`
+  inchangée.
+- Compilations React member/admin : toutes deux **réussies**.
+- Backend actuel sur serveur : commit `b1143de` ; code nouveau sur
+  branche `custum`, NON déployé. Base `cectapi_live` contient
+  2 comptes internes, 1 membre et 0 pack lors du dernier inventaire.
+- Les tests globaux sont en cours de vérification finale ; ne jamais
+  déclarer mise en production à cause de la seule réussite des tests ciblés.
+
+### Marche finale pour l'administrateur autorisé
+
+Conserver le webhook désactivé tant que l'API n'est pas opérationnelle.
+Depuis la console Didit / API & Webhooks, faire installer **directement
+vers le gestionnaire de secrets du serveur** (et non le chat/GitHub)
+la valeur brute de la clé API et le secret partagé du webhook.
+Ajouter le workflow UUID PF ci-dessus et `DIDIT_ENVIRONMENT=sandbox`,
+puis exécuter des tests de bout en bout sur un véritable Sandbox et
+la suite complète de non-régression avant le déploiement coordonné.
+
+---
 ## COMPTE MCP DIDIT EFFECTIVEMENT CONNECTÉ — opérations réelles (22 oct 2026)
 
 **Cette section remplace l'ancien blocage OAuth et les mentions selon lesquelles
