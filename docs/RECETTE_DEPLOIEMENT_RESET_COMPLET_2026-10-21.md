@@ -1,0 +1,113 @@
+# CECT — Remise à zéro contrôlée et recette fonctionnelle exhaustive
+
+Date d'ouverture : 21 octobre 2026. Source : branches `custum` des dépôts `70-DIDIER/cecet-api`, `70-DIDIER/CECT-frontend`, `70-DIDIER/cect-admin`.
+
+## Statut actuel
+
+**Préparation uniquement. Aucun effacement n'a été effectué.** À l'ouverture du chantier, l'agent Desktop Commander du serveur `ip-172-31-25-53` est **hors ligne**. Il est impossible de confirmer les données de base en temps réel, de sauvegarder la base ou de lancer une commande Artisan sur ce serveur. Ce document est un plan d'intervention et un journal de recette, **pas** un rapport affirmant que les vérifications runtime sont passées.
+
+Référence historique consultée le 21/10/2026 lors d'un accès antérieur : Laravel en `APP_ENV=staging`, `APP_DEBUG=false`, mTLS Superadmin actif, PostgreSQL, frontend/admin accessibles. Il y avait 10 plans en base dont 1 Vendeur `V15` publié, 1 Consommateur en brouillon et 8 archivés. **Recompter au moment de l'intervention.**
+
+## 0. Sauvegarde et garde-fous AVANT l'effacement
+
+| Vérification / action | Condition de réussite | État |
+|---|---|---|
+| Agent distant en ligne, opérateur identifié | Connexion non privilégiée/priviliégiée autorisée | BLOQUÉ |
+| Base cible confirmée | `APP_ENV=staging`, nom de base, hôte, statut provider `fake` uniquement pour les opérations simulées ; aucun paiement réel pending | À faire |
+| Rapport initial anonymisé | Comptages membres par statut, packs par statut/famille, transactions, comptes internes, clés Superadmin | À faire |
+| Sauvegarde PostgreSQL | `pg_dump` complet en fichier `-Fc` daté, hors chemin web, droits stricts (0600), checksum SHA-256 | À faire |
+| Restauration test | `pg_restore` dans une base **isolée** de validation, preuve de cohérence | À faire |
+| API/worker/scheduler sécurisés pendant l'opération | Fenêtre de maintenance, aucune nouvelle transaction ni tâche de décaissement | À faire |
+| Sécurité préservée | Identité Superadmin, mTLS, PKI/CRL, profil des 3 adresses et clé active conservés | À faire |
+
+**Ne jamais exécuter** `migrate:fresh`, `db:wipe`, `TRUNCATE ... CASCADE`, ou `db:seed --force` sur le serveur sans validation d'un plan détaillé : les tables de sécurité, d'audit et de clés sont liées au système. Ne jamais publier le dump, `.env` ou les e-mails réels sur GitHub/ChatGPT.
+
+## 1. Ce que la commande de nettoyage existante sait réellement faire
+
+Le code `app/Domain/Access/Console/ResetDemoActivityCommand.php` expose :
+
+```bash
+php artisan cect:reset-demo-activity                 # dry-run, aucun effacement
+# Exécution possible SEULEMENT après sauvegarde prouvée, interruption du trafic, et contrôle manuel :
+# php artisan cect:reset-demo-activity --execute --confirm=RESET-CECT-DEMO --backup=<CHEMIN_ABSOLU> 
+```
+
+**Important :** cette commande **préserve** explicitement `pack_plans`, `pack_versions`, tarifs, configurations, comptes internes, Superadmin, certificats, journaux d'audit. Elle efface notamment les membres et les transactions. **Elle ne réalise PAS la remise à zéro complète demandée.** Ne pas la lancer puis annoncer « zéro pack ».
+
+Il faut une **deuxième procédure vérifiée** pour vider le catalogue, ses versions, les comptes internes Administrateur/Comptabilité de test et les données dérivées, après inspection des relations FK et tests sur une copie **isolée**. Aucune purge des référentiels de sécurité ni des journaux immuables sans procédure formelle.
+
+## 2. Cible de remise à zéro pour la recette
+
+| Données | Valeur recherchée |
+|---|---|
+| Comptes membres PF / PM | **0** |
+| Comptes internes de test Administrateur / Comptabilité | **0** |
+| Packs du catalogue + versions, niveaux, publication | **0** |
+| Souscriptions, quotas, crédits, réservations, écritures de quota | **0** |
+| Marchands, QR, paiements marchands, comptes et écritures | **0** |
+| Ventes YEM, rééchanges, versements, tentatives PSP fictives | **0** |
+| Adhésions, notifications et documents transactionnels de démo | **0** |
+| Configurations business | Conserver temporairement les réglages de référence **explicitement identifiés** (pour comparer les parcours) ; ne pas réinitialiser les clés/fournisseurs au hasard |
+| Superadmin + certificat navigateur + clé d'accès + profil de sécurité | **1 Superadmin protégé, accès inchangé** |
+| Sécurité, audit et migration/structure | **Préservés** et revérifiés |
+
+**Avertissement :** « zéro » signifie zéro donnée **active/transactionnelle dans les tables métier**, pas effacement d'un journal d'audit en ajout seul ni réutilisation des identifiants historiques. Les profils et clés de sécurité ne doivent pas être supprimés. Les fichiers et archives de sauvegarde doivent demeurer confidentiels. Si une autre portée que celle-ci est retenue ultérieurement, documenter la décision avant intervention.
+
+## 3. Validation technique après reset
+
+- **Comptages** : exécuter des requêtes de lecture pour chaque table métier ; 0 membres, 0 packs/versions, 0 mouvements, 0 transactions, 0 comptes internes de test ; 1 Superadmin autorisé, profil mTLS et clé active inchangés.
+- **PostgreSQL** : aucune FK/triggers invalidés, migrations toujours appliquées, horloge, connexions et jobs cohérents.
+- **Laravel** : `php artisan ledger:verify`, `php artisan audit:verify`, `php artisan ops:check --integrity`. Toute anomalie bloque les essais financiers.
+- **HTTP** : endpoint health 200, frontend et admin accessibles, Superadmin sans certificat 403 ; connexion réelle uniquement avec certificat/fichier/OTP.
+- **Business** : publier ensuite uniquement les packs créés durant le scénario ; ne pas repeupler automatiquement la base serveur avec `DemoClientSeeder` ou des packs historiques non approuvés.
+
+## 4. Audit fonctionnel à mener ensemble, opération par opération
+
+**Méthode :** pour chaque opération, lister le résultat métier attendu, tester le parcours positif, les refus d'accès, un échec et une répétition/idempotence ; noter PASS / FAIL / BLOQUÉ, cause, capture non sensible, corrections et re-test. **Les routes/fichiers présents sur GitHub ne prouvent pas que la fonctionnalité déployée marche.** Lorsqu'une règle métier n'est pas encore validée, demander l'arbitrage au responsable avant modification.
+
+| Ordre | Opération / acteur | Vérifications fonctionnelles | État initial |
+|---|---|---|---|
+| 00 | Base de référence | Sauvegarde, purge, 0 membre, 0 pack, Superadmin intact | BLOQUÉ — agent hors ligne |
+| 01 | Inscription PF | Création dossier, unicité Pernum/mail, OTP, prix non visible avant OTP, statut `pending_payment`, accès limité au dossier/paiement | ÉCART DÉJÀ OBSERVÉ |
+| 02 | Adhésion PF | Paiement simulé, montant versionné, succès/échec/doublon, activation ; modalités définitives à arbitrer | NON TESTÉ / décision partielle |
+| 03 | Inscription PM | Identification morale, RCCM/NIF si requis, représentant, OTP, droits et restrictions | NON TESTÉ |
+| 04 | Connexion / sécurité | Session, déconnexion, récupération mot de passe, OTP, suspension immédiate, contrôle des routes | NON TESTÉ |
+| 05 | Superadmin | mTLS, `.cectkey`, trois e-mails/OTP, renouvellement, révocation, refus d'accès non autorisé | NON TESTÉ |
+| 06 | Administrateur | Gestion membres PF/PM, équipe, consultation sans privilège financier indu | NON TESTÉ |
+| 07 | Comptabilité | File de validation, contrôles maker-checker, confirmation/refus, journaux | NON TESTÉ |
+| 08 | Catalogue | Création, version, niveau, prix, quota, durée, suspension, archivage, publication | NON TESTÉ |
+| 09 | Souscription | Éligibilité PF/PM, packs autorisés, cumul/limite configurée, paiement, provisionnement | NON TESTÉ |
+| 10 | Vendeur | Quantité réservée, transfert Foundation, confirmation et versement fictif, quota restant | NON TESTÉ |
+| 11 | Consommateur | YEM achetés/bonus, solde pack, disponibilité, paiement QR, idempotence | NON TESTÉ |
+| 12 | Marchand | Éligibilité PM, pack Marchand, QR, réception/confirmation, rééchange et calcul des frais | NON TESTÉ |
+| 13 | Personnel | Ouverture, rechargement, cashback et solde par pack | NON TESTÉ |
+| 14 | Moyens de paiement | 47 méthodes référencées dans la config publique au 21/10, sélection par pays, logos, carte simulée, aucun vrai débit | NON TESTÉ |
+| 15 | Pays / destinations | 7 pays de réception dans la config publique au 21/10, affichage admin et numéros autorisés | NON TESTÉ |
+| 16 | Finances / audit | Solde crédité-réservé, reporting, exports, traces audit, ledger, rapprochements | NON TESTÉ |
+| 17 | Robustesse | double clic, requêtes concurrentes, erreurs réseau, expiration OTP, back/forward navigateur | NON TESTÉ |
+
+## 5. Écarts confirmés par lecture de code (pas par exécution E2E)
+
+1. **INSCRIPTION PF : règle métier 01/B non respectée dans le code courant.** `CECT-frontend/src/pages/RegisterPage.tsx` affiche `publicConfig.membership_fees` dans la sélection PF/PM et dans une carte de tarif avant OTP (lignes environ 233-249). `cecet-api/app/Domain/Identity/Http/Controllers/RegistrationController.php::store` inclut encore `membership_fee` dans la réponse HTTP avant vérification. Attendu explicitement décidé le 20 octobre : ne révéler les frais **au membre** qu'après vérification d'e-mail, sur sa page de paiement. À corriger et retester.
+2. **INSCRIPTION PF : accès `pending_payment` à auditer.** `MemberLayout.tsx` redirige côté client les non-actifs vers `/espace/adhesion`, mais cela ne remplace pas un contrôle API ; les routes `/me/dashboard`, `/me/packs` et autres doivent refuser les états non autorisés dans le backend. Des tests API dédiés sont nécessaires.
+3. **PACKS : paramètre de limites non utilisé.** Dans `cecet-api@custum`, `packs.families_excluded_from_limit` est toujours configurable dans `SettingsCatalog` ; `SubscribeToPack::assertWithinStructuredLimit` vérifie maintenant spécifiquement `VENDEUR` et ignore cette liste. La règle métier et l'interface de configuration doivent être alignées avant reprise.
+4. **DÉPLOIEMENT : différence entre sources actuelles et releases observées.** L'API serveur était à `b1143de`, tandis que les branches `custum` avaient évolué après ; les bundles frontend/admin servis provenaient de releases antérieures. Contrôler les SHAs déployés puis déployer seulement après sauvegarde, tests et rollback validé.
+5. **CI** : dernières Actions consultées pour `custum` sur admin et API en échec ; le workflow frontend ne suivait pas `custum`. Compiler et tester effectivement avant de déclarer une fonctionnalité opérationnelle.
+
+## 6. Registre de recette (modèle à remplir)
+
+| Date | Opération | Test, rôle et données fictives | Attendu | Observé | Statut | Preuve non sensible | Action |
+|---|---|---|---|---|---|---|---|
+| 2026-10-21 | 00 reset | Inspection commande `cect:reset-demo-activity` | Effacer membres ET packs | La commande conserve les packs | FAIL (périmètre incomplet) | Lecture du code | Préparer purge complète sécurisée |
+| 2026-10-21 | 01 PF | Affichage du tarif avant OTP | Prix invisible avant OTP | `RegisterPage.tsx` affiche le tarif | FAIL (code) | Fichier frontend | Corriger et retester |
+| 2026-10-21 | 01 PF | Réponse API pré-OTP | Pas de montant avant e-mail validé | `RegistrationController::store` renvoie `membership_fee` | FAIL (code) | Fichier API | Corriger et retester |
+
+## Prochain jalon
+
+Une fois l'agent distant reconnecté :
+1. Inventorier à nouveau la base et les transactions, confirmer *staging*, produire et tester la sauvegarde.
+2. Mettre en sécurité le traitement des paiements et queues ; purger la démo avec la procédure existante **puis** le catalogue et les autres comptes de test avec un script **validé sur une restauration isolée**, préserver la sécurité et les journaux.
+3. Recompter les tables, vérifier mTLS, API health, ledgers et audit.
+4. Commencer **l'opération 01 — inscription PF**, selon décisions métier **A / A / B / A**, en montrant chaque résultat et en sollicitant les décisions suivantes uniquement quand nécessaires.
+
+**Rappel : cette feuille de route n'autorise aucune commande destructive sans sauvegarde et contrôle préalable.**
