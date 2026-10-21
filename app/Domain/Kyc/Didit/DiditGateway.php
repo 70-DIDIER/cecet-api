@@ -73,6 +73,7 @@ final class DiditGateway
         );
         $docs = $pass((array) ($payload['id_verifications'] ?? []));
         $face = $pass((array) ($payload['face_matches'] ?? []));
+        $business = $pass((array) ($payload['business_verifications'] ?? []));
         $liveness = collect((array) ($payload['liveness_checks'] ?? []))->contains(
             static fn ($row) => is_array($row)
                 && ($row['status'] ?? null) === 'Approved'
@@ -89,6 +90,7 @@ final class DiditGateway
             'document' => $docs,
             'active_liveness' => $liveness,
             'face_match' => $face,
+            'business_verified' => $business,
             'warnings_present' => count($warnings) > 0,
             'complete' => $docs && $liveness && $face && count($warnings) === 0,
         ];
