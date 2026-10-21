@@ -20,6 +20,8 @@ class Notifier
 {
     public const EVENTS = [
         'membership.activated',
+        'identity.approved',
+        'identity.rejected',
         'payment.rejected',
         'pack.activated',
         'topup.credited',
@@ -70,6 +72,15 @@ class Notifier
             'membership.activated' => ['Votre adhésion à la CECT est active', [
                 'Votre paiement a été reçu : votre adhésion est désormais active.',
                 'Vous pouvez souscrire les packs ouverts à votre profil.',
+            ]],
+            'identity.approved' => ['Votre identité est validée', [
+                'La CECT a vérifié votre pièce d\'identité et votre photo.',
+                'Vous pouvez désormais souscrire les packs ouverts à votre profil.',
+            ]],
+            'identity.rejected' => ['Votre vérification d\'identité n\'a pas été acceptée', [
+                'La CECT n\'a pas pu valider les documents envoyés.',
+                "Motif : {$get('reason')}",
+                'Vous pouvez envoyer de nouveaux documents depuis votre espace membre.',
             ]],
             'payment.rejected' => ['Votre paiement n\'a pas pu être validé', [
                 "Le paiement {$get('reference')} ({$get('label')}) n'a pas été retrouvé par la CECT.",

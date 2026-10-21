@@ -11,6 +11,11 @@ final class SubscriptionException extends ApiException
         return new self('MEMBERSHIP_REQUIRED', 'Votre adhésion doit être active pour souscrire un pack.', 403);
     }
 
+    public static function identityNotVerified(): self
+    {
+        return new self('IDENTITY_VERIFICATION_REQUIRED', 'Votre identité doit être validée par la CECT avant de souscrire un pack.', 403);
+    }
+
     public static function planNotAvailable(): self
     {
         return new self('PACK_NOT_AVAILABLE', 'Ce pack n\'est pas disponible à la souscription.', 409);

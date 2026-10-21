@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Domain\Access\Actions\SyncAccessCatalog;
+use App\Domain\Access\PermissionCatalog;
 use App\Domain\Identity\Enums\PersonType;
 use App\Domain\Identity\Enums\UserKind;
 use App\Domain\Identity\Enums\UserStatus;
@@ -38,6 +39,7 @@ class UserFactory extends Factory
             'phone' => '+228'.fake()->numerify('9#######'),
             'status' => UserStatus::Active,
             'email_verified_at' => now(),
+            'identity_verified_at' => now(),
             'password' => static::$password ??= Hash::make('Password123'),
             'remember_token' => Str::random(10),
         ];
@@ -62,6 +64,14 @@ class UserFactory extends Factory
     }
 
     /**
+     * A member whose identity document and selfie have not been approved yet.
+     */
+    public function identityUnverified(): static
+    {
+        return $this->state(fn (array $attributes) => ['identity_verified_at' => null]);
+    }
+
+    /**
      * An active internal account holding the given system or custom roles.
      */
     public function staff(string ...$roles): static
@@ -76,8 +86,8 @@ class UserFactory extends Factory
                 // Historical tests request the removed Validator role. Route that
                 // fixture to Accounting; never recreate or assign a Validator role.
                 $mapped = array_map(
-                    fn (string $role): string => $role === \App\Domain\Access\PermissionCatalog::VALIDATOR
-                        ? \App\Domain\Access\PermissionCatalog::ACCOUNTING : $role,
+                    fn (string $role): string => $role === PermissionCatalog::VALIDATOR
+                        ? PermissionCatalog::ACCOUNTING : $role,
                     $roles
                 );
                 $user->syncRoles(array_values(array_unique($mapped)));
