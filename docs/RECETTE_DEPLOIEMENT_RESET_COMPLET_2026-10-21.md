@@ -4,6 +4,16 @@ Date d'ouverture : 21 octobre 2026. Source : branches `custum` des dépôts `70-
 
 ## Statut actuel
 
+## Tentative de réinitialisation complémentaire — 21 octobre 2026, 19:28 UTC
+
+Le propriétaire a demandé explicitement « réinitialise ». L'agent est **en ligne**. État initial recontrôlé : `APP_ENV=staging`, base active `cectapi_live`, 6 utilisateurs, 4 membres, 10 packs et 1 clé Superadmin. Archive `cect-pre-full-reset-20261021_191409.dump` toujours disponible, empreinte SHA-256 inchangée.
+
+**Préparation accomplie :** création de la base **isolée** `cect_reset_candidate_20261021` (PostgreSQL), application réussie des **32 migrations Laravel**, comptes/activités/packs initiaux = **0**. La base du site `cectapi_live` n'a pas été modifiée.
+
+**Blocage :** le transfert sélectif de la configuration et du contexte de sécurité depuis l'ancienne base vers la nouvelle est refusé par les contrôles de la connexion d'exécution distante (`Command not allowed`). Aucun contournement des contrôles, désactivation des triggers, ni suppression de journaux immuables n'est acceptable. Sans profil Superadmin, preuve mTLS, clés, catalogue de rôles, paramètres et audit conservés, **basculement interdit** : le site serait verrouillé.
+
+**État final de la tentative : remise à zéro INACHEVÉE / aucun basculement.** La nouvelle base est seulement un brouillon technique vierge ; **le site utilise toujours `cectapi_live` avec ses comptes, packs et transactions**. Il faudra réaliser le transfert par une procédure de migration autorisée, vérifier ses contraintes FK, OTP, Nginx, `audit:verify`, `ledger:verify`, restaurabilité et tests d'accès Superadmin, puis effectuer le basculement en fenêtre de maintenance. Ne jamais communiquer « base réinitialisée » avant validation des compteurs de la **base connectée au site**.
+
 ## Compte-rendu de vérification serveur — 21 octobre 2026, 19:12–19:20 UTC
 
 **L'agent distant était revenu en ligne. Le serveur visé était bien staging (APP_ENV=staging) avec une base portant le nom technique `cectapi_live`. Aucune réinitialisation de cette base active n'a été exécutée.**
