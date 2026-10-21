@@ -39,7 +39,8 @@ final class EnsureStaffGuardianSession
         // Only KYC and adhesion are allowed before account activation.
         if ($user->isMember() && $user->status !== UserStatus::Active) {
             $path = $request->path();
-            $allow = ['api/v1/me', 'api/v1/me/kyc', 'api/v1/me/membership'];
+            $allow = ['api/v1/me', 'api/v1/me/kyc', 'api/v1/me/membership',
+                'api/v1/me/kyc/didit/start', 'api/v1/me/kyc/didit/refresh'];
             $payment = str_starts_with($path, 'api/v1/me/membership/payments')
                 || preg_match('#^api/v1/me/payments/[^/]+/(declare|simulate)$#', $path);
             if (! in_array($path, $allow, true)
