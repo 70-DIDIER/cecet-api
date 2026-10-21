@@ -8,10 +8,11 @@ use App\Domain\Kyc\Models\MemberKycCase;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * KYC before membership payment. Files are PRIVATE: no public/storage URL,
@@ -58,9 +59,16 @@ class KycController
         try {
             foreach (['document_front', 'document_back', 'company_document'] as $field) {
                 if ($request->hasFile($field)) {
-                    $path = $request->file($field)->store('kyc/'.$member->id.'/'.$case->id, 'local');
-                    if (! $path) {
-                        throw new \RuntimeException('Échec de stockage privé du document.');
+                    $file = $request->file($field);
+                    $extension = $file->guessExtension();
+                    abort_unless(in_array($extension, ['jpg', 'jpeg', 'png', 'pdf'], true), 422, 'Format de document non pris en charge.');
+                    $path = 'kyc/'.$member->id.'/'.$case->id.'/'
+                        .\Illuminate\Support\Str::uuid().'.'.$extension.'.enc';
+                    $contents = file_get_contents($file->getRealPath());
+                    if ($contents === false || ! Storage::disk('local')->put(
+                        $path, Crypt::encryptString(base64_encode($contents))
+                    )) {
+                        throw new \RuntimeException('Échec de stockage chiffré du document.');
                     }
                     $paths[$field] = $path;
                 }
@@ -128,18 +136,19 @@ class KycController
             ->header('Cache-Control', 'no-store');
     }
 
-    public function show(Request $request, MemberKycCase $case): JsonResponse
+    public function show(Request $request, MemberKycCase $case, AuditLogger $audit): JsonResponse
     {
         $this->reviewer($request);
         $case->load('user:id,first_name,last_name,email,person_type,member_number');
+        $audit->record('kyc.identity_viewed', $case, actor: $request->user());
         $response = $this->reviewSummary($case);
         $response['identity'] = $case->identity_payload;
         return response()->json(['data' => $response])->header('Cache-Control', 'no-store');
     }
 
-    public function document(Request $request, MemberKycCase $case, string $type): BinaryFileResponse
+    public function document(Request $request, MemberKycCase $case, string $type, AuditLogger $audit): Response
     {
-        $this->reviewer($request);
+        $actor = $this->reviewer($request);
         abort_unless(in_array($type, ['front', 'back', 'company'], true), 404);
         $field = match ($type) {
             'front' => 'document_front_path',
@@ -148,10 +157,22 @@ class KycController
         };
         $path = $case->{$field};
         abort_unless($path && Storage::disk('local')->exists($path), 404);
-        // Only application-generated paths inside the private KYC directory.
         abort_unless(str_starts_with($path, 'kyc/'.$case->user_id.'/'.$case->id.'/'), 403);
+        abort_unless(preg_match('/\.(jpg|jpeg|png|pdf)\.enc$/', $path, $ext), 404);
 
-        return response()->download(Storage::disk('local')->path($path), 'verification-'.$type.'.'.pathinfo($path, PATHINFO_EXTENSION), [
+        $encoded = Crypt::decryptString(Storage::disk('local')->get($path));
+        $bytes = base64_decode($encoded, true);
+        abort_if($bytes === false, 500, 'Document KYC corrompu.');
+        $mime = match ($ext[1]) {
+            'pdf' => 'application/pdf',
+            'png' => 'image/png',
+            default => 'image/jpeg',
+        };
+        $audit->record('kyc.document_accessed', $case, metadata: ['document_type' => $type], actor: $actor);
+
+        return response($bytes, 200, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'attachment; filename="verification-'.$type.'.'.$ext[1].'"',
             'Cache-Control' => 'private, no-store, max-age=0',
             'X-Content-Type-Options' => 'nosniff',
             'Content-Security-Policy' => "default-src 'none'",
