@@ -15,6 +15,7 @@ beforeEach(function () {
         throw new RuntimeException('KYC tests may only run on cectapi_test.');
     }
     config()->set('staff_guardian.enabled', false);
+    config()->set('kyc.provider', 'manual');
     Storage::fake('local');
 });
 
