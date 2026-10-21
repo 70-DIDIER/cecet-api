@@ -3,6 +3,35 @@ Date : 17 octobre 2026
 Statut : référence fonctionnelle de recette et développement évolutif.
 Référentiel : cette version 5.0 reprend intégralement le cahier v4.0 en annexe historique ; les nouvelles dispositions v5.0 priment sur toute ancienne formulation contradictoire.
 
+## ADDENDUM V5.14 — KYC obligatoire avant frais d'adhésion (22 octobre 2026)
+
+**Exigence prioritaire du maître d'ouvrage :** l'entreprise demande une vérification
+d'identité KYC entre la validation OTP e-mail et le paiement des frais d'adhésion.
+Un **rôle interne Validateur KYC** distinct de Comptabilité est réintroduit.
+Le parcours est : inscription PF/PM -> OTP -> pending_kyc -> dépôt KYC ->
+contrôle manuel ou prestataire de vérification réellement connecté -> approbation
+KYC -> pending_payment -> paiement -> active.
+**Cet addendum remplace la transition OTP -> pending_payment de l'addendum V5.13.**
+
+Dossier PF : justificatif officiel d'identité, date de naissance, adresse et
+contrôle document/titulaire. PM : pièces de société et identité du représentant.
+Documents accessibles seulement aux agents habilités, stockés en privé et
+données personnelles chiffrées. Rejet/motif/complément et resoumission prévus.
+**Aucun paiement ni activation ne doit passer sans un KYC approuvé côté backend**.
+Les frais sont affichés seulement après cette approbation.
+
+Le **Validateur KYC** ne possède ni privilège comptable, ni droits de validation
+des YEM. Le Validateur historique YEM demeure absorbé par Comptabilité.
+Les comptes et accès administratifs existants (notamment mTLS Superadmin)
+sont préservés. Le mode manuel est implémenté dans le code ; le mode automatique
+requiert encore la sélection d'un prestataire de confiance, un contrat et une
+API vérifiable signée. Aucune approbation automatique par OCR seul.
+
+L'exigence de protection des données personnelles et de conservation des pièces,
+ainsi que la qualification réglementaire exacte de la coopérative, doivent être
+validées avant traitement de pièces réelles. Référence technique et registre
+des décisions : docs/KYC_AVANT_ADHESION_2026-10-22.md.
+
 ## ADDENDUM V5.13 — Décision métier validée : opération 01, inscription PF (20 octobre 2026)
 
 **PRIORITÉ FONCTIONNELLE : ces quatre décisions du maître d'ouvrage prévalent sur les dispositions anciennes contradictoires des sections v5 et des annexes historiques.** Le détail des choix et de leurs écarts d'implémentation est conservé dans `docs/DECISIONS_METIER_CECT_2026-10-20.md`.
