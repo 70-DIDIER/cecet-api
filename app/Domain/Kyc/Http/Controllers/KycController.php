@@ -201,6 +201,7 @@ class KycController
                     && $locked->provider_status === 'Approved'
                     && $locked->provider_verified_at
                     && ($checks['complete'] ?? false)
+                    && ($member->person_type?->value !== 'legal' || ($checks['business_verified'] ?? false))
                     && $locked->provider_environment === config('kyc.didit.environment'),
                     409, 'Contrôles Didit document, vidéo et visage requis.');
             }
