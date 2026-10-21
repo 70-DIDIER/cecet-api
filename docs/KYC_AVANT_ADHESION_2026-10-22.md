@@ -1,3 +1,47 @@
+## Situation vérifiée — 22 octobre 2026 : branche prête, compte Didit manquant
+
+**Actions effectivement réalisées :** étude de la documentation officielle v3,
+durcissement des signatures HMAC-V2 en PHP (objets JSON vides et Unicode),
+reconnaissance de la méthode réelle `ACTIVE_3D`, exigence de cohérence
+de `X-Timestamp` avec l'horodatage signé, traitement sécurisé des webhooks
+de démonstration console et maintien des contrôles de séparation Sandbox/Live.
+
+Tests finaux sur l'ancienne base de QA `cectapi_test` :
+**22 tests ciblés réussis, 128 assertions.** Appels HTTP Didit simulés,
+pas de confirmation de bout en bout contre l'infrastructure Didit.
+
+**Blocage authentification externe :** aucune intégration Didit connectée
+à cet espace ChatGPT, et aucun courrier Didit existant trouvé dans les
+deux comptes Gmail connectés. Clés `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`
+et `DIDIT_WEBHOOK_SECRET` absentes du .env du backend LIVE consulté.
+**Aucun compte, organisation, application Sandbox ou workflow Didit réel
+n'a été créé à cette étape.** Aucun secret n'est stocké dans GitHub.
+
+**KYB des PM NON implémenté :** la documentation Didit v3 retourne les
+preuves d'entreprise dans un objet de session business distinct avec
+`registry_checks[]`, `document_verifications[]` et `key_people_checks[]`,
+et non `business_verifications[]` dans la décision KYC du représentant.
+Par sécurité, le code retourne `business_verified=false` tant qu'une
+session KYB distincte, liée au représentant et à la PM, n'est pas
+implémentée et vérifiée. Cela **bloque le paiement des PM** et ne doit
+pas être présenté comme un KYB fonctionnel.
+
+**Déploiement : NON**, en particulier avant :
+- Connexion personnelle autorisée à la console Didit et création de
+  l'organisation/app Sandbox au nom convenu pour la CECT ;
+- Activation d'un workflow **ID Verification + 3D active liveness + Face Match**
+  dans cette application, et configuration de son webhook `status.updated` ;
+- Stockage serveur sécurisé des trois secrets et essais Didit réels sur
+  des documents fictifs (la Sandbox conserve réellement les captures) ;
+- Implémentation KYB PM, revue de la protection des données biométriques,
+  conformité locale et correction des tests globaux encore échoués.
+
+Sources primaires de vérité :
+https://docs.didit.me/integration/webhooks
+https://docs.didit.me/integration/sandbox-testing
+https://docs.didit.me/integration/verification-statuses
+
+---
 
 ### Sécurisation complémentaire, recette finale ciblée
 
