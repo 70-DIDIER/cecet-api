@@ -4,6 +4,49 @@ Date d'ouverture : 21 octobre 2026. Source : branches `custum` des dépôts `70-
 
 ## Statut actuel
 
+## EXÉCUTION RÉUSSIE — RESET IN PLACE `cectapi_live` (21 octobre 2026, ~22:09 UTC)
+
+**Cette section actualise et remplace les anciens états « bloqué » ou « non exécuté » ci-dessous : la remise à zéro demandée a maintenant été réalisée dans la base existante. Le propriétaire a explicitement ordonné de conserver tout le personnel et l'administration, sans création d'une nouvelle base.**
+
+**Environnement et précautions :**
+- Serveur `ip-172-31-25-53`, checkout backend `/var/www/cect-api`, branche `custum`, environnement `staging`, base **`cectapi_live`** ; aucune modification de `DB_DATABASE`, des clés ou des certificats.
+- Nouvelle sauvegarde PostgreSQL au format custom réalisée **avant la purge** dans `/home/ubuntu/cect-private-backups/cect-pre-reset-same-db-20261021_220825.dump` (247 685 octets, permissions 0600), SHA-256 **`bd6b67c48b5a3fb09cfc64c0396dd7fc92994f62cc094f333850fc74a9f4afcb`** ; restauration de l'archive précédente déjà validée sur base isolée lors du contrôle initial. Archive confidentielle hors Git.
+- Laravel mis en maintenance via `php artisan down`, worker `cect-queue.service` temporairement arrêté, queue initiale vide. Script à usage unique resté privé sur le serveur : `/home/ubuntu/cect-private-backups/reset-cect-business-once-20261021.php` (permissions 0600).
+- Suppression dans **une seule transaction PostgreSQL**, validant `APP_ENV=staging` et la base cible. Trois guards *no_truncate* des **tables de mouvements métier uniquement** (`merchant_ledger_entries`, `quota_ledger_entries`, `validation_events`) ont été suspendus temporairement au sein de la transaction, puis réactivés **avant le commit**. Aucune protection sur `audit_events`, `security_events`, `setting_versions` ou sur l'administration n'a été désactivée.
+- Suppression des tables métier liées entre elles (données marchands, moyens de paiement fictifs, quota, packs/versioning, souscriptions, adhésions, Pernum, associations légales, demandes, imports business), puis des seuls **membres `kind=member`**, leurs OTP, jetons et permissions propres. Les données de comptes `kind=staff` sont comparées avant/après transaction pour empêcher toute modification.
+- Nettoyage complémentaire des idempotency keys **membres et visiteurs**, mais **conservation des clés liées au personnel** ; 18 entrées supprimées et 20 conservées.
+- Le brouillon inutilisé `cect_reset_candidate_20261021` créé lors de la tentative antérieure a été **supprimé**. Il n'a jamais été connecté à la plateforme. Aucune nouvelle base n'a été créée pour ce reset.
+- `php artisan up` et `cect-queue.service` remis en fonction.
+
+**Contrôles effectués après commit :**
+
+| Entité/contrôle | Après | Résultat |
+|---|---:|---|
+| Membres PF/PM | **0** | PASS |
+| Packs plans / versions | **0 / 0** | PASS |
+| Souscriptions, périodes, comptes de quota / écritures | **0** | PASS |
+| Paiements et tentatives PSP fictives | **0** | PASS |
+| Marchands, QR, mouvements marchand | **0** | PASS |
+| Demandes, remboursements, lots de versement, adhésions, Pernum, organisations | **0** | PASS |
+| Comptes internes (Superadmin + autre personnel) | **2 inchangés** | PASS |
+| Superadmin / profils / clés actives | **1 / 1 / 1** | PASS |
+| Rôles / paramètres / versions de paramètres | **3 / 65 / 141**, conservés | PASS |
+| Événements audit / sécurité | **132 / 37**, conservés | PASS |
+| Idempotency keys personnel / membre-visiteur | **20 / 0** | PASS |
+| `php artisan ledger:verify` | Journaux cohérents : **0 comptes de quota, 0 marchand** | PASS |
+| `php artisan audit:verify` | Chaîne intègre sur **132 événements** | PASS |
+| Triggers `*_no_truncate` des trois journaux métier | **`tgenabled=O` pour les 3**, réactivés | PASS |
+| Laravel API health | **HTTP 200** | PASS |
+| Page Superadmin sans certificat | **HTTP 403**, attendu | PASS |
+| API publique `/api/v1/packs` | **`{"data":[]}`** | PASS |
+| Worker `cect-queue.service` | **active** | PASS |
+
+**Conservation délibérée :** sessions et OTP propres au personnel, `settings`, `setting_versions`, archives de sauvegarde, événements d'audit/sécurité, export snapshots internes et métadonnées d'administration, référentiels de rôles/permissions. Les séquences numériques historiques ne sont pas réutilisées pour éviter la confusion avec la piste d'audit.
+
+**Limite fonctionnelle :** le catalogue public est désormais vide par décision explicite. Pour la recette, il faudra reconstituer et publier des packs via les parcours Superadmin/Administrateur ; ne pas reseeder de démos ni réutiliser d'anciens comptes sans validation. La vérification des fonctionnalités se fera opération par opération. Le test `403` n'atteste pas à lui seul une connexion Superadmin authentifiée.
+
+---
+
 ## Décision de périmètre confirmée — 21 octobre 2026, 23:56 heure locale
 
 **Instruction expresse du maître d'ouvrage : `NE CRÉE PAS DE NOUVELLE BASE DE DONNÉES ; RÉINITIALISE TOUT SAUF CE QUI CONCERNE L'ADMIN ; NE TOUCHE PAS À L'ADMIN`. Cette décision prévaut sur les propositions antérieures de reconstruire une nouvelle base et sur l'objectif précédent de retirer les comptes internes de test.**
