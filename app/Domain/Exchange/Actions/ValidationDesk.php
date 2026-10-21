@@ -8,6 +8,8 @@ use App\Domain\Exchange\Enums\ValidationAction;
 use App\Domain\Exchange\Exceptions\ExchangeException;
 use App\Domain\Exchange\ExchangeReservations;
 use App\Domain\Exchange\Models\ExchangeRequest;
+use App\Domain\Exchange\Enums\ExchangeKind;
+use App\Domain\Merchant\MerchantRedemptionPricing;
 use App\Domain\Notification\Notifier;
 use App\Domain\Payout\PayoutPlanner;
 use App\Domain\Quota\Exceptions\QuotaException;
@@ -58,6 +60,15 @@ class ValidationDesk
             }
 
             $before = $exchange->status;
+            $merchantBreakdown = $exchange->kind === ExchangeKind::MerchantRedemption
+                ? MerchantRedemptionPricing::forExchange($exchange, $received) : null;
+            if ($merchantBreakdown !== null && $merchantBreakdown['net_amount_xof'] <= 0) {
+                // A partial receipt could be smaller than the fee even when
+                // the original full-quantity quote was positive. Keep the
+                // quota reserved and ask for dispute/correction, never take
+                // merchant YEM for no payout.
+                throw ExchangeException::merchantNetNonPositive();
+            }
 
             $this->reservations->consume($exchange, $received);
 
@@ -68,7 +79,9 @@ class ValidationDesk
             }
 
             // Counter-value truncated to the franc: the cooperative never pays a fraction of a franc it does not owe.
-            $amount = YemQuantity::toXof($received, $exchange->rate_xof_per_yem);
+            $amount = $merchantBreakdown !== null
+                ? $merchantBreakdown['net_amount_xof']
+                : YemQuantity::toXof($received, $exchange->rate_xof_per_yem);
 
             $exchange->forceFill([
                 'status' => $amount > 0 ? ExchangeStatus::YemReceived : ExchangeStatus::Completed,
@@ -90,6 +103,7 @@ class ValidationDesk
                 'quantity_requested' => $exchange->quantity_requested,
                 'quantity_received' => $received,
                 'rate_xof_per_yem' => $exchange->rate_xof_per_yem,
+                'merchant_pricing' => $merchantBreakdown,
                 'amount_due_xof' => $amount,
                 'external_reference' => $externalReference,
             ], actor: $validator);

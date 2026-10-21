@@ -9,6 +9,7 @@ use App\Domain\Exchange\Http\Controllers\MemberExchangeController;
 use App\Domain\Exchange\Http\Controllers\ValidationController;
 use App\Domain\Identity\Enums\UserKind;
 use App\Domain\Identity\Http\Controllers\LoginController;
+use App\Domain\Identity\Http\Controllers\SuperadminSecurityController;
 use App\Domain\Identity\Http\Controllers\OtpController;
 use App\Domain\Identity\Http\Controllers\PasswordResetController;
 use App\Domain\Identity\Http\Controllers\RegistrationController;
@@ -39,6 +40,8 @@ use App\Domain\Settings\Http\Controllers\PublicConfigController;
 use App\Domain\Settings\Http\Controllers\SettingController;
 use App\Domain\Shared\Http\Controllers\HealthController;
 use App\Domain\Subscription\Http\Controllers\MemberPackController;
+use App\Domain\Identity\Http\Controllers\StaffGuardianLoginController;
+use App\Domain\Identity\Http\Controllers\StaffAccessWindowController;
 use App\Domain\Subscription\Http\Controllers\UserPackAdminController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,6 +57,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
             Route::post('register/check', [RegistrationController::class, 'check'])->name('register.check');
             Route::post('login', [LoginController::class, 'store'])->name('login');
             Route::post('staff/activate', StaffActivationController::class)->name('staff.activate');
+            Route::post('staff/login/start', [StaffGuardianLoginController::class, 'start'])->middleware('throttle:5,1')->name('staff.login.start');
             Route::post('password/forgot', [PasswordResetController::class, 'forgot'])->name('password.forgot');
         });
 
@@ -61,8 +65,29 @@ Route::prefix('v1')->name('v1.')->group(function () {
             Route::post('email/verify', [RegistrationController::class, 'verifyEmail'])->name('email.verify');
             Route::post('login/verify', [LoginController::class, 'verifyOtp'])->name('login.verify');
             Route::post('mfa/verify', [LoginController::class, 'verifyOtp'])->name('mfa.verify');
+            Route::post('staff/login/verify', [StaffGuardianLoginController::class, 'verify'])->name('staff.login.verify');
             Route::post('otp/resend', [OtpController::class, 'resend'])->name('otp.resend');
             Route::post('password/reset', [PasswordResetController::class, 'reset'])->name('password.reset');
+        });
+    });
+
+    // Every route here requires a valid client certificate presented to the isolated Nginx vhost.
+    Route::prefix('superadmin')->name('superadmin.')->middleware(['superadmin.mtls', 'throttle:20,1'])->group(function () {
+        Route::get('status', [SuperadminSecurityController::class, 'status']);
+        Route::post('enroll/start', [SuperadminSecurityController::class, 'enrollStart']);
+        Route::post('enroll/finish', [SuperadminSecurityController::class, 'enrollFinish']);
+        Route::post('key/challenge', [SuperadminSecurityController::class, 'keyChallenge']);
+        Route::post('key/prove', [SuperadminSecurityController::class, 'keyProve']);
+        Route::post('login/verify', [SuperadminSecurityController::class, 'loginVerify']);
+        Route::post('rotate/finish', [SuperadminSecurityController::class, 'rotateFinish']);
+        Route::post('recover/start', [SuperadminSecurityController::class, 'recoverStart']);
+        Route::post('recover/finish', [SuperadminSecurityController::class, 'recoverFinish']);
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::get('security', [SuperadminSecurityController::class, 'security']);
+            Route::post('step-up/start', [SuperadminSecurityController::class, 'stepUpStart']);
+            Route::post('step-up/verify', [SuperadminSecurityController::class, 'stepUpVerify']);
+            Route::post('emails/start', [SuperadminSecurityController::class, 'emailsStart']);
+            Route::post('emails/finish', [SuperadminSecurityController::class, 'emailsFinish']);
         });
     });
 
@@ -87,7 +112,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
     /*
      * Authenticated account (members and staff).
      */
-    Route::middleware(['auth:sanctum', 'throttle:api-user'])->group(function () {
+    Route::middleware(['auth:sanctum', 'superadmin.session', 'staff.guardian', 'throttle:api-user'])->group(function () {
         Route::post('auth/logout', [SessionController::class, 'logout'])->name('auth.logout');
         Route::post('auth/step-up', [StepUpController::class, 'store'])->middleware('throttle:auth-otp')->name('auth.step-up');
         Route::post('auth/step-up/verify', [StepUpController::class, 'confirm'])->middleware('throttle:auth-otp')->name('auth.step-up.verify');
@@ -221,6 +246,18 @@ Route::prefix('v1')->name('v1.')->group(function () {
                 });
             }
 
+            Route::post('members/invitations', [AccountController::class, 'inviteMember'])
+                ->middleware(['can:members.manage', 'step-up', 'throttle:5,1', 'idempotent'])
+                ->name('members.invitations.store');
+            Route::post('members/{user}/close', [AccountController::class, 'closeMember'])
+                ->middleware(['can:members.manage', 'step-up'])
+                ->name('members.close');
+
+            Route::get('staff/{user}/login-hours', [StaffAccessWindowController::class, 'show'])
+                ->middleware(['can:staff.manage', 'can:settings.update_critical'])->name('staff.login-hours.show');
+            Route::put('staff/{user}/login-hours', [StaffAccessWindowController::class, 'update'])
+                ->middleware(['can:staff.manage', 'can:settings.update_critical', 'step-up', 'idempotent'])->name('staff.login-hours.update');
+
             Route::get('members/{user}/overview', MemberOverviewController::class)->middleware('can:members.view')->name('members.overview');
 
             Route::middleware(['can:staff.manage', 'step-up'])->group(function () {
@@ -239,6 +276,8 @@ Route::prefix('v1')->name('v1.')->group(function () {
             Route::get('packs/plans/{plan}', [PackPlanAdminController::class, 'show'])->middleware('can:packs.view')->name('packs.plans.show');
             Route::middleware(['can:packs.manage', 'step-up'])->group(function () {
                 Route::post('packs/plans', [PackPlanAdminController::class, 'store'])->middleware('idempotent')->name('packs.plans.store');
+                Route::put('packs/plans/{plan}', [PackPlanAdminController::class, 'update'])->middleware('idempotent')->name('packs.plans.update');
+                Route::delete('packs/plans/{plan}', [PackPlanAdminController::class, 'destroy'])->middleware('can:settings.update_critical')->name('packs.plans.destroy');
                 Route::post('packs/plans/{plan}/versions', [PackPlanAdminController::class, 'storeVersion'])->middleware('idempotent')->name('packs.versions.store');
                 Route::post('packs/plans/{plan}/versions/{version}/publish', [PackPlanAdminController::class, 'publishVersion'])->scopeBindings()->name('packs.versions.publish');
                 Route::delete('packs/plans/{plan}/versions/{version}', [PackPlanAdminController::class, 'destroyVersion'])->scopeBindings()->name('packs.versions.destroy');

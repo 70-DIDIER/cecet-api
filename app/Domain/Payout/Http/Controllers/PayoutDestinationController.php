@@ -46,6 +46,19 @@ class PayoutDestinationController
 
         $methodConfig = $methods->get($validated['method']);
         $channel = (string) data_get($methodConfig, 'channel', 'manual');
+        // Card payouts require a PSP-issued recipient token. Never collect
+        // or persist raw card numbers as a generic payout destination.
+        if ($channel === 'card') {
+            throw ValidationException::withMessages([
+                'method' => 'Le versement vers carte bancaire nécessite un prestataire de paiement compatible. Choisissez Mobile Money ou virement pour cette démonstration.',
+            ]);
+        }
+        if ($validated['method'] === 'BANK_TRANSFER'
+            && (empty($validated['bank_name']) || empty($validated['account_holder']) || empty($validated['account_number']))) {
+            throw ValidationException::withMessages([
+                'bank_name' => 'Banque, titulaire et numéro de compte sont obligatoires pour un virement.',
+            ]);
+        }
         $country = strtoupper($validated['country']);
         $allowedCountries = collect(data_get($methodConfig, 'countries', []))->map(fn (mixed $value): string => strtoupper((string) $value))->all();
 

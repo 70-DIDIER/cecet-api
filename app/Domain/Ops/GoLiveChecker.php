@@ -36,10 +36,16 @@ class GoLiveChecker
             $this->item('payout_provider', $this->settings->string('payment.payout_provider') !== 'fake', 'payment.payout_provider ne doit pas être « fake ».'),
             $this->item('provider_keys', ! $usesFedapay || (filled($services['secret_key'] ?? null) && filled($services['webhook_secret'] ?? null)), 'Clé secrète et secret de webhook FedaPay requis.'),
             $this->item('provider_environment', ! $usesFedapay || ($services['environment'] ?? 'sandbox') === 'live', 'FEDAPAY_ENVIRONMENT doit valoir « live ».'),
+            // Warn even when the FAKE adapter is active: a configured sandbox
+            // API token without the webhook signing secret cannot be promoted
+            // safely to external collection merely by changing the provider.
+            $this->item('fedapay_webhook_ready',
+                ! filled($services['secret_key'] ?? null) || filled($services['webhook_secret'] ?? null),
+                'Une clé API FedaPay est présente, mais le secret de signature webhook manque : impossible de valider les encaissements externes.'),
             $this->item('cect_pernum', filled($this->settings->string('yem.cect_pernum')), 'yem.cect_pernum (Pernum de réception de la CECT) n\'est pas configuré.'),
             $this->item('alert_emails', $this->settings->array('ops.alert_emails') !== [], 'ops.alert_emails est vide : personne ne recevra les alertes.'),
             $this->item('superadmin', $this->activeStaffWith(PermissionCatalog::SUPERADMIN) >= 1, 'Aucun compte Superadmin actif (php artisan cect:create-superadmin).'),
-            $this->item('staff_roles', $this->activeStaffWith(PermissionCatalog::VALIDATOR) >= 1 && $this->activeStaffWith(PermissionCatalog::ACCOUNTING) >= 1, 'Il faut au moins un Validateur et un compte Comptabilité nominatifs actifs.'),
+            $this->item('staff_roles', $this->activeStaffWith(PermissionCatalog::ACCOUNTING) >= 1, 'Il faut au moins un compte Comptabilité nominatif actif, doté des permissions de validation YEM et de gestion des paiements.'),
             $this->item('hash_driver', config('hashing.driver') === 'argon2id', 'HASH_DRIVER doit rester argon2id.'),
         ];
     }

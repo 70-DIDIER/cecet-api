@@ -52,9 +52,39 @@ class CatalogManager
     }
 
     /**
-     * Adds an unpublished version. It is not offered to anyone until it is published.
+     * Update the commercial name, description and level without changing past
+     * contracts. Code and family remain immutable. Every change is audited.
+     */
+    public function updatePlanMetadata(User $actor, PackPlan $plan, string $name, ?int $level, ?string $description, string $reason): PackPlan
+    {
+        $this->assertMutable($plan);
+
+        return DB::transaction(function () use ($actor, $plan, $name, $level, $description, $reason): PackPlan {
+            $plan = PackPlan::query()->lockForUpdate()->findOrFail($plan->id);
+            $this->assertMutable($plan);
+            $before = $plan->only(['name', 'level', 'description']);
+            $plan->forceFill([
+                'name' => trim($name),
+                'level' => $level,
+                'description' => $description !== null ? trim($description) : null,
+            ])->save();
+
+            $this->auditLogger->record(
+                'packs.plan_metadata_updated',
+                $plan,
+                before: $before,
+                after: $plan->only(['name', 'level', 'description']),
+                reason: $reason,
+                actor: $actor,
+            );
+            return $plan->refresh();
+        });
+    }
+
+    /**
+     * Adds an unpublished version; already purchased versions remain immutable.
      *
-     * @param  array<string, mixed>  $terms  raw API input, validated according to the family of the plan
+     * @param array<string, mixed> $terms Validated by PackVersionValidator
      */
     public function createVersion(User $actor, PackPlan $plan, array $terms): PackVersion
     {
@@ -180,6 +210,38 @@ class CatalogManager
             $this->auditLogger->record('packs.plan_duplicated', $copy, after: ['source_plan_id' => $source->id, 'source_code' => $source->code], actor: $actor);
 
             return $copy;
+        });
+    }
+
+    /**
+     * An unused, never-published draft may be removed physically.
+     * Every published or subscribed pack is archived instead, preserving
+     * contracts, audit evidence and accounting references.
+     *
+     * @return 'deleted'|'archived'
+     */
+    public function removePlan(User $actor, PackPlan $plan, string $reason): string
+    {
+        return DB::transaction(function () use ($actor, $plan, $reason): string {
+            $plan = PackPlan::query()->lockForUpdate()->findOrFail($plan->id);
+            $subscribed = DB::table('user_packs')->where('pack_plan_id', $plan->id)->exists();
+            $everPublished = $plan->published_at !== null || $plan->versions()->whereNotNull('published_at')->exists();
+            if ($subscribed || $everPublished) {
+                $before = $plan->status->value;
+                $plan->forceFill(['status' => PackPlanStatus::Archived])->save();
+                $this->auditLogger->record('packs.plan_archived', $plan,
+                    before: ['status' => $before],
+                    after: ['status' => 'archived', 'used' => $subscribed],
+                    reason: $reason, actor: $actor);
+                return 'archived';
+            }
+            $details = ['id' => $plan->id, 'code' => $plan->code, 'family' => $plan->family->value];
+            // All remaining versions are drafts (never purchased nor published).
+            $plan->versions()->delete();
+            $this->auditLogger->record('packs.plan_deleted', $plan,
+                before: $details, reason: $reason, actor: $actor);
+            $plan->delete();
+            return 'deleted';
         });
     }
 

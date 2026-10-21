@@ -43,6 +43,12 @@ class AccountManager
     public function create(?User $actor, array $identity, array $roleNames): User
     {
         $this->assertCanGrant($actor, $roleNames);
+        // Certificate-bound SuperAdmin is a unique identity. The regular
+        // staff-creation form must never mint a second SuperAdmin account.
+        if (in_array(PermissionCatalog::SUPERADMIN, $roleNames, true)
+            && User::query()->role(PermissionCatalog::SUPERADMIN)->exists()) {
+            throw AccessException::superadminProtected();
+        }
         $roles = $this->roles->resolveAssignableRoles($roleNames);
 
         try {
@@ -53,7 +59,8 @@ class AccountManager
                     'last_name' => $identity['last_name'],
                     'email' => $identity['email'],
                     'phone' => $identity['phone'] ?? null,
-                    'status' => UserStatus::PendingActivation,
+                    'status' => config('staff_guardian.enabled') ? UserStatus::Active : UserStatus::PendingActivation,
+                    'email_verified_at' => config('staff_guardian.enabled') ? now() : null,
                 ]);
                 $user->syncRoles($roles);
 
@@ -66,7 +73,9 @@ class AccountManager
                     'roles' => $roleNames,
                 ]);
 
-                $this->otp->issue($user, OtpPurpose::AccountActivation);
+                if (! config('staff_guardian.enabled')) {
+                    $this->otp->issue($user, OtpPurpose::AccountActivation);
+                }
 
                 return $user;
             });
@@ -83,6 +92,11 @@ class AccountManager
         $this->assertStaff($staff);
         $this->assertCanManage($actor, $staff);
         $this->assertCanGrant($actor, $roleNames);
+        if (in_array(PermissionCatalog::SUPERADMIN, $roleNames, true)
+            && ! $staff->isSuperadmin()
+            && User::query()->role(PermissionCatalog::SUPERADMIN)->exists()) {
+            throw AccessException::superadminProtected();
+        }
 
         $roles = $this->roles->resolveAssignableRoles($roleNames, $staff->id);
 
@@ -170,6 +184,36 @@ class AccountManager
             $this->securityLogger->record('account.reactivated', SecuritySeverity::Info, $actor->id, metadata: ['target_id' => $target->id]);
 
             return $target;
+        });
+    }
+
+    /**
+     * Close an existing membership without deleting financial, quota, legal
+     * or audit records. Closure is terminal; it revokes member sessions.
+     */
+    public function closeMember(User $actor, User $member, string $reason): User
+    {
+        $this->assertCanManage($actor, $member);
+        if (! $member->isMember() || $member->status === UserStatus::Closed) {
+            throw AccessException::invalidStatusTransition($member->status->value, 'closed');
+        }
+
+        return DB::transaction(function () use ($actor, $member, $reason): User {
+            $locked = User::query()->lockForUpdate()->findOrFail($member->id);
+            $before = $locked->status;
+            $locked->forceFill([
+                'status' => UserStatus::Closed,
+                'suspended_at' => now(),
+                'status_before_suspension' => null,
+            ])->save();
+            $sessions = $this->terminator->terminateAll($locked);
+            $this->auditLogger->record('members.closed', $locked,
+                before: ['status' => $before->value],
+                after: ['status' => 'closed'],
+                reason: $reason, actor: $actor);
+            $this->securityLogger->record('account.closed', SecuritySeverity::Warning, $actor->id,
+                metadata: ['target_id' => $locked->id, 'revoked_sessions' => $sessions]);
+            return $locked;
         });
     }
 

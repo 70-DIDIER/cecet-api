@@ -71,11 +71,9 @@ final class PermissionCatalog
                 'settings.view', 'settings.update', 'audit.view', 'packs.view', 'packs.manage',
                 'yem_validations.view', 'payments.view', 'payouts.view', 'reports.view', 'reports.export', 'imports.manage', 'api_docs.view',
             ]],
-            self::VALIDATOR => ['label' => 'Validateur', 'permissions' => [
-                'yem_validations.view', 'yem_validations.confirm', 'yem_validations.dispute',
-            ]],
             self::ACCOUNTING => ['label' => 'Comptabilité', 'permissions' => [
-                'yem_validations.view', 'payments.validate_manual', 'payments.view', 'user_packs.view',
+                'yem_validations.view', 'yem_validations.confirm', 'yem_validations.dispute',
+                'payments.validate_manual', 'payments.view', 'user_packs.view',
                 'payouts.view', 'payouts.retry', 'payouts.settle_manual', 'reports.view', 'reports.export',
             ]],
         ];
@@ -88,12 +86,10 @@ final class PermissionCatalog
      */
     public function incompatiblePairs(): array
     {
-        return [
-            ['yem_validations.confirm', 'payments.validate_manual'],
-            ['yem_validations.confirm', 'payouts.settle_manual'],
-            ['yem_validations.confirm', 'payouts.retry'],
-            ['yem_validations.confirm', 'payouts.approve_manual'],
-        ];
+        // Comptabilité now carries the former Validator duties (v5).
+        // Conflict control is per-operation (e.g. maker/checker IDs on payouts),
+        // not a blanket prohibition on holding accounting/validation permissions.
+        return [];
     }
 
     public function exists(string $permission): bool

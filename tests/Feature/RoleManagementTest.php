@@ -19,7 +19,7 @@ function systemRole(string $name): Role
     return Role::query()->where('name', $name)->sole();
 }
 
-it('exposes only the four internal system roles and the permission catalog', function () {
+it('exposes the three current internal system roles and the permission catalog', function () {
     $this->withToken($this->token)->getJson('/api/v1/admin/permissions')
         ->assertOk()
         ->assertJsonFragment(['name' => 'roles.manage', 'reserved_to_superadmin' => true]);
@@ -30,7 +30,6 @@ it('exposes only the four internal system roles and the permission catalog', fun
         PermissionCatalog::ADMIN,
         PermissionCatalog::ACCOUNTING,
         PermissionCatalog::SUPERADMIN,
-        PermissionCatalog::VALIDATOR,
     ]);
 });
 
@@ -43,7 +42,7 @@ it('does not expose an endpoint for creating arbitrary roles', function () {
 });
 
 it('reconfigures a system role and audits the change', function () {
-    $validator = systemRole(PermissionCatalog::VALIDATOR);
+    $validator = systemRole(PermissionCatalog::ACCOUNTING);
 
     $this->withToken($this->token)->putJson("/api/v1/admin/roles/{$validator->id}/permissions", [
         'permissions' => ['yem_validations.view', 'yem_validations.confirm'],
@@ -53,13 +52,15 @@ it('reconfigures a system role and audits the change', function () {
     expect(AuditEvent::query()->where('action', 'roles.permissions_updated')->exists())->toBeTrue();
 });
 
-it('refuses to merge YEM confirmation with manual payment control', function () {
-    $validator = systemRole(PermissionCatalog::VALIDATOR);
+it('allows Comptabilité to combine the former Validator and Accounting permissions', function () {
+    $validator = systemRole(PermissionCatalog::ACCOUNTING);
 
     $this->withToken($this->token)->putJson("/api/v1/admin/roles/{$validator->id}/permissions", [
         'permissions' => ['yem_validations.view', 'yem_validations.confirm', 'payments.validate_manual'],
         'reason' => 'Tentative de fusion des fonctions',
-    ])->assertStatus(422)->assertJsonPath('code', 'SEGREGATION_OF_DUTIES_VIOLATION');
+    ])->assertOk()->assertJsonPath('data.permissions', [
+        'payments.validate_manual', 'yem_validations.confirm', 'yem_validations.view',
+    ]);
 });
 
 it('protects the Superadmin role', function () {
@@ -82,7 +83,7 @@ it('refuses assigning a legacy custom role to staff', function () {
 
 it('reserves role permission management to the Superadmin', function () {
     $admin = User::factory()->staff(PermissionCatalog::ADMIN)->create();
-    $validator = systemRole(PermissionCatalog::VALIDATOR);
+    $validator = systemRole(PermissionCatalog::ACCOUNTING);
 
     $this->withToken(tokenFor($admin, withStepUp: true))->putJson("/api/v1/admin/roles/{$validator->id}/permissions", [
         'permissions' => ['yem_validations.view'],

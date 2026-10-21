@@ -1,6 +1,62 @@
+# État de conformité SuperAdmin v5.1 — 18 octobre 2026
+
+**Référence active :** `Cahier_des_charges_CECT_YEM_v5.0.md`, addendum §13 ; branches `custum` des dépôts `70-DIDIER` uniquement.
+
+| Exigence | Constat vérifié | Reste à recetter |
+| --- | --- | --- |
+| Trois rôles internes | SuperAdmin, Administrateur, Comptabilité dans PostgreSQL ; Validateur retiré | Paiements et validations avec comptes Comptabilité réels |
+| Gouvernance | Écran `/admin/gouvernance` alimenté par API et navigation vers modules | Exercer tous les boutons avec des permissions minimales |
+| Tarifs et cours YEM | 510/650/610 FCFA/YEM, frais PF/PM configurables, réservations SuperAdmin | Ratification des conditions économiques |
+| Paramètres versionnés | Éditeur + motif + date d'effet ; historique consultable | Vérifier répercussion immédiate sur inscription et achats |
+| Packs et cashback | Catalogue géré par API, 25 packs conservés, configuration de bonus YEM | Barèmes définitifs, quotas et cas limite d'utilisation |
+| Accès privilégié | mTLS + RSA + OTP, 403 sans certificat ; SuperAdmin conservé | E2E navigateur, renouvellement CRL et clé chiffrée |
+| Économie financière | Paiements `fake` exclus du KPI encaissé ; démo vidée | Recette paiement, payouts, contrôles d'intégrité |
+| Sécurité et sauvegarde | Journalisation et sauvegarde PostgreSQL préalable | Test de restauration, audit indépendant |
+
+**État : conformité fonctionnelle partielle ; pas de go-live production validé.**
+
+---
+
+## Revue Packs et Adhésion — 18 octobre 2026 (v5.3)
+
+| Exigence | Code sur `custum` | Vérification à compléter |
+|---|---|---|
+| 4 familles, 25 plans préservés | Tableau de bord Packs, filtres et indicateurs publiés / brouillons | Confirmer l’affichage final avec session SuperAdmin |
+| Création de formule | Formulaire (code, famille, nom, niveau, description), route `POST /admin/packs/plans` | Créer une formule de test, vérifier absence de publication |
+| Modifier nom/niveau/description | Route `PUT /admin/packs/plans/{plan}`, autorisation `packs.manage`, `step-up`, motif et audit | Tester autorisations et journal des modifications |
+| Versionnement des conditions | Prix, cycles, quotas, cumul, expiration, min/max, délai, éligibilité, règles selon famille | Confirmer création et publication en session navigateur |
+| Publication initiale | Publier la version puis passer automatiquement le plan DRAFT à PUBLISHED | Vérifier transaction et comportement en cas d’échec de la 2e étape |
+| Pack Marchand | Refus API d’éligibilité personne physique même si la requête est forgée | Ajouter test d’intégration backend |
+| Gestion complète du cycle de vie | Suspendre / réactiver / retirer / archiver avec motif | Vérifier l’état des souscriptions existantes |
+| Frais d’adhésion PF/PM | Panneau SuperAdmin, modification directe via paramètres critiques versionnés | Tester modification, propagation publique et refus des rôles non autorisés |
+| Référentiel Joseph | API `custum` est en avance sur `joseph`; comparaison de référence sans écrasement | Ne pas synchroniser automatiquement des anciennes règles contradictoires |
+
+**État de livraison :** fichiers commités sur `70-DIDIER/cecet-api:custum` et `70-DIDIER/cect-admin:custum`, cahier cumulatif v5.3 mis à jour. La publication serveur et les tests de recette navigables restent à confirmer (agent Desktop Commander sans réponse au moment de cette revue). Le catalogue et ses valeurs n’ont pas été modifiés.
+
+**Décision commerciale à confirmer :** V1 à 100 000 FCFA / 125 YEM par mois selon la grille héritée, ou à 100 000 FCFA / 500 YEM par mois selon une instruction ultérieure. Ne pas imposer l’un sans arbitrage du SuperAdmin et du CA.
+
+---
+
+## Packs, quotas et cashback intégrés — v5.5
+
+| Contrôle | Implémentation commitée | Statut |
+| --- | --- | --- |
+| Navigation | Un module Packs & avantages, sections Formules/Bonus/Adhésion. Ancien lien Cashback redirigé | Compilation React réussie |
+| Formules | Conditions principales clairement expliquées ; options avancées repliées ; calcul pédagogique total YEM | Compilation React réussie, tests navigateur restant |
+| Cashback | Familles autorisées uniquement `CONSOMMATEUR` / `PERSONNEL`, validation `cashback.rules` et seconde barrière dans `CashbackCalculator` | Syntaxe PHP réussie, tests de recette API en attente |
+| Comptabilisation | Consommateur : bonus à l'achat réparti sur la durée ; Personnel : bonus au rechargement ; paiement FCFA non réduit | Implémenté par services Subscription existants, intégration à recetter |
+| Pays de paiement | Gestion distincte `/admin/pays`, pas d'imbrication avec la politique commerciale | Compilation réussie |
+| Données historiques | Aucune modification des tarifs, packs ou transactions ; cashback actuellement désactivé | Vérification de base et recette à reprendre après reconnexion serveur |
+| Documentation | Cahier cumulatif §17 v5.5 mis à jour, code synchronisé sur `custum` API/Admin | Commits enregistrés |
+
+**Déploiement serveur :** en attente de tests d'intégration et reprise de l'agent Desktop Commander ; ne pas présenter ces changements comme en production tant que le nouvel artefact compilé n'a pas été installé et testé, notamment 403 mTLS sans certificat.
+
+---
+
+## Archives antérieures (non normatives)
 # Matrice de conformité — Cahier des charges CECT/YEM
 
-Dernière revue : 11 octobre 2026.
+Dernière revue historique : 11 octobre 2026. **Mise à jour de gouvernance du 18 octobre 2026 ci-dessous : les lignes anciennes « Validateur » et la branche `joseph` ne sont plus des références opérationnelles.**
 
 Ce document relie les exigences du cahier des charges fonctionnel à l'implémentation de la branche `joseph`. Il complète le changelog et sert de checklist de non-régression.
 

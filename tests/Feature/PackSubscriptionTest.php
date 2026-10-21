@@ -182,43 +182,53 @@ describe('subscription', function () {
     });
 });
 
-describe('structured pack limit', function () {
-    it('counts pending and active packs, and lets Personnel stay outside the limit', function () {
-        $first = makePlan(code: 'V1');
-        $second = makePlan(PackFamily::Consommateur, 'C1');
-        $third = makePlan(code: 'V2');
+describe('seller subscriptions limit, consumer independence and duplicate seller formulas', function () {
+    it('counts only Vendeur subscriptions, including pending and active, not Consommateur or Personnel', function () {
+        $v1 = makePlan(code: 'V1');
+        $v2 = makePlan(code: 'V2');
+        $v3 = makePlan(code: 'V3');
+        $consumer = makePlan(PackFamily::Consommateur, 'C1');
         $personnel = makePlan(PackFamily::Personnel, 'P1');
 
-        subscribeTo($this->member, $first->id)->assertCreated();
-        subscribeTo($this->member, $second->id)->assertCreated();
-
-        subscribeTo($this->member, $third->id)
-            ->assertStatus(409)
-            ->assertJsonPath('code', 'PACK_LIMIT_REACHED')
-            ->assertJsonPath('details.max_structured_packs', 2);
-
+        subscribeTo($this->member, $v1->id)->assertCreated();
+        subscribeTo($this->member, $consumer->id)->assertCreated();
+        subscribeTo($this->member, $v2->id)->assertCreated();
+        subscribeTo($this->member, $v3->id)->assertStatus(409)
+            ->assertJsonPath('code', 'PACK_LIMIT_REACHED');
         subscribeTo($this->member, $personnel->id)->assertCreated();
+        subscribeTo($this->member, makePlan(PackFamily::Consommateur, 'C2')->id)->assertCreated();
     });
 
-    it('follows the configured limit and excluded families', function () {
+    it('accepts two active Vendeur contracts of the same formula and a fresh Consommateur contract each time', function () {
+        $seller = makePlan(code: 'V1');
+        $consumer = makePlan(PackFamily::Consommateur, 'C1');
+        $a = subscribeAndPay($this->member, $seller);
+        $b = subscribeAndPay($this->member, $seller);
+        expect($a->id)->not->toBe($b->id);
+        subscribeTo($this->member, makePlan(code: 'V2')->id)->assertStatus(409);
+        $c1 = subscribeAndPay($this->member, $consumer);
+        $c2 = subscribeAndPay($this->member, $consumer);
+        expect($c1->id)->not->toBe($c2->id)
+            ->and(UserPack::query()->where('user_id', $this->member->id)->where('family', PackFamily::Vendeur)->where('status', UserPackStatus::Active)->count())->toBe(2);
+    });
+
+    it('follows a SuperAdmin-configured seller-only slot limit', function () {
         $settings = app(SettingsService::class);
         $plans = [makePlan(code: 'V1'), makePlan(code: 'V2'), makePlan(code: 'V3')];
-
-        $settings->set('packs.max_structured_active', 3, 'Le CA porte la limite à trois packs');
+        $settings->set('packs.max_structured_active', 3, 'Autorise trois souscriptions Vendeur');
         foreach ($plans as $plan) {
             subscribeTo($this->member, $plan->id)->assertCreated();
         }
-
-        $settings->set('packs.max_structured_active', 1, 'Retour à un seul pack');
+        $settings->set('packs.max_structured_active', 1, 'Retour à un seul pack Vendeur');
         subscribeTo($this->member, makePlan(code: 'V4')->id)->assertStatus(409);
-
-        $settings->set('packs.families_excluded_from_limit', ['PERSONNEL', 'VENDEUR'], 'Vendeur hors limite');
-        subscribeTo($this->member, makePlan(code: 'V5')->id)->assertCreated();
+        $settings->set('packs.families_excluded_from_limit', ['PERSONNEL', 'VENDEUR'], 'Compatibilité historique');
+        subscribeTo($this->member, makePlan(code: 'V5')->id)->assertStatus(409);
+        subscribeTo($this->member, makePlan(PackFamily::Consommateur, 'C1')->id)->assertCreated();
     });
 
-    it('frees the slot when an unpaid pack is canceled', function () {
+    it('frees one Vendeur slot after stale unpaid pack cancellation', function () {
         $settings = app(SettingsService::class);
-        $settings->set('packs.max_structured_active', 1, 'Un seul pack');
+        $settings->set('packs.max_structured_active', 1, 'Un seul pack Vendeur');
         $first = makePlan(code: 'V1');
         $second = makePlan(code: 'V2');
 
@@ -227,7 +237,6 @@ describe('structured pack limit', function () {
 
         $this->travel(25)->hours();
         $this->artisan('packs:cancel-stale-pending')->expectsOutputToContain('1 pack(s)')->assertSuccessful();
-
         subscribeTo($this->member, $second->id)->assertCreated();
     });
 });

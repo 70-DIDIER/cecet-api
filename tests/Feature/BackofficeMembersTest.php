@@ -30,7 +30,7 @@ it('lists members with their Pernum, packs and YEM balance, and filters them', f
         ->assertSee('Yendoukoa NAKORE')
         ->assertSee('1001043953')
         ->assertSee('Vendeur')
-        ->assertSee("125,00\u{00A0}YEM");
+        ->assertSee("0,00\u{00A0}YEM");
 
     $this->get('/backoffice/membres?search=1001292934')->assertOk()->assertSee('1001292934')->assertDontSee('Yendoukoa NAKORE');
     $this->get('/backoffice/membres?family=VENDEUR')->assertOk()->assertSee('Yendoukoa NAKORE')->assertDontSee('1001292934');

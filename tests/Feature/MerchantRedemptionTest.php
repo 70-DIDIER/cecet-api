@@ -52,13 +52,13 @@ function merchantBalance(UserPack $pack): array
     return [$account->eligible, $account->reserved, $account->redeemed];
 }
 
-it('redeems collected YEM: reservation, transfer to the CECT, Validator confirmation, payout', function () {
+it('redeems collected YEM: reservation, transfer to the CECT, Accounting confirmation, payout', function () {
     $exchange = redeem($this->merchant, $this->merchantPack, '50')
         ->assertCreated()
         ->assertJsonPath('data.kind', 'merchant_redemption')
         ->assertJsonPath('data.transfer_instructions.send_to_pernum', '1000000001')
         ->assertJsonPath('data.transfer_instructions.from_pernum', '1001292934')
-        ->assertJsonPath('data.rate_xof_per_yem', 500)
+        ->assertJsonPath('data.rate_xof_per_yem', 610)
         ->json('data');
 
     expect($exchange['reference'])->toStartWith('RD-')
@@ -73,13 +73,118 @@ it('redeems collected YEM: reservation, transfer to the CECT, Validator confirma
     $this->withToken(tokenFor($this->validator, withStepUp: true))
         ->postJson("/api/v1/validations/{$exchange['id']}/confirm", ['quantity_received' => '45', 'external_reference' => 'YEMPay 9'], ['Idempotency-Key' => (string) Str::ulid()])
         ->assertOk()
-        ->assertJsonPath('data.amount_due_xof', 22500);
+        ->assertJsonPath('data.amount_due_xof', 27450);
 
     // 45 redeemed, the 5 not received go back to the eligible balance and to the pack quota.
     expect(merchantBalance($this->merchantPack))->toBe(['15.000000', '0.000000', '45.000000'])
         ->and($this->merchantPack->account()->first()->consumed)->toBe('45.000000')
-        ->and(PayoutBatch::query()->sole()->total_amount)->toBe(22500);
+        ->and(PayoutBatch::query()->sole()->total_amount)->toBe(27450);
 
+    $this->artisan('ledger:verify')->assertSuccessful();
+});
+
+it('freezes the configurable sale-minus-fee contract even after SuperAdmin changes rates and policy', function () {
+    $settings = app(SettingsService::class);
+    $settings->set('merchant_redemption.pricing', [
+        'mode' => 'sale_minus_fee',
+        'fee_bps' => 300,
+        'fixed_fee_xof' => 75,
+        'fee_rounding' => 'down',
+    ], 'Barème de cession Marchand : 3 % et frais fixes');
+
+    $request = redeem($this->merchant, $this->merchantPack, '50')
+        ->assertCreated()
+        ->assertJsonPath('data.rate_xof_per_yem', 650)
+        ->assertJsonPath('data.estimated_amount_xof', 31450)
+        ->assertJsonPath('data.merchant_pricing.estimated.gross_amount_xof', 32500)
+        ->assertJsonPath('data.merchant_pricing.estimated.management_fee_xof', 1050)
+        ->assertJsonPath('data.merchant_pricing.policy.mode', 'sale_minus_fee')
+        ->assertJsonPath('data.merchant_pricing.policy.fee_bps', 300)
+        ->json('data');
+
+    // Future pricing changes must not rewrite the reserved member's quotation.
+    $settings->set('rates.sale_xof_per_yem', 700, 'Nouveau cours de vente à venir');
+    $settings->set('merchant_redemption.pricing', [
+        'mode' => 'fixed', 'fee_bps' => 0, 'fixed_fee_xof' => 0, 'fee_rounding' => 'down',
+    ], 'Retour au taux fixe pour les prochaines demandes');
+
+    $this->withToken(tokenFor($this->validator, withStepUp: true))
+        ->postJson("/api/v1/validations/{$request['id']}/confirm",
+            ['quantity_received' => '45', 'external_reference' => 'CONFIRMED-YEM-45'],
+            ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertOk()
+        ->assertJsonPath('data.amount_due_xof', 28298)
+        ->assertJsonPath('data.merchant_pricing.confirmed.gross_amount_xof', 29250)
+        ->assertJsonPath('data.merchant_pricing.confirmed.management_fee_xof', 952)
+        ->assertJsonPath('data.merchant_pricing.confirmed.net_amount_xof', 28298);
+
+    expect(PayoutBatch::query()->sole()->total_amount)->toBe(28298);
+
+    $this->withToken(tokenFor(User::factory()->staff(PermissionCatalog::ADMIN)->create()))
+        ->getJson('/api/v1/admin/reports/summary')
+        ->assertOk()
+        ->assertJsonPath('data.yem_activity.merchant_management_fees_xof', 952)
+        ->assertJsonPath('data.yem_activity.redeemed_by_merchants_xof', 28298);
+
+    $future = redeem($this->merchant, $this->merchantPack, '10')
+        ->assertCreated()
+        ->assertJsonPath('data.rate_xof_per_yem', 610)
+        ->assertJsonPath('data.estimated_amount_xof', 6100)
+        ->assertJsonPath('data.merchant_pricing.policy.mode', 'fixed')
+        ->json('data');
+
+    expect($request['id'])->not->toBe($future['id']);
+    $this->artisan('ledger:verify')->assertSuccessful();
+});
+
+it('accepts rate changes from SuperAdmin and keeps all earlier merchant quotes unchanged', function () {
+    $settings = app(SettingsService::class);
+    $first = redeem($this->merchant, $this->merchantPack, '10')
+        ->assertCreated()->assertJsonPath('data.estimated_amount_xof', 6100)->json('data');
+
+    $settings->set('rates.transfer_xof_per_yem', 580, 'Cours Marchand rectifié par le SuperAdmin');
+
+    $second = redeem($this->merchant, $this->merchantPack, '10')
+        ->assertCreated()->assertJsonPath('data.estimated_amount_xof', 5800)->json('data');
+
+    $this->withToken(tokenFor($this->merchant))->getJson("/api/v1/me/exchange-requests/{$first['id']}")
+        ->assertOk()->assertJsonPath('data.estimated_amount_xof', 6100);
+    $this->withToken(tokenFor($this->merchant))->getJson("/api/v1/me/exchange-requests/{$second['id']}")
+        ->assertOk()->assertJsonPath('data.estimated_amount_xof', 5800);
+});
+
+it('blocks a merchant redemption when the configured fee leaves zero net FCFA', function () {
+    app(SettingsService::class)->set('merchant_redemption.pricing', [
+        'mode' => 'sale_minus_fee', 'fee_bps' => 300,
+        'fixed_fee_xof' => 40000, 'fee_rounding' => 'down',
+    ], 'Borne de test : refuser les versements nuls');
+
+    redeem($this->merchant, $this->merchantPack, '50')
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'MERCHANT_NET_PAYOUT_ZERO');
+
+    expect(merchantBalance($this->merchantPack))->toBe(['60.000000', '0.000000', '0.000000'])
+        ->and($this->merchantPack->account()->first()->reserved)->toBe('0.000000');
+    $this->artisan('ledger:verify')->assertSuccessful();
+});
+
+it('refuses a tiny partial YEM confirmation whose fees exceed the value without consuming the reservation', function () {
+    app(SettingsService::class)->set('merchant_redemption.pricing', [
+        'mode' => 'sale_minus_fee', 'fee_bps' => 300,
+        'fixed_fee_xof' => 75, 'fee_rounding' => 'down',
+    ], 'Borne de test : confirmation partielle et frais fixes');
+    $request = redeem($this->merchant, $this->merchantPack, '50')->assertCreated()->json('data');
+
+    $this->withToken(tokenFor($this->validator, withStepUp: true))
+        ->postJson("/api/v1/validations/{$request['id']}/confirm",
+            ['quantity_received' => '0.1', 'external_reference' => 'YEM-PARTIAL-VERY-SMALL'],
+            ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'MERCHANT_NET_PAYOUT_ZERO');
+
+    expect(merchantBalance($this->merchantPack))->toBe(['10.000000', '50.000000', '0.000000'])
+        ->and($this->merchantPack->account()->first()->reserved)->toBe('50.000000')
+        ->and(PayoutBatch::query()->count())->toBe(0);
     $this->artisan('ledger:verify')->assertSuccessful();
 });
 
@@ -130,7 +235,7 @@ it('reports the YEM activity of the period', function () {
         ->assertJsonPath('data.yem_activity.paid_to_merchants', '60.000000')
         ->assertJsonPath('data.yem_activity.merchant_payments', 1)
         ->assertJsonPath('data.yem_activity.redeemed_by_merchants', '40.000000')
-        ->assertJsonPath('data.yem_activity.redeemed_by_merchants_xof', 20000)
+        ->assertJsonPath('data.yem_activity.redeemed_by_merchants_xof', 24400)
         ->assertJsonPath('data.yem_activity.active_merchants', 1);
 });
 
@@ -182,7 +287,7 @@ it('reports the payouts owed and paid', function () {
         ->assertOk();
 
     $this->withToken(tokenFor(User::factory()->staff(PermissionCatalog::ADMIN)->create()))->getJson('/api/v1/admin/reports/summary')
-        ->assertJsonPath('data.payouts.remaining_due_xof', 20000)
+        ->assertJsonPath('data.payouts.remaining_due_xof', 24400)
         ->assertJsonPath('data.payouts.remaining_due_batches', 1)
         ->assertJsonPath('data.payouts.paid_by_provider_xof', 0);
 });

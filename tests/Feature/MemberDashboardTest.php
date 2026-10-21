@@ -11,6 +11,27 @@ beforeEach(function () {
     Mail::fake();
 });
 
+it('never exposes Vendeur sale capacity as spendable YEM on the member dashboard', function () {
+    $member = User::factory()->create();
+    $seller = subscribeAndPay($member, makePlan(PackFamily::Vendeur, 'V1'));
+
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/dashboard')
+        ->assertOk()
+        ->assertJsonPath('data.yem.balance', '0.000000')
+        ->assertJsonPath('data.yem.total_credited', '0.000000');
+
+    $consumer = subscribeAndPay($member, makePlan(PackFamily::Consommateur, 'C1'));
+    $consumerAvailable = $consumer->account()->firstOrFail()->available;
+    $sellerAvailable = $seller->account()->firstOrFail()->available;
+
+    expect($sellerAvailable)->not->toBe('0.000000');
+
+    $response = $this->withToken(tokenFor($member))->getJson('/api/v1/me/dashboard')->assertOk();
+    $response->assertJsonPath('data.yem.balance', $consumerAvailable);
+    expect((float) $response->json('data.yem.balance'))->toBeLessThan((float) $consumerAvailable + (float) $sellerAvailable);
+});
+
+
 it('summarises the member area: profile, YEM balance, active packs and latest movements', function () {
     $member = User::factory()->create(['city' => 'Lomé']);
     $member->pernumIdentities()->create(['pernum' => '1001043953', 'kind' => 'personal', 'status' => 'declared']);

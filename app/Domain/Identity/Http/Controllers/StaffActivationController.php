@@ -14,6 +14,9 @@ class StaffActivationController
      */
     public function __invoke(Request $request, ActivateStaffAccount $activate, PasswordPolicy $passwordPolicy): JsonResponse
     {
+        // Three-guardian staff login replaces the legacy activation/password
+        // route; leaving it available would silently reenable old credentials.
+        abort_if(config('staff_guardian.enabled'), 404);
         $validated = $request->validate([
             'email' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'digits:6'],

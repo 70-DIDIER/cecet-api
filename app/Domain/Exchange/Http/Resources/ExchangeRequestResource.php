@@ -3,6 +3,8 @@
 namespace App\Domain\Exchange\Http\Resources;
 
 use App\Domain\Exchange\Models\ExchangeRequest;
+use App\Domain\Exchange\Enums\ExchangeKind;
+use App\Domain\Merchant\MerchantRedemptionPricing;
 use App\Support\YemQuantity;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -29,7 +31,15 @@ class ExchangeRequestResource extends JsonResource
             'quantity_requested' => $this->quantity_requested,
             'quantity_received' => $this->quantity_received,
             'rate_xof_per_yem' => $this->rate_xof_per_yem,
-            'estimated_amount_xof' => YemQuantity::toXof($this->quantity_requested, $this->rate_xof_per_yem),
+            'estimated_amount_xof' => $this->kind === ExchangeKind::MerchantRedemption
+                ? MerchantRedemptionPricing::forExchange($this->resource, $this->quantity_requested)['net_amount_xof']
+                : YemQuantity::toXof($this->quantity_requested, $this->rate_xof_per_yem),
+            'merchant_pricing' => $this->kind === ExchangeKind::MerchantRedemption ? [
+                'policy' => $this->pricing_snapshot ?? ['mode' => 'fixed', 'fee_bps' => 0, 'fixed_fee_xof' => 0],
+                'estimated' => MerchantRedemptionPricing::forExchange($this->resource, $this->quantity_requested),
+                'confirmed' => $this->quantity_received !== null
+                    ? MerchantRedemptionPricing::forExchange($this->resource, $this->quantity_received) : null,
+            ] : null,
             'amount_due_xof' => $this->amount_due_xof,
             'transfer_instructions' => [
                 'send_to_pernum' => $this->cect_pernum,

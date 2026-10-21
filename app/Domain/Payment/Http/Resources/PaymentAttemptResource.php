@@ -27,6 +27,11 @@ class PaymentAttemptResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->humanReference(),
             'provider' => $this->provider,
+            // The simulator is exposed exclusively for an authenticated fake-provider attempt
+            // in staging/testing. In production this is always false.
+            'simulation_available' => app()->environment(['staging', 'testing'])
+                && $this->provider === \App\Domain\Payment\Providers\Fake\FakePaymentProvider::NAME
+                && $this->status->isInFlight(),
             'method' => $this->method,
             'mode' => $manual ? 'manual' : 'psp',
             'status' => $this->status->value,

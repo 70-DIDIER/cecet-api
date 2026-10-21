@@ -80,7 +80,7 @@ class ReportingQueries
         return [
             'members' => DB::table('users')->where('kind', 'member')->count(),
             'active_members' => DB::table('users')->where('kind', 'member')->where('status', 'active')->count(),
-            'total_collected_xof' => (int) DB::table('payment_intents')->where('status', 'succeeded')->sum('amount'),
+            'total_collected_xof' => (int) $this->realCollectedIntents()->sum('pi.amount'),
             'pending_validations' => $pending['count'] + DB::table('exchange_requests')->whereIn('status', ['declared_sent', 'disputed'])->count(),
             'yem_in_circulation' => $this->yemInCirculation(),
         ];
@@ -248,6 +248,8 @@ class ReportingQueries
                 'YEM reçus' => $row->quantity_received,
                 'Cours FCFA/YEM' => $row->rate_xof_per_yem,
                 'Montant dû (FCFA)' => $row->amount_due_xof,
+                'Frais de gestion retenus (FCFA)' => $row->kind === 'merchant_redemption' && $row->amount_due_xof !== null
+                    ? max(0, YemQuantity::toXof((string) $row->quantity_received, (int) $row->rate_xof_per_yem) - (int) $row->amount_due_xof) : 0,
                 'Statut' => $row->status,
                 'Référence transfert membre' => $row->member_transfer_reference,
                 'Déclaré le' => $row->declared_at,
@@ -339,6 +341,7 @@ class ReportingQueries
             ->join('user_packs as up', 'up.id', '=', 'qa.user_pack_id')
             ->whereColumn('up.user_id', $userColumn)
             ->where('up.status', 'active')
+            ->whereIn('up.family', ['CONSOMMATEUR', 'PERSONNEL'])
             ->selectRaw('COALESCE(SUM(qa.available), 0)');
     }
 
@@ -357,6 +360,7 @@ class ReportingQueries
             ->selectRaw("COALESCE(SUM(amount_due_xof) FILTER (WHERE kind = 'seller'), 0) AS sold_xof")
             ->selectRaw("COALESCE(SUM(quantity_received) FILTER (WHERE kind = 'merchant_redemption'), 0) AS redeemed")
             ->selectRaw("COALESCE(SUM(amount_due_xof) FILTER (WHERE kind = 'merchant_redemption'), 0) AS redeemed_xof")
+            ->selectRaw("COALESCE(SUM(floor(quantity_received * rate_xof_per_yem) - amount_due_xof) FILTER (WHERE kind = 'merchant_redemption'), 0) AS management_fees")
             ->first();
 
         $merchantPayments = DB::table('merchant_payments')
@@ -374,6 +378,7 @@ class ReportingQueries
             'merchants_paid' => (int) ($merchantPayments->merchants ?? 0),
             'redeemed_by_merchants' => YemQuantity::of((string) ($exchanges->redeemed ?? '0')),
             'redeemed_by_merchants_xof' => (int) ($exchanges->redeemed_xof ?? 0),
+            'merchant_management_fees_xof' => (int) ($exchanges->management_fees ?? 0),
             'active_merchants' => DB::table('user_packs')->where('family', 'MARCHAND')->where('status', 'active')->distinct()->count('user_id'),
         ];
     }
@@ -464,6 +469,11 @@ class ReportingQueries
             ->leftJoin('organizations as o', 'o.user_id', '=', 'u.id')
             ->leftJoin('user_packs as up', fn ($join) => $join->on('up.id', '=', 'pi.payable_id')->where('pi.payable_type', '=', 'user_pack'))
             ->where('pi.status', 'succeeded')
+            ->whereExists(fn (Builder $query) => $query->selectRaw('1')
+                ->from('payment_attempts as pa')
+                ->whereColumn('pa.payment_intent_id', 'pi.id')
+                ->where('pa.status', 'approved')
+                ->where('pa.provider', '<>', 'fake'))
             ->orderByDesc('pi.succeeded_at')
             ->limit($limit)
             ->select(['pi.id', 'pi.purpose', 'pi.amount', 'pi.succeeded_at', 'up.family', 'u.first_name', 'u.last_name', 'o.legal_name'])
@@ -505,10 +515,24 @@ class ReportingQueries
         ];
     }
 
-    private function paidIntents(CarbonImmutable $from, CarbonImmutable $to): Builder
+    /**
+     * Only actual confirmed provider receipts count as collected cash.
+     * Fake/simulation provider payments must never inflate financial KPIs.
+     */
+    private function realCollectedIntents(): Builder
     {
         return DB::table('payment_intents as pi')
             ->where('pi.status', 'succeeded')
+            ->whereExists(fn (Builder $query) => $query->selectRaw('1')
+                ->from('payment_attempts as pa')
+                ->whereColumn('pa.payment_intent_id', 'pi.id')
+                ->where('pa.status', 'approved')
+                ->where('pa.provider', '<>', 'fake'));
+    }
+
+    private function paidIntents(CarbonImmutable $from, CarbonImmutable $to): Builder
+    {
+        return $this->realCollectedIntents()
             ->where('pi.succeeded_at', '>=', $from)
             ->where('pi.succeeded_at', '<', $to);
     }
@@ -529,9 +553,12 @@ class ReportingQueries
 
     private function yemInCirculation(): string
     {
+        // Seller quotas are permissions to offer YEM, not YEM owned or
+        // circulated. Merchant entitlements likewise are not minted funds.
         $sum = DB::table('quota_accounts as qa')
             ->join('user_packs as up', 'up.id', '=', 'qa.user_pack_id')
             ->where('up.status', 'active')
+            ->whereIn('up.family', ['CONSOMMATEUR', 'PERSONNEL'])
             ->sum('qa.available');
 
         return YemQuantity::of((string) $sum);

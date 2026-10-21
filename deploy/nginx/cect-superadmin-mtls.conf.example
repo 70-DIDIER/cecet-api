@@ -1,0 +1,57 @@
+# Dedicated Nginx HTTPS server. Do NOT enable before CA and browser client certificates exist.
+# Replace domain and TLS server-certificate paths. Keep client CA key OFF the server.
+server {
+    listen 443 ssl;
+    server_name superadmin.example.tg;
+    root /home/ubuntu/cect-current/admin;
+    index index.html;
+    server_tokens off;
+
+    ssl_certificate /etc/letsencrypt/live/superadmin.example.tg/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/superadmin.example.tg/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    ssl_client_certificate /etc/nginx/cect-pki/ca.crt;
+    ssl_verify_client on;
+    ssl_verify_depth 1;
+    # Keep the signed CRL up to date; a stale CRL can block all legitimate clients.
+    ssl_crl /etc/nginx/cect-pki/clients.crl.pem;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy no-referrer always;
+    add_header Cache-Control "no-store" always;
+
+    # Laravel Sanctum + API under the SAME authenticated origin.
+    location ^~ /api/ {
+        root /var/www/cect-api/public;
+        try_files $uri /index.php?$query_string;
+    }
+    location ^~ /sanctum/ {
+        root /var/www/cect-api/public;
+        try_files $uri /index.php?$query_string;
+    }
+
+    # Direct PHP paths are never published; only internal framework front controller.
+    location = /index.php {
+        internal;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /var/www/cect-api/public/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_param HTTPS on;
+        # FastCGI server variables, NOT user-controlled request headers.
+        fastcgi_param CECT_MTLS_VERIFY $ssl_client_verify;
+        fastcgi_param CECT_MTLS_CERT $ssl_client_escaped_cert;
+        fastcgi_pass unix:/run/php/php8.5-fpm.sock;
+    }
+    location ~ \.php$ { return 404; }
+    location ~ /\. { deny all; }
+    location ~* \.(?:env|log|ini|sql|bak|dist)$ { deny all; }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+# Configure port 80 independently for ACME HTTP-01 challenges and redirect to HTTPS.
+# Do not proxy SuperAdmin routes from another public Nginx virtual host.

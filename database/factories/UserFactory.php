@@ -73,7 +73,14 @@ class UserFactory extends Factory
         ])->afterCreating(function (User $user) use ($roles): void {
             if ($roles !== []) {
                 app(SyncAccessCatalog::class)->handle();
-                $user->syncRoles($roles);
+                // Historical tests request the removed Validator role. Route that
+                // fixture to Accounting; never recreate or assign a Validator role.
+                $mapped = array_map(
+                    fn (string $role): string => $role === \App\Domain\Access\PermissionCatalog::VALIDATOR
+                        ? \App\Domain\Access\PermissionCatalog::ACCOUNTING : $role,
+                    $roles
+                );
+                $user->syncRoles(array_values(array_unique($mapped)));
             }
         });
     }

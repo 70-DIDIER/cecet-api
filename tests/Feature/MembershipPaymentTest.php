@@ -58,7 +58,9 @@ it('opens a hosted checkout for the configured fee and ignores any amount sent b
         ->assertCreated()
         ->assertJsonPath('data.status', 'pending')
         ->assertJsonPath('data.amount', 25000)
-        ->assertJsonPath('data.currency', 'XOF');
+        ->assertJsonPath('data.currency', 'XOF')
+        ->assertJsonPath('data.provider', 'fake')
+        ->assertJsonPath('data.simulation_available', true);
 
     expect($response->json('data.checkout_url'))->toStartWith('http');
 
@@ -466,4 +468,100 @@ describe('demo gateway bypass', function () {
 
         expect($this->member->refresh()->status)->toBe(UserStatus::PendingPayment);
     });
+});
+
+
+it('shows a safe information page for historical fake-checkout links on staging', function () {
+    app()->detectEnvironment(fn () => 'staging');
+
+    $this->get('/fake-checkout/fake_01m55fwt1234')
+        ->assertOk()
+        ->assertSee('mode simulation')
+        ->assertSee('aucun paiement');
+
+    app()->detectEnvironment(fn () => 'production');
+    $this->get('/fake-checkout/fake_01m55fwt1234')->assertNotFound();
+});
+
+
+it('recovers an owned pending simulated payment after a server cache reset', function () {
+    $attemptId = startMembershipPayment($this->member)->assertCreated()->json('data.id');
+    $transactionId = (string) PaymentAttempt::query()->findOrFail($attemptId)->provider_transaction_id;
+    \Illuminate\Support\Facades\Cache::forget('fake_payment:'.$transactionId);
+
+    $this->withToken(tokenFor($this->member))
+        ->postJson("/api/v1/me/payments/{$attemptId}/simulate")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'approved')
+        ->assertJsonPath('data.simulation_available', false);
+
+    expect($this->member->refresh()->status)->toBe(UserStatus::Active)
+        ->and(PaymentAttempt::query()->count())->toBe(1);
+});
+
+it('never reconstructs unknown fake transactions from arbitrary identifiers', function () {
+    expect(fn () => app(FakePaymentProvider::class)->fetchTransaction('fake_unknown'))
+        ->toThrow(\App\Domain\Payment\Exceptions\PaymentProviderException::class);
+});
+
+
+it('accepts an international Senegal phone for enabled simulated Wave', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'WAVE',
+        'payment_phone' => '+221771234567',
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated()
+        ->assertJsonPath('data.method', 'WAVE')
+        ->assertJsonPath('data.provider', 'fake')
+        ->assertJsonPath('data.simulation_available', true);
+});
+
+it('refuses a mobile money method not enabled for the payment phone country', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'ORANGE_MONEY',
+        'payment_phone' => '+22890123456',
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertStatus(422);
+
+    expect(PaymentAttempt::query()->count())->toBe(0);
+});
+
+it('rejects a foreign phone without an enabled operator and prevents a test checkout', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'TMONEY',
+        'payment_phone' => '+33612345678',
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertStatus(422);
+
+    expect(PaymentAttempt::query()->count())->toBe(0);
+});
+
+
+it('accepts simulated card fallback for a non-African phone and never creates a real charge', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'CARD_SIM',
+        'payment_phone' => '+33612345678',
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated()
+        ->assertJsonPath('data.method', 'CARD_SIM')
+        ->assertJsonPath('data.provider', 'fake')
+        ->assertJsonPath('data.simulation_available', true);
+});
+
+it('accepts simulated card fallback in an African country without a named mobile money network', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'CARD_SIM',
+        'payment_phone' => '+213555123456',
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated()->assertJsonPath('data.method', 'CARD_SIM');
+});
+
+it('offers the simulated bank card as an alternative to Mobile Money in Togo', function () {
+    $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/payments', [
+        'method' => 'CARD_SIM',
+        'payment_phone' => '+22890123456',
+    ], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated()->assertJsonPath('data.method', 'CARD_SIM')
+        ->assertJsonPath('data.provider', 'fake')
+        ->assertJsonPath('data.simulation_available', true);
 });

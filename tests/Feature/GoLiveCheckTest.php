@@ -28,3 +28,11 @@ it('turns green for the settings and accounts it can judge', function () {
 
     expect(failingCodes())->not->toContain('cect_pernum', 'alert_emails', 'superadmin', 'staff_roles', 'demo_bypass', 'hash_driver');
 });
+
+it('blocks a configured FedaPay API token without webhook validation even with the demo gateway active', function () {
+    config(['services.fedapay.secret_key' => 'sandbox-only-fixture', 'services.fedapay.webhook_secret' => null]);
+    expect(failingCodes())->toContain('fedapay_webhook_ready');
+
+    config(['services.fedapay.webhook_secret' => 'sandbox-signature-fixture']);
+    expect(failingCodes())->not->toContain('fedapay_webhook_ready');
+});

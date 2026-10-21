@@ -26,9 +26,13 @@ class CollectionRouter
     /**
      * @return array{method: string, provider: string, manual: bool, gateway: PaymentProvider|null}
      */
-    public function route(User $payer, ?string $method): array
+    public function route(User $payer, ?string $method, ?string $paymentPhone = null): array
     {
-        $enabled = $this->enabledMethods();
+        // The chosen payment phone, if supplied, controls available operators.
+        // A mobile provider cannot be offered for a country where CECT has not enabled it.
+        $phone = $paymentPhone ?? $payer->phone;
+        $country = AfricanMobileMoneyCatalog::countryFromPhone($phone);
+        $enabled = $this->enabledMethods($country);
         $method = $method ?? ($payer->preferred_payment_method !== null && in_array($payer->preferred_payment_method, $enabled, true) ? $payer->preferred_payment_method : null);
         $modes = $this->settings->array('payment.collection_modes');
 
@@ -64,10 +68,28 @@ class CollectionRouter
     /**
      * @return list<string>
      */
-    private function enabledMethods(): array
+    private function enabledMethods(?string $country): array
     {
         return array_values(collect($this->settings->array('payment.methods'))
-            ->filter(fn (mixed $method): bool => is_array($method) && ($method['enabled'] ?? false) === true)
+            ->filter(function (mixed $method) use ($country): bool {
+                if (! is_array($method) || ($method['enabled'] ?? false) !== true) {
+                    return false;
+                }
+                $code = (string) ($method['code'] ?? '');
+                // Card simulation is a test-only alternative, including in
+                // African countries where Mobile Money is available.
+                if ($code === AfricanMobileMoneyCatalog::CARD_SIM) {
+                    return app()->environment(['staging', 'testing']);
+                }
+                // The generic test-only wallet is retired; it must never be accepted
+                // even when an older database settings version still contains it.
+                if ($code === 'AFRICA_WALLET_TEST') {
+                    return false;
+                }
+                $countries = $method['countries'] ?? [];
+                return ! is_array($countries) || $countries === [] ||
+                    ($country !== null && in_array($country, $countries, true));
+            })
             ->map(fn (array $method): string => (string) ($method['code'] ?? ''))
             ->all());
     }

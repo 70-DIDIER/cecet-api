@@ -1,0 +1,114 @@
+name: CECT Preproduction QA
+
+on:
+  push:
+    branches: [custum]
+  workflow_dispatch:
+
+concurrency:
+  group: cect-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  financial-and-security-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: cect
+          POSTGRES_PASSWORD: cect
+          POSTGRES_DB: cectapi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cect -d cectapi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: cectapi_test
+      DB_USERNAME: cect
+      DB_PASSWORD: cect
+      APP_ENV: testing
+      MAIL_MAILER: array
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      SUPERADMIN_MTLS_ENABLED: "false"
+      STAFF_GUARDIAN_LOGIN_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql, bcmath, intl, mbstring, sodium
+          coverage: none
+      - name: Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Isolated testing key
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+      - name: Confirm isolated PostgreSQL target
+        run: |
+          php artisan tinker --execute='if (DB::selectOne("select current_database() as n")->n !== "cectapi_test") {throw new RuntimeException("Unsafe database.");} echo "QA database isolated";'
+      - name: Isolated Blade compile directory
+        run: mkdir -p /tmp/cect-qa-blade-views
+      - name: Complete backend API suite (functional, payments, ledger, roles and security)
+        shell: bash
+        run: |
+          set -o pipefail
+          php artisan test --compact --no-ansi 2>&1 | tee cect-complete-test-results.log
+      - name: Store failure details for audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cect-preprod-test-log
+          path: cect-complete-test-results.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  synthetic-financial-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: cect
+          POSTGRES_PASSWORD: cect
+          POSTGRES_DB: cectapi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cect -d cectapi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DB_HOST: 127.0.0.1
+      DB_CONNECTION: pgsql
+      DB_PORT: 5432
+      DB_DATABASE: cectapi_test
+      DB_USERNAME: cect
+      DB_PASSWORD: cect
+      APP_ENV: testing
+      SUPERADMIN_MTLS_ENABLED: "false"
+      STAFF_GUARDIAN_LOGIN_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql, bcmath, intl, mbstring, sodium
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Setup test application
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+      - name: Synthetic 100000 users / 1000000 journal calculations (rollback only)
+        run: php scripts/qa-synthetic-ledger-million.php

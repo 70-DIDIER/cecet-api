@@ -58,6 +58,15 @@ class AuthenticateUser
             throw IdentityException::invalidCredentials();
         }
 
+        // Password + legacy OTP must never bypass the isolated mTLS + access-key workflow.
+        if ($user->isSuperadmin() && config('superadmin.enabled')) {
+            throw IdentityException::invalidCredentials();
+        }
+
+        if ($user->isStaff() && ! $user->isSuperadmin() && config('staff_guardian.enabled')) {
+            throw IdentityException::invalidCredentials();
+        }
+
         RateLimiter::clear($throttleKey);
 
         $this->ensureCanAuthenticate($user);

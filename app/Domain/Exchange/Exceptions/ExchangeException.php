@@ -36,6 +36,15 @@ final class ExchangeException extends ApiException
         return new self('RECEIVED_EXCEEDS_REQUESTED', 'La quantité reçue dépasse la quantité demandée : placez la demande en litige.', 422, ['quantity_requested' => $requested]);
     }
 
+    public static function merchantNetNonPositive(): self
+    {
+        return new self(
+            'MERCHANT_NET_PAYOUT_ZERO',
+            'Les frais configurés dépassent la contre-valeur de ce rééchange : aucun versement ne serait dû. Réduisez les frais ou augmentez la quantité avant de transférer des YEM.',
+            422
+        );
+    }
+
     public static function externalReferenceRequired(): self
     {
         return new self('EXTERNAL_REFERENCE_REQUIRED', 'La référence de la transaction YEM est obligatoire pour confirmer une réception.', 422);

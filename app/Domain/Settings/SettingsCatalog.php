@@ -53,9 +53,11 @@ final class SettingsCatalog
     {
         return [
             new SettingDefinition('membership.fee.natural_person', 'membership', SettingType::Integer, 25000,
-                'Frais d\'adhésion initiale d\'une personne physique (XOF).', rules: ['value' => ['required', 'min:0']]),
+                'Frais d\'adhésion initiale d\'une personne physique (XOF).', SettingEditLevel::Superadmin,
+                rules: ['value' => ['required', 'integer', 'min:0']]),
             new SettingDefinition('membership.fee.legal_person', 'membership', SettingType::Integer, 200000,
-                'Frais d\'adhésion initiale d\'une personne morale (XOF).', rules: ['value' => ['required', 'min:0']]),
+                'Frais d\'adhésion initiale d\'une personne morale (XOF).', SettingEditLevel::Superadmin,
+                rules: ['value' => ['required', 'integer', 'min:0']]),
             new SettingDefinition('membership.commitment_version', 'membership', SettingType::String, 'statuts-ri-2026',
                 'Version du texte d\'engagement (statuts et règlement intérieur) acceptée à l\'inscription ; à changer quand le texte change.',
                 rules: ['value' => ['required', 'max:40']]),
@@ -109,12 +111,25 @@ final class SettingsCatalog
     private function rates(): array
     {
         return [
-            new SettingDefinition('rates.purchase_xof_per_yem', 'rates', SettingType::Integer, 500,
-                'Cours d\'achat d\'un YEM par la CECT (XOF) — à ratifier par le CA (PO-01).', rules: ['value' => ['required', 'min:1']]),
+            new SettingDefinition('rates.purchase_xof_per_yem', 'rates', SettingType::Integer, 510,
+                'Cours d\'achat d\'un YEM par la CECT (XOF) — valeur paramétrable par le Superadmin.', SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:1']]),
             new SettingDefinition('rates.sale_xof_per_yem', 'rates', SettingType::Integer, 650,
-                'Cours de vente d\'un YEM par la CECT (XOF) — à ratifier par le CA (PO-01).', rules: ['value' => ['required', 'min:1']]),
+                'Cours de vente d\'un YEM par la CECT (XOF) — à ratifier par le CA (PO-01).', SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:1']]),
             new SettingDefinition('rates.transfer_xof_per_yem', 'rates', SettingType::Integer, 610,
-                'Cours de cession d\'un YEM (XOF) — à ratifier par le CA (PO-01).', rules: ['value' => ['required', 'min:1']]),
+                'Cours de cession d\'un YEM (XOF) — à ratifier par le CA (PO-01).', SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:1']]),
+            new SettingDefinition('merchant_redemption.pricing', 'rates', SettingType::Json, [
+                'mode' => 'fixed',
+                'fee_bps' => 0,
+                'fixed_fee_xof' => 0,
+                'fee_rounding' => 'down',
+            ], 'Politique de rachat Marchand gérée exclusivement par le SuperAdmin : taux fixe du cours Marchand ou cours de vente CECT diminué de frais de gestion. Les règles sont versionnées ; chaque demande garde sa photographie contractuelle.',
+                SettingEditLevel::Superadmin, rules: [
+                    'value' => ['required', 'array:mode,fee_bps,fixed_fee_xof,fee_rounding'],
+                    'value.mode' => ['required', 'in:fixed,sale_minus_fee'],
+                    'value.fee_bps' => ['required', 'integer', 'min:0', 'max:9999'],
+                    'value.fixed_fee_xof' => ['required', 'integer', 'min:0', 'max:10000000'],
+                    'value.fee_rounding' => ['required', 'in:down,up'],
+                ]),
         ];
     }
 
@@ -135,14 +150,14 @@ final class SettingsCatalog
                 'max_yem' => null,
                 'families' => ['CONSOMMATEUR', 'PERSONNEL'],
                 'rounding' => 'down',
-            ], 'Cashback en YEM offert lors de l’achat (le prix payé ne change jamais) : activation, taux en centièmes de %, plafond en YEM (null = aucun), familles éligibles et arrondi. Chaque modification crée une version ; les achats déjà calculés gardent la leur.',
+            ], 'Cashback en YEM offert lors de l’achat (le prix payé ne change jamais) : activation, taux en centièmes de %, plafond en YEM (null = aucun), uniquement les packs Consommateur et Personnel, et arrondi. Chaque modification crée une version ; les achats déjà calculés gardent la leur.',
                 SettingEditLevel::Superadmin, rules: [
                     'value' => ['required'],
                     'value.enabled' => ['required', 'boolean'],
                     'value.rate_bps' => ['required', 'integer', 'min:0', 'max:9999'],
                     'value.max_yem' => ['nullable', 'numeric', 'min:0'],
                     'value.families' => ['present', 'array'],
-                    'value.families.*' => ['string', 'in:VENDEUR,CONSOMMATEUR,PERSONNEL,MARCHAND', 'distinct'],
+                    'value.families.*' => ['string', 'in:CONSOMMATEUR,PERSONNEL', 'distinct'],
                     'value.rounding' => ['required', 'in:down,half_up'],
                 ]),
             new SettingDefinition('packs.families_excluded_from_limit', 'packs', SettingType::Json, ['PERSONNEL'],
@@ -422,12 +437,9 @@ final class SettingsCatalog
                     'value.*.fixed_xof' => ['required', 'integer', 'min:0'],
                     'value.*.rounding_xof' => ['sometimes', 'integer', 'min:1', 'max:1000'],
                 ]),
-            new SettingDefinition('payment.collection_modes', 'payment', SettingType::Json, [
-                'TMONEY' => 'psp',
-                'FLOOZ' => 'psp',
-                'BANK_TRANSFER' => 'manual',
-                'CASH' => 'manual',
-            ], 'Routage métier : Mobile Money via provider/simulateur ; banque et espèces via workflow manuel contrôlé.',
+            new SettingDefinition('payment.collection_modes', 'payment', SettingType::Json,
+                \App\Domain\Payment\AfricanMobileMoneyCatalog::mobileCollectionModes(),
+                'Routage de test des opérateurs mobiles et règlements manuels (aucun débit réel).',
                 rules: ['value' => ['required'], 'value.*' => ['in:psp,manual']]),
             new SettingDefinition('payment.manual_instructions', 'payment', SettingType::Json,
                 $simulationEnvironment ? [
@@ -445,16 +457,13 @@ final class SettingsCatalog
             new SettingDefinition('payment.webhook_tolerance_seconds', 'payment', SettingType::Integer, 300,
                 'Écart maximal toléré entre l’horodatage signé d’un webhook et l’heure serveur (secondes).',
                 SettingEditLevel::Superadmin, rules: ['value' => ['required', 'min:0', 'max:3600']]),
-            new SettingDefinition('payment.methods', 'payment', SettingType::Json, [
-                ['code' => 'TMONEY', 'label' => 'T-Money'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
-                ['code' => 'FLOOZ', 'label' => 'Flooz'.$methodSuffix, 'channel' => 'mobile_money', 'countries' => ['TG'], 'enabled' => true],
-                ['code' => 'BANK_TRANSFER', 'label' => 'Virement bancaire'.$methodSuffix, 'channel' => 'manual', 'countries' => [], 'enabled' => true],
-                ['code' => 'CASH', 'label' => 'Espèces'.$methodSuffix, 'channel' => 'manual', 'countries' => [], 'enabled' => true],
-            ], 'Moyens métier. Une liste de pays vide signifie disponibilité globale ; le routage réel reste soumis à la gouvernance provider.', rules: [
+            new SettingDefinition('payment.methods', 'payment', SettingType::Json,
+                \App\Domain\Payment\AfricanMobileMoneyCatalog::methods($simulationEnvironment),
+                'Simulation Mobile Money : pays documentés BCEAO/GSMA, sans contrat de paiement réel.', rules: [
                 'value' => ['required', 'min:1'],
                 'value.*.code' => ['required', 'string', 'alpha_dash:ascii', 'distinct'],
                 'value.*.label' => ['required', 'string', 'max:80'],
-                'value.*.channel' => ['required', 'in:mobile_money,manual'],
+                'value.*.channel' => ['required', 'in:mobile_money,card,manual'],
                 'value.*.countries' => ['sometimes', 'array', 'max:250'],
                 'value.*.countries.*' => ['required', 'string', 'size:2', 'alpha:ascii'],
                 'value.*.enabled' => ['required', 'boolean'],

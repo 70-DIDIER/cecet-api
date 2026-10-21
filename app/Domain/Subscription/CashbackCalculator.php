@@ -20,16 +20,21 @@ class CashbackCalculator
 
     public function __construct(private readonly SettingsService $settings) {}
 
-    public function quote(PackFamily $family, string $yemBase): CashbackQuote
+    /** @param array<string,mixed>|null $packRule Immutable version-local rule; null retains historic global setting. */
+    public function quote(PackFamily $family, string $yemBase, ?array $packRule = null, ?string $versionEffectiveFrom = null): CashbackQuote
     {
         $now = CarbonImmutable::now();
         $base = YemQuantity::of($yemBase);
-        $rules = $this->settings->array(self::RULES_KEY);
+        $rules = $packRule ?? $this->settings->array(self::RULES_KEY);
 
         $rounding = ($rules['rounding'] ?? 'down') === 'half_up' ? 'half_up' : 'down';
         $rateBps = is_int($rules['rate_bps'] ?? null) ? $rules['rate_bps'] : 0;
         $families = array_map('strval', is_array($rules['families'] ?? null) ? $rules['families'] : []);
-        $applies = ($rules['enabled'] ?? false) === true && $rateBps > 0 && in_array($family->value, $families, true);
+        // Defense in depth: ignore legacy or corrupted settings granting cashback
+        // to Vendeur/Marchand. Eligibility is a fixed product policy, not a UI hint.
+        $eligibleFamily = in_array($family, [PackFamily::Consommateur, PackFamily::Personnel], true);
+        $applies = $eligibleFamily && ($rules['enabled'] ?? false) === true && $rateBps > 0
+            && ($packRule !== null || in_array($family->value, $families, true));
 
         $cashback = YemQuantity::zero();
 
@@ -48,7 +53,9 @@ class CashbackCalculator
             yemTotal: YemQuantity::add($base, $cashback),
             rateBps: $applies ? $rateBps : 0,
             rounding: $rounding,
-            ruleEffectiveFrom: $this->settings->effectiveFrom(self::RULES_KEY, $now),
+            ruleEffectiveFrom: $packRule !== null
+                ? ($versionEffectiveFrom ?? $now->toIso8601String())
+                : $this->settings->effectiveFrom(self::RULES_KEY, $now),
             calculatedAt: $now,
         );
     }
