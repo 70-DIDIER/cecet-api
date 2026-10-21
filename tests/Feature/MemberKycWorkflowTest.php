@@ -14,6 +14,7 @@ beforeEach(function () {
     if (\Illuminate\Support\Facades\DB::connection()->getDatabaseName() !== 'cectapi_test') {
         throw new RuntimeException('KYC tests may only run on cectapi_test.');
     }
+    config()->set('staff_guardian.enabled', false);
     Storage::fake('local');
 });
 
