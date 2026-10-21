@@ -4,6 +4,18 @@ Date d'ouverture : 21 octobre 2026. Source : branches `custum` des dépôts `70-
 
 ## Statut actuel
 
+## Décision de périmètre confirmée — 21 octobre 2026, 23:56 heure locale
+
+**Instruction expresse du maître d'ouvrage : `NE CRÉE PAS DE NOUVELLE BASE DE DONNÉES ; RÉINITIALISE TOUT SAUF CE QUI CONCERNE L'ADMIN ; NE TOUCHE PAS À L'ADMIN`. Cette décision prévaut sur les propositions antérieures de reconstruire une nouvelle base et sur l'objectif précédent de retirer les comptes internes de test.**
+
+- Base unique à maintenir : **`cectapi_live`** (environnement `staging`). **Interdiction de modifier la cible `DB_DATABASE` de l'application ou d'effectuer un basculement.**
+- **Conserver à l'identique tous les comptes internes** (`kind=staff`, notamment Superadmin, Administrateur et Comptabilité), leurs rôles/autorisations, sessions et mécanismes d'authentification, y compris les trois e-mails de contrôle, les clés mTLS et profils/challenges Superadmin, les configurations business administrables, les réglages, les paramètres de paiement, les journaux d'audit/sécurité et les références indispensables à leur fonctionnement.
+- **Réinitialiser dans cette même base** les membres PF/PM (`kind=member`), adhésions, entreprises associées, Pernum membres, OTP de membres, souscriptions, packs du catalogue (`pack_plans`, `pack_versions`), quotas, périodes, crédits/réservations, mouvements financiers de démonstration, paiements simulés, QR, rééchanges, demandes, notifications et données transactionnelles.
+- **Ne pas effacer ni corrompre les écritures financières/audits protégés sans méthode de maintenance validée** : les triggers PostgreSQL append-only bloquent les suppressions classiques. Exiger un inventaire des clés étrangères, l'isolation des transactions, une sauvegarde vérifiée, un mécanisme de restauration et un audit de cohérence avant toute purge, sans désactiver les protections de l'administration.
+- Après remise à zéro, **attendu : zéro membre, zéro pack, zéro opération métier active ; tout le personnel et l'administration inchangés**. Les traces d'audit/sécurité peuvent conserver l'historique afin de préserver leur intégrité. Ne pas interpréter les données historisées comme des opérations actives.
+- L'ancien brouillon `cect_reset_candidate_20261021`, créé lors de la tentative précédente et jamais connecté au site, **n'est PAS utilisable** ; le supprimer dès que l'agent est disponible et que l'absence de dépendances est confirmée, sans toucher à `cectapi_live`.
+- **Statut : NON EXÉCUTÉ** à la date de cette mise à jour ; agent Desktop Commander `ip-172-31-25-53` constaté **hors ligne**. L'archive de sauvegarde validée reste la référence jusqu'à nouvelle sauvegarde avant purge. Ne jamais déclarer les compteurs à zéro sans requête directe sur `cectapi_live`.
+
 ## Tentative de réinitialisation complémentaire — 21 octobre 2026, 19:28 UTC
 
 Le propriétaire a demandé explicitement « réinitialise ». L'agent est **en ligne**. État initial recontrôlé : `APP_ENV=staging`, base active `cectapi_live`, 6 utilisateurs, 4 membres, 10 packs et 1 clé Superadmin. Archive `cect-pre-full-reset-20261021_191409.dump` toujours disponible, empreinte SHA-256 inchangée.
