@@ -109,3 +109,98 @@ est utilisée uniquement avec APP_ENV=testing et des justificatifs fictifs.
 Le système KYC manuel est développé dans les trois dépôts mais n'est PAS
 encore accessible sur le site actif. Le KYC automatique ne fonctionne pas
 sans un prestataire d'identité réel et une interface contractuelle sécurisée.
+
+## EXIGENCE COMPLEMENTAIRE — SELFIE, VIDEO ET KYC BIOMETRIQUE (22 octobre 2026)
+
+Décision complémentaire expresse de l'entreprise : **le KYC CECT doit inclure
+une prise de SELFIE EN DIRECT et une SEQUENCE VIDEO GUIDEE**, et pas uniquement
+des photos de documents officiels. Le niveau attendu est un onboarding
+biométrique réel, avec liveness et confrontation documentaire.
+
+### Parcours d'identification attendu — PF et représentant PM
+
+1. Consentement/information claire sur les finalités, prestataire, conservation
+   des données biométriques, éventuels transferts à l'étranger et droits.
+2. Scan des documents officiels recto/verso (ou passeport), extraction OCR,
+   contrôle de qualité, cohérence, validité et indices de falsification.
+3. **Selfie en direct** via caméra, cadrage et contrôle de qualité, pas une
+   image importée depuis la galerie comme preuve exclusive.
+4. **Liveness actif par VIDEO/sequence caméra** : actions aléatoires imposées
+   par SDK tiers (tête, regard, flash/mouvements selon prestataire),
+   protection contre photo, masque, vidéo rejouée, spoof et deepfake.
+   La nature exacte du fichier brut (vidéo stockée vs frames sécurisées)
+   dépend de l'API du fournisseur et de la politique de minimisation.
+5. Comparaison biométrique selfie/video contre la photographie de la pièce
+   (face match), vérification de qualité et des seuils documentés.
+6. Vérification des doublons, signaux appareils/IP, contrôles risque,
+   listes sanctions/PEP seulement si justifiés et autorisés ; vérification
+   KYB du PM/identité du représentant et bénéficiaires effectifs selon règles.
+7. Résultat tiers authentifié : VERIFIED / IN_REVIEW / REJECTED / RETRY.
+   Liveness raté, doublon, photo incohérente ou vidéo non vérifiable
+   imposent une REVUE HUMAINE, jamais une approbation automatique forcée.
+8. Validation humaine par rôle Validateur KYC, motif, preuve de contrôle,
+   historique, second avis/recours et journal d'accès aux pièces.
+9. Paiement de l'adhésion débloqué uniquement lorsque **toutes** les étapes
+   obligatoires et le verdict d'identité sont approuvés.
+
+### Exigences techniques et opérationnelles
+
+- Interface mobile-first, caméra avant/arrière avec permission explicite
+  getUserMedia / SDK, possibilité de reprendre une capture de mauvaise
+  qualité, contrôle de bande passante, reprise après perte réseau,
+  navigation accessible et support d'appareils modestes en Afrique.
+- Session fournisseur éphémère liée à un dossier CECT via nonce/idempotence,
+  webhook signé, réconciliation serveur, prévention des replay et des faux
+  callbacks ; aucune décision finale fournie par le navigateur n'est fiable.
+- Séparer statut de l'étape DOCUMENT, SELFIE, VIDEO_LIVENESS, FACE_MATCH,
+  FRAUD_CHECK, KYC_FINAL, identité du Validateur, source auto/manuelle.
+- Chiffrement au repos et en transit, conservation minimale, journal
+  d'accès, droits d'effacement/rectification dans les limites légales,
+  procédure de gestion des incidents et analyse antimalware des fichiers.
+- La reconnaissance faciale/biométrie requiert une revue conformité
+  spécifique avec l'IPDCP Togo AVANT traitement réel, notamment sous
+  la loi 2019-014. Vérifier les conditions de transfert international.
+
+### Prestataires possibles et coûts consultés en octobre 2026
+
+- DIDIT : 500 KYC mensuels gratuits pour ID + liveness PASSIF + face match
+  + analyse IP/appareil, puis 0,33 USD par vérification complète.
+  Le liveness ACTIF (mouvements/3D) est facturé 0,15 USD par contrôle
+  dès le premier contrôle ; confirmez le format de séquence VIDEO précis
+  proposé au SDK avant contractualisation.
+- SUMSUB : Basic 1,35 USD / KYC, engagement minimum 149 USD / mois ;
+  document, selfie, liveness, face match. Contrôler les options vidéo.
+- IDENFY : Basic 1,35 USD / KYC, engagement minimum 135 USD / mois ;
+  options de liveness 3D et contrôle humain facturées séparément.
+- SMILE ID : tarif sur devis ; catalogue documents officiels incluant
+  le Togo et solutions selfie/liveness. Vérifier le périmètre vidéo.
+
+Sources fournisseurs :
+https://didit.me/pricing/
+https://help.didit.me/getting-started/free-plan
+https://help.didit.me/liveness-biometrics/how-liveness-works
+https://sumsub.com/fr/pricing/
+https://idenfy.com/fr/tarifs/
+https://smile.id/supported-documents
+Autorité de protection des données du Togo : https://ipdcp.tg/
+
+### Etat d'implémentation honnête
+
+Le code KYC déjà ajouté sur custum sait recevoir un document chiffré,
+présenter une file Validateur et vérifier une décision manuelle ;
+**IL NE SAIT PAS ENCORE CAPTURER DE SELFIE/VIDEO AVEC LIVENESS CERTIFIE,
+NI INTERROGER UN FOURNISSEUR AUTOMATIQUE.**
+Le parcours complet document + selfie + vidéo est une EXIGENCE FERME
+de la prochaine phase de développement, pas une fonctionnalité déployée.
+Ne jamais qualifier le KYC précédent de complet ou suffisamment
+biométrique avant intégration réelle, tests anti-fraude et conformité.
+
+### Critères de recette bloquants
+
+Un client qui soumet seulement une pièce sans selfie/liveness ne doit
+pas être automatiquement qualifié de KYC complet. Après activation
+du nouveau dispositif biométrique, la règle de paiement doit exiger
+un résultat KYC final incluant preuve de vie vérifiée, correspondance
+faciale et contrôle documentaire, ou une procédure d'exception
+formellement autorisée et auditée. Aucune validation des documents
+fictifs, capture vidéo locale seule ou score OCR ne vaut preuve.
