@@ -3,6 +3,7 @@
 namespace App\Domain\Membership\Http\Controllers;
 
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Kyc\KycEligibility;
 use App\Domain\Membership\Actions\DemoActivateMembership;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Http\Resources\MembershipResource;
@@ -39,7 +40,7 @@ class MembershipController
     public function show(Request $request, MembershipFee $fees, PaymentFeeCalculator $feeCalculator, PaymentCheckout $checkout, SettingsService $settings): JsonResponse
     {
         $member = $this->member($request);
-        abort_if($member->status === UserStatus::PendingKyc, 403, 'KYC obligatoire avant le paiement.');
+        abort_unless($member->status === UserStatus::Active || KycEligibility::approved($member), 403, 'KYC obligatoire avant le paiement.');
         $membership = Membership::query()->where('user_id', $member->id)->first();
 
         if ($membership !== null) {
