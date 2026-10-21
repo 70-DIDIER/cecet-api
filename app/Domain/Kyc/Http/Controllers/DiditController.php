@@ -7,6 +7,7 @@ use App\Domain\Identity\Enums\UserStatus;
 use App\Domain\Kyc\Didit\DiditDecisionProcessor;
 use App\Domain\Kyc\Didit\DiditGateway;
 use App\Domain\Kyc\Models\MemberKycCase;
+use App\Domain\Kyc\Jobs\ProcessDiditDecision;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -84,7 +85,7 @@ final class DiditController
      * Verifies a full-body HMAC before reading the payload. Matching a user by
      * vendor_data is forbidden: the session id must exist in CECT's database.
      */
-    public function webhook(Request $request, DiditGateway $gateway, DiditDecisionProcessor $processor): JsonResponse
+    public function webhook(Request $request, DiditGateway $gateway): JsonResponse
     {
         abort_unless(config('kyc.provider') === 'didit', 404);
         $raw = $request->getContent();
@@ -96,6 +97,8 @@ final class DiditController
         $timestamp = $data['timestamp'] ?? null;
         abort_unless(is_numeric($timestamp) && abs(time() - (int) $timestamp) <= 300, 401,
             'Notification Didit périmée.');
+        abort_unless(($data['environment'] ?? null) === config('kyc.didit.environment'), 409,
+            'Événement d’un environnement Didit différent.');
         $event = $data['webhook_type'] ?? $data['event_type'] ?? $data['event'] ?? null;
         if ($event !== 'status.updated') {
             return response()->json(['received' => true]);
@@ -105,7 +108,7 @@ final class DiditController
         $case = MemberKycCase::query()->where('provider_reference', $session)
             ->where('verification_mode', 'didit')->first();
         if (! $case) return response()->json(['received' => true]);
-        $processor->sync($case);
+        ProcessDiditDecision::dispatch($case->id);
         return response()->json(['received' => true]);
     }
 }
