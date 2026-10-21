@@ -21,6 +21,8 @@ final class KycEligibility
                 ->where('provider_status', 'Approved')
                 ->whereNotNull('provider_verified_at')
                 ->where('provider_environment', config('kyc.didit.environment'));
+            // Conclusive results must be documented in the case evidence checklist.
+            $query->whereRaw("(provider_checks->>'complete')::boolean = true");
         }
         return $query->exists();
     }
