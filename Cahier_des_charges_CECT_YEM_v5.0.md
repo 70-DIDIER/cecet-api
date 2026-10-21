@@ -3,6 +3,34 @@ Date : 17 octobre 2026
 Statut : référence fonctionnelle de recette et développement évolutif.
 Référentiel : cette version 5.0 reprend intégralement le cahier v4.0 en annexe historique ; les nouvelles dispositions v5.0 priment sur toute ancienne formulation contradictoire.
 
+## ADDENDUM V5.16 — PRESTATAIRE KYC DIDIT RETENU (22 octobre 2026)
+
+**Decision du responsable du projet : DIDIT devient le fournisseur retenu
+pour la vérification KYC documentaire et biométrique chez CECT.**
+
+L'inscription reste OTP -> KYC -> approbation -> paiement adhésion.
+Le parcours KYC requiert : documents officiels vérifiables, selfie en
+direct, **liveness actif 3D/vidéo**, confrontation visage/pièce, traitement
+antifraude et intervention du rôle Validateur pour les cas douteux.
+La PM ajoute la vérification KYB de la société et de son représentant.
+
+Integration retenue : API Didit v3 create session, interface de capture
+hébergée Didit sur smartphone/web (pas de stockage de vidéo en clair
+dans CECT), webhook HTTPS `status.updated` signature HMAC, puis lecture
+serveur du résultat réel et des modules de vérification avant décision.
+Rien ne peut débloquer les frais avant validation effective des contrôles.
+
+Clés API, identifiant workflow et secret webhook à stocker exclusivement
+dans les secrets serveur. `DIDIT_AUTO_APPROVE=false` par défaut ;
+examen humain obligatoire tant que l'entreprise n'autorise pas l'auto
+validation via politique conformité. Liveness passif SEUL insuffisant.
+
+Avancement : connecteur Laravel, endpoints, interface Didit, contrôle de
+résultat et tests isolés sont ajoutés dans les branches `custum`.
+**Pas déployé, pas lié à un compte Didit réel, pas encore validé par
+la suite complète de non-régression et la conformité biométrique.**
+Voir `docs/KYC_AVANT_ADHESION_2026-10-22.md` pour configuration sandbox
+et critères d'acceptation. Ne pas annoncer une mise en service.
 ## ADDENDUM V5.15 — SELFIE EN DIRECT ET VIDEO BIOMETRIQUE OBLIGATOIRES (22 octobre 2026)
 
 **Decision metier du donneur d'ordre : le KYC doit comporter toutes les
