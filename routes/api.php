@@ -11,6 +11,7 @@ use App\Domain\Identity\Enums\UserKind;
 use App\Domain\Identity\Http\Controllers\LoginController;
 use App\Domain\Identity\Http\Controllers\SuperadminSecurityController;
 use App\Domain\Kyc\Http\Controllers\KycController;
+use App\Domain\Kyc\Http\Controllers\DiditController;
 use App\Domain\Identity\Http\Controllers\OtpController;
 use App\Domain\Identity\Http\Controllers\PasswordResetController;
 use App\Domain\Identity\Http\Controllers\RegistrationController;
@@ -110,6 +111,9 @@ Route::prefix('v1')->name('v1.')->group(function () {
         ->middleware('throttle:webhooks')
         ->name('webhooks.payments');
 
+    Route::post('webhooks/kyc/didit', [DiditController::class, 'webhook'])
+        ->middleware('throttle:webhooks')->name('webhooks.kyc.didit');
+
     /*
      * Authenticated account (members and staff).
      */
@@ -136,6 +140,11 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::get('me/kyc', [KycController::class, 'mine'])->name('me.kyc.show');
         Route::post('me/kyc', [KycController::class, 'submit'])
             ->middleware('throttle:5,1')->name('me.kyc.submit');
+
+        Route::post('me/kyc/didit/start', [DiditController::class, 'start'])
+            ->middleware('throttle:3,1')->name('me.kyc.didit.start');
+        Route::post('me/kyc/didit/refresh', [DiditController::class, 'refresh'])
+            ->middleware('throttle:2,1')->name('me.kyc.didit.refresh');
 
         Route::get('me/membership', [MembershipController::class, 'show'])->name('me.membership.show');
         Route::post('me/membership/payments', [MembershipController::class, 'startPayment'])->middleware('idempotent')->name('me.membership.payments.store');
