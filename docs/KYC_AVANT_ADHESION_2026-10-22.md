@@ -1,4 +1,26 @@
 
+### Sécurisation complémentaire, recette finale ciblée
+
+- Les notifications Didit signées sont envoyées à un **job Laravel** :
+  réponse HTTP immédiate, retries si la consultation Didit échoue.
+- Environnement webhook signé obligatoire : `sandbox` ou `live`, jamais
+  mélanger les deux. Mode `live` requis avant une vraie approbation
+  (le mode `sandbox` ne peut activer un membre que dans la suite de tests isolée).
+- **Sandbox Didit simule les verdicts MAIS conserve les médias réels uploadés.**
+  Ne jamais utiliser de vrais documents, selfies ni vidéos personnels
+  lors des tests sandbox ; employer exclusivement les pièces de démonstration.
+- Nouveaux tests ciblés : **20 tests réussis, 120 assertions**, incluant
+  webhook signé HMAC-V2, replay potentiel/erreur d'environnement,
+  vérification indépendant du statut faux, séparation Validateur/Comptabilité.
+- Les appels API réels et la reconnaissance faciale de Didit restent
+  **NON TESTÉS** faute des trois secrets dans la configuration du serveur.
+- À la date du contrôle, la base active utilise encore son ancien commit
+  backend et reste intacte. Aucun déploiement ni débit Didit.
+
+Documentation éditeur sandbox :
+https://help.didit.me/getting-started/sandbox-and-testing
+
+
 ## MISE À JOUR V5.16 — Didit retenu et connecteur développé (22 octobre 2026)
 
 **Décision métier : DIDIT est le prestataire officiel choisi pour le KYC CECT.**
@@ -45,7 +67,7 @@ Cet état remplace les mentions précédentes « prestataire non choisi ».
    des modules/disponibilités du contrat et des pays couverts.
 3. Copier depuis la console **en environnement serveur sécurisé** :
    `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`, `DIDIT_WEBHOOK_SECRET`.
-   Configurer `DIDIT_ENVIRONMENT=sandbox` pour les essais,
+   Configurer `DIDIT_ENVIRONMENT=sandbox` pour les essais, puis `live` sur l'application de production Didit,
    `DIDIT_AUTO_APPROVE=false` et `KYC_PROVIDER=didit`.
 4. Déclarer la destination webhook HTTPS
    `https://api.13-49-203-235.sslip.io/api/v1/webhooks/kyc/didit`
@@ -58,8 +80,8 @@ Cet état remplace les mentions précédentes « prestataire non choisi ».
    des données et contrat Didit. Pour activer en conditions réelles,
    obtenir les identifiants production et repasser la recette complète.
 
-**Tests réalisés en environnement isolé `cectapi_test` : 19 tests ciblés
-réussis (114 assertions), dont vérification HMAC falsifiée et vérification
+**Tests réalisés en environnement isolé `cectapi_test` : 20 tests ciblés
+réussis (120 assertions), dont vérification HMAC falsifiée et vérification
 des preuves de liveness actif ; frontend membre compilé.**
 Cette preuve technique n'est pas un essai réel des serveurs Didit :
 les appels HTTP Didit ont été simulés. Sans clés sandbox, workflow réel,
