@@ -24,6 +24,9 @@ final class KycEligibility
             // Conclusive results must be documented in the case evidence checklist.
             $query->whereRaw("(provider_checks->>'complete')::boolean = true");
         }
+        if (config('kyc.provider') === 'didit' && $member->person_type?->value === 'legal') {
+            $query->whereRaw("(provider_checks->>'business_verified')::boolean = true");
+        }
         return $query->exists();
     }
 }
