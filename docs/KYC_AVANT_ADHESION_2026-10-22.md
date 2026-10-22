@@ -1,3 +1,84 @@
+## RECETTE DE RÉGRESSION ET CORRECTION PAIEMENT — 22 octobre 2026, 08:50 UTC
+
+**Statut : correctif applicatif DÉPLOYÉ, recettes complètes CECT VALIDÉES en QA.**
+Cette section remplace les conclusions plus anciennes selon lesquelles
+l'adhésion était entièrement opérationnelle après le premier raccordement KYC.
+
+### Bug constaté et corrigé
+
+- `MembershipController::show()` contenait `$membership = $sandboxPreview ? null : ...`.
+  Pour tout membre terminé en Didit Sandbox, le serveur renvoyait
+  **toujours une adhésion fictivement absente**, même quand un
+  vrai dossier `memberships` et des tentatives `fake` étaient en cours.
+- Conséquence observée sur `cectapi_live` : le membre a commencé
+  quatre essais successifs (~08:38–08:39 UTC),
+  trois expirés par changement de moyen et un encore `pending`.
+  L'écran d'adhésion ne pouvait pas récupérer l'essai en cours
+  pour offrir le bouton de confirmation simulée.
+- Fix Git `86e8be0` : requête `Membership` exécutée pour
+  **tous** les membres y compris KYC Sandbox, préservant les
+  règles de démonstration et de sécurité. Aucun montant
+  ou compte supprimé ; aucun essai de paiement forcé.
+- Déployé API commit `0c51ba7` dans `/var/www/cect-api`,
+  Laravel caches reconstruits ; frontend courant et
+  Admin/Superadmin inchangés.
+- Recette QA reproduisant la régression : après KYC
+  `Approved`, **GET /me/membership** fournit la tentative
+  existante `pending` et son drapeau de simulation,
+  nouvel appel avec la même méthode réutilise la même
+  tentative (aucun doublon), confirmation `simulate` →
+  adhésion `active` puis dashboard, catalogue, packs,
+  notifications et quota-ledger accessibles.
+
+### Recette élargie post-correction
+
+- Tests inscription/KYC/membres/personnel : **63 réussis**
+  (338 assertions, base isolée `cectapi_test`).
+- Scénario approfondi KYC → frais d'adhésion → checkout
+  simulé → activation → acquisition d'un pack Consommateur
+  → paiement simulé → crédit de quota → mouvements et dashboard :
+  **18 réussis, 164 assertions** (sous-ensemble des 63).
+- Packs / paiement marchand / rééchange marchand :
+  **50 réussis, 508 assertions** après réconciliation des
+  *fixtures de test* avec les rôles métier actuels :
+  `Comptabilité` et non l'ancien `Validateur`.
+  Une assertion historique a été actualisée pour
+  vérifier le refus 403 pré-adhésion via le middleware.
+  **Aucune permission de production n'a été modifiée**.
+- Total des deux familles disjointes : **113 tests réussis,
+  846 assertions**. Le total n'inclut pas un test
+  visuel avec les cookies personnels d'un vrai membre.
+- Contrôle API et pages HTTP 200, invités API HTTP 401,
+  mTLS Superadmin HTTP 403 sans certificat, audit
+  intègre 154 événements, worker actif, zéro job échoué.
+
+### Restauration / conservation
+
+- Dump avant le correctif :
+  `/home/ubuntu/cect-private-backups/cect-restore-checkout-20261022/cectapi_live_pre_checkout_fix_20261022_084751.dump`
+  382 objets PostgreSQL confirmés, et SHA précédent
+  `9a2a95d` archivés dans le même dossier privé.
+- 4 membres, 2 personnels et 1 clé Superadmin conservés.
+  Les quatre tentatives de paiement simulées restent
+  en base ; la plus récente, `FLOOZ`, était `pending`
+  au dernier contrôle, **éligible à la confirmation
+  via le composant de paiement original**.
+- Les opérations `fake` sont des simulations,
+  sans débit FedaPay ou Mobile Money. La validation
+  réelle de l'identité ne doit jamais être inférée
+  du statut Sandbox.
+
+### Vérification navigateur à effectuer par le membre
+
+Actualisation forcée `Ctrl+Shift+R`, ouverture
+`/espace/adhesion`, reprise du paiement FLOOZ encore en
+attente s'il n'a pas expiré, clic sur bouton de confirmation
+simulée, puis vérification de la redirection au dashboard.
+Si un blocage persiste, relever la réponse API
+`/api/v1/me/membership` et le message d'erreur réseau
+sans demander le mot de passe ou l'OTP au membre.
+
+---
 ## Démonstration commerciale : rétablissement du parcours métier existant — 22 octobre 2026, 08:33 UTC
 
 **DÉPLOYÉ sur le VPS autorisé**. Cette section constitue le
