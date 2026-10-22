@@ -1,3 +1,61 @@
+## Mise à jour d'exécution — recette QA et sauvegarde (22 octobre 2026)
+
+**Le déploiement public de CECT n'a PAS eu lieu à cette étape.**
+Le site et l'API actifs sont volontairement restés sur la version
+`b1143de` ; l'API publique répond HTTP 200.
+
+Actions concrètes exécutées sur le serveur, sans affecter `cectapi_live` :
+
+- Application Didit `CECT-test` confirmée en mode `sandbox` par la
+  lecture authentifiée d'une session synthétique Didit.
+- Session Didit sandbox réellement créée via `DiditGateway::create()`
+  depuis PHP Laravel QA ; résultat : identifiant de session
+  et lien HTTPS autorisé `verify.didit.me` retournés.
+- `.env` de QA seulement configuré avec les secrets Didit
+  test (non journalisés, non versés dans GitHub), application
+  et workflow Didit verrouillés. Dossier privé
+  `/home/ubuntu/.config/cect-kyc-test/` permissions 0700,
+  fichiers des secrets permissions 0600.
+- API QA locale lancée sur `127.0.0.1:18100` :
+  endpoint de santé HTTP 200, accès KYC anonyme HTTP 401,
+  webhook sans signature HTTP 401 et webhook synthétique
+  correctement signé HTTP 200 (session inconnue sans mutation).
+  Ce n'est pas une vérification biométrique réelle.
+- Vérification serveur Didit renforcée : HMAC entier, vérification
+  `DIDIT_APPLICATION_ID`, environnement `sandbox`, correspondance
+  du `workflow_id`, liveness strict `ACTIVE_3D`, contrôle
+  indépendant de la décision du fournisseur.
+- Cas de l'unique membre existant `pending_payment` traité sans
+  modification de son compte en production : l'application
+  QA permet désormais de démarrer le KYC rétroactif et de
+  garder les paiements bloqués jusqu'à l'approbation réelle.
+- **42 tests ciblés réussis, 231 assertions**, dont membres historiques,
+  contrôle des droits Superadmin, OTP et traitement Didit.
+- Builds React membre et admin en version API publique réalisés
+  avec `VITE_API_URL=https://api.13-49-203-235.sslip.io`,
+  artefacts préassemblés dans
+  `/home/ubuntu/cect-releases/frontend-didit-qa-20261022`
+  et `/home/ubuntu/cect-releases/admin-didit-qa-20261022`.
+- Base live sauvegardée sans mutation dans
+  `/home/ubuntu/cect-private-backups/` : dump PostgreSQL
+  format custom `pg_restore --list` OK, fichier privé mode 0600.
+
+**Blocage du basculement public :** l'application Didit actuelle est
+un SANDBOX (les verdicts ne constituent pas un vrai KYC).
+Le code interdit explicitement une approbation sandbox sur un
+service de production. Le KYB PM exige encore sa liaison avec
+les sessions business réelles ; la suite de 604 tests comporte
+121 échecs historiques non qualifiés. La conformité et les
+restrictions de données biométriques ne sont pas finalisées.
+
+Pour une mise en production sûre, obtenir une application Didit
+`live` et des secrets propres à cette application, faire qualifier
+les tests globaux, finaliser l'orchestration KYB PM et obtenir
+la validation de la notice biométrique ; puis sauvegarde,
+migration, bascule backend/frontends et activation du webhook
+après contrôle d'intégrité.
+
+---
 ## VALIDATION DES IDENTIFIANTS DE TEST (22/10/2026)
 
 Une nouvelle clé API a été fournie par le responsable du projet.
