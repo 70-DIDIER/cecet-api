@@ -452,9 +452,29 @@ it('reuses the full existing fake checkout and activates a simulated membership 
         ->assertJsonPath('data.simulation_available', true);
 
     expect($member->refresh()->status)->toBe(UserStatus::PendingPayment);
+    // CRITICAL REGRESSION: the existing membership/attempt must be returned
+    // after a document-only KYC, or the UI shows a second checkout instead
+    // of the pending payment and its confirmation button.
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')
+        ->assertOk()
+        ->assertJsonPath('data.account_status', 'pending_payment')
+        ->assertJsonPath('data.payment_attempts.0.id', $attempt->json('data.id'))
+        ->assertJsonPath('data.payment_attempts.0.status', 'pending')
+        ->assertJsonPath('data.payment_attempts.0.simulation_available', true);
+    $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/membership/payments',
+            ['method' => 'TMONEY', 'payment_phone' => '+22890123456'],
+            ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])
+        ->assertOk()->assertJsonPath('data.id', $attempt->json('data.id'));
+    expect(\App\Domain\Payment\Models\PaymentAttempt::query()->count())->toBe(1);
+
     $this->withToken(tokenFor($member))
         ->postJson('/api/v1/me/payments/'.$attempt->json('data.id').'/simulate', [])
         ->assertOk()->assertJsonPath('data.status', 'approved');
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')
+        ->assertOk()
+        ->assertJsonPath('data.status', 'active')
+        ->assertJsonPath('data.payment_attempts.0.status', 'approved');
 
     expect($member->refresh()->status)->toBe(UserStatus::Active);
     $membership = \App\Domain\Membership\Models\Membership::query()
