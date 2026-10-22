@@ -14,6 +14,7 @@ return [
         'webhook_secret' => env('DIDIT_WEBHOOK_SECRET'),
         'auto_approve' => filter_var(env('DIDIT_AUTO_APPROVE', false), FILTER_VALIDATE_BOOLEAN),
         'environment' => env('DIDIT_ENVIRONMENT', 'sandbox'),
+        'document_only_test' => filter_var(env('DIDIT_DOCUMENT_ONLY_TEST', false), FILTER_VALIDATE_BOOLEAN),
         'allowed_redirect_hosts' => ['verify.didit.me'],
     ],
 ];
