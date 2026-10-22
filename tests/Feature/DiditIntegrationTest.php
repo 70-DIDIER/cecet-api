@@ -482,6 +482,16 @@ it('reuses the full existing fake checkout and activates a simulated membership 
     expect($membership->activation_mode->value)->toBe('simulated_payment')
         ->and($membership->paid_at)->toBeNull();
     $this->withToken(tokenFor($member))->getJson('/api/v1/me/dashboard')->assertOk();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/catalog-packs')->assertOk();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/packs')->assertOk();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/quota-ledger')->assertOk();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/notifications')->assertOk();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')
+        ->assertOk()->assertJsonPath('data.payment_attempts.0.status', 'approved');
+    // Repeated settlement must never credit or activate a second time.
+    $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/payments/'.$attempt->json('data.id').'/simulate', [])
+        ->assertOk()->assertJsonPath('data.status', 'approved');
     expect(\App\Domain\Payment\Models\PaymentAttempt::query()
         ->where('provider', 'fake')->count())->toBe(1);
 });
