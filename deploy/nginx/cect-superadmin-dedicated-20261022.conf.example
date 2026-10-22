@@ -1,0 +1,70 @@
+# CECT — FUTURE dedicated Superadmin virtual host (not yet activated).
+# HTTPS certificate for this exact host must be issued before enabling.
+# Nginx changes require the authorized system administrator.
+#
+# Independent from the ordinary admin HTTPS server. DO NOT replace the
+# admin.13-49-203-235.sslip.io virtual host: Comptabilité and Administrateur
+# must keep their regular sign-in.
+#
+# This configuration is FAIL-CLOSED: the entire host requires a valid client
+# certificate issued by the designated CA and not revoked according to CRL.
+# Never use ssl_verify_client optional or off on this dedicated host.
+#
+# The private CA signing key and personal user .p12/.cectkey files MUST NOT
+# be installed on this server.
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name superadmin.13-49-203-235.sslip.io;
+
+    root /home/ubuntu/cect-current/admin;
+    index index.html;
+    server_tokens off;
+
+    # Requires separately issued ACME certificate containing this exact DNS SAN.
+    ssl_certificate /etc/letsencrypt/live/superadmin.13-49-203-235.sslip.io/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/superadmin.13-49-203-235.sslip.io/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    ssl_client_certificate /home/ubuntu/cect-demo-pki/ca.crt;
+    ssl_verify_client on;
+    ssl_verify_depth 1;
+    ssl_crl /home/ubuntu/cect-demo-pki/clients.crl.pem;
+
+    add_header Cache-Control "no-store" always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+
+    # Same-origin API: these requests carry Nginx-attested FastCGI proof.
+    # Do not forward any untrusted HTTP headers as CECT_MTLS_* values.
+    location ^~ /api/ {
+        root /var/www/cect-api/public;
+        try_files $uri /index.php?$query_string;
+    }
+
+    location ^~ /sanctum/ {
+        root /var/www/cect-api/public;
+        try_files $uri /index.php?$query_string;
+    }
+
+    location = /index.php {
+        internal;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /var/www/cect-api/public/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_param HTTPS on;
+        fastcgi_param CECT_MTLS_VERIFY $ssl_client_verify;
+        fastcgi_param CECT_MTLS_CERT $ssl_client_escaped_cert;
+        fastcgi_pass unix:/run/php/php8.5-fpm.sock;
+    }
+
+    location ~ \.php$ { return 404; }
+    location ~ /\. { deny all; }
+    location ~* \.(?:env|log|ini|sql|bak|dist)$ { deny all; }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
