@@ -17,6 +17,7 @@ final class DiditGateway
         return config('kyc.provider') === 'didit'
             && filled(config('kyc.didit.api_key'))
             && filled(config('kyc.didit.workflow_id'))
+            && filled(config('kyc.didit.application_id'))
             && filled(config('kyc.didit.webhook_secret'));
     }
 
@@ -79,7 +80,7 @@ final class DiditGateway
             static fn ($row) => is_array($row)
                 && ($row['status'] ?? null) === 'Approved'
                 && in_array(strtoupper(str_replace([' ', '-'], '_', (string) ($row['method'] ?? ''))),
-                    ['ACTIVE_3D', '3D_ACTION', 'ACTION', 'ACTIVE', '3D_FLASH', 'FLASH'], true)
+                    ['ACTIVE_3D'], true)
         );
         $warnings = array_merge(
             (array) ($payload['warnings'] ?? []),
