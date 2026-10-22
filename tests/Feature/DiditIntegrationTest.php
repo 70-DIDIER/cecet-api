@@ -296,3 +296,23 @@ it('limits both PF and legal-person test applications to a document-only session
     expect(MemberKycCase::where('user_id', $secondLegal->id)->sole()->provider_workflow_id)
         ->toBe('company-kyb-workflow');
 });
+
+
+it('preselects the sandbox card-only result on the server, never on the member form', function () {
+    config()->set('kyc.didit.document_only_test', true);
+    fakeDiditCreation();
+    $member = User::factory()->status(UserStatus::PendingKyc)->create();
+    startDidit($member)->assertOk();
+    Http::assertSent(fn ($request) => $request['sandbox_scenario'] === 'approve');
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
+});
+
+it('never supplies a simulation result in a live Didit session', function () {
+    config()->set('kyc.didit.environment', 'live');
+    config()->set('kyc.didit.document_only_test', true);
+    fakeDiditCreation();
+    $member = User::factory()->status(UserStatus::PendingKyc)->create();
+    startDidit($member)->assertOk();
+    Http::assertSent(fn ($request) => ! isset($request['sandbox_scenario']));
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
+});
