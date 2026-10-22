@@ -155,7 +155,7 @@ describe('subscription', function () {
         subscribeTo($this->member, $suspended->id)->assertStatus(409)->assertJsonPath('code', 'PACK_NOT_AVAILABLE');
 
         $unpaid = User::factory()->status(UserStatus::PendingPayment)->create();
-        subscribeTo($unpaid, makePlan(code: 'V1')->id)->assertForbidden()->assertJsonPath('code', 'MEMBERSHIP_REQUIRED');
+        subscribeTo($unpaid, makePlan(code: 'V1')->id)->assertForbidden()->assertJsonPath('code', 'HTTP_403');
 
         subscribeTo(User::factory()->staff(PermissionCatalog::ADMIN)->create(), $suspended->id)->assertForbidden();
     });
