@@ -4,6 +4,7 @@ namespace App\Domain\Identity\Http\Middleware;
 
 use App\Domain\Identity\StaffAccessPolicy;
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Kyc\KycEligibility;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
@@ -48,7 +49,12 @@ final class EnsureStaffGuardianSession
                 abort(403, 'Finalisez votre vérification KYC et votre adhésion.');
             }
             if ($user->status === UserStatus::PendingKyc && $path === 'api/v1/me/membership') {
-                abort(403, 'KYC obligatoire avant le paiement.');
+                // A completed Sandbox ID test can only preview the existing
+                // membership screen. Payment routes remain forbidden by status
+                // here and require real KYC approval in the payment action.
+                abort_unless($request->isMethod('GET')
+                    && KycEligibility::sandboxDocumentTestCompleted($user),
+                    403, 'KYC obligatoire avant le paiement.');
             }
         }
 
