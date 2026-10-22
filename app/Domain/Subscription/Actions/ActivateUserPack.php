@@ -41,7 +41,7 @@ class ActivateUserPack
             return $configured;
         }
 
-        return $pack->family === PackFamily::Vendeur ? 1 : 0;
+        return $pack->family->defaultFirstCreditDelayPeriods() ?? 0;
     }
 
     public function handle(UserPack $pack, ?PaymentIntent $intent = null): UserPack

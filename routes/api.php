@@ -19,6 +19,7 @@ use App\Domain\Identity\Http\Controllers\SessionController;
 use App\Domain\Identity\Http\Controllers\StaffActivationController;
 use App\Domain\Identity\Http\Controllers\StepUpController;
 use App\Domain\Membership\Http\Controllers\MemberDashboardController;
+use App\Domain\Membership\Http\Controllers\MemberPaymentStatementController;
 use App\Domain\Membership\Http\Controllers\MemberDocumentController;
 use App\Domain\Membership\Http\Controllers\MembershipController;
 use App\Domain\Merchant\Http\Controllers\MemberMerchantPaymentController;
@@ -135,6 +136,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
          * Membership of the authenticated member.
          */
         Route::get('me/dashboard', MemberDashboardController::class)->name('me.dashboard');
+        Route::get('me/payment-statement', MemberPaymentStatementController::class)->name('me.payment-statement');
         Route::get('me/documents', [MemberDocumentController::class, 'index'])->name('me.documents.index');
         Route::get('me/documents/{type}.pdf', [MemberDocumentController::class, 'download'])->middleware('throttle:20,1')->name('me.documents.download');
         Route::get('me/kyc', [KycController::class, 'mine'])->name('me.kyc.show');
@@ -297,7 +299,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
 
             Route::get('packs/plans', [PackPlanAdminController::class, 'index'])->middleware('can:packs.view')->name('packs.plans.index');
             Route::get('packs/plans/{plan}', [PackPlanAdminController::class, 'show'])->middleware('can:packs.view')->name('packs.plans.show');
-            Route::middleware(['can:packs.manage', 'step-up'])->group(function () {
+            Route::middleware(['can:packs.manage', 'can:settings.update_critical', 'step-up'])->group(function () {
                 Route::post('packs/plans', [PackPlanAdminController::class, 'store'])->middleware('idempotent')->name('packs.plans.store');
                 Route::put('packs/plans/{plan}', [PackPlanAdminController::class, 'update'])->middleware('idempotent')->name('packs.plans.update');
                 Route::delete('packs/plans/{plan}', [PackPlanAdminController::class, 'destroy'])->middleware('can:settings.update_critical')->name('packs.plans.destroy');

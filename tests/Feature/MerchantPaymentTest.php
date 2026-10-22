@@ -108,8 +108,13 @@ it('refuses more than the available quota, a Vendeur pack, and paying oneself', 
     $vendeur = subscribeAndPay($this->payer, makePlan(PackFamily::Vendeur, 'V1'));
     payMerchant($this->payer, $vendeur, $this->token, '1')->assertStatus(422)->assertJsonPath('code', 'PACK_NOT_ELIGIBLE_FOR_MERCHANT_PAYMENT');
 
-    $ownConsumer = subscribeAndPay($this->merchant, makePlan(PackFamily::Consommateur, 'C2'));
-    payMerchant($this->merchant, $ownConsumer, $this->token, '1')->assertStatus(422)->assertJsonPath('code', 'MERCHANT_SELF_PAYMENT');
+    // The merchant is a PM. By the current CECT policy a PM cannot subscribe to a
+    // Consommateur pack at all, so the old self-payment fixture is now invalid.
+    $consumer = makePlan(PackFamily::Consommateur, 'C2');
+    $this->withToken(tokenFor($this->merchant))
+        ->postJson('/api/v1/me/packs', ['plan_id' => $consumer->id], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'PACK_NOT_ELIGIBLE');
 
     $this->withToken(tokenFor($this->payer))->postJson('/api/v1/merchant-payments/intents', ['token' => $this->token, 'user_pack_id' => $this->merchantPack->id, 'quantity' => '1'], ['Idempotency-Key' => (string) Str::ulid()])
         ->assertNotFound();

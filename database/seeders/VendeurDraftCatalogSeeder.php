@@ -70,7 +70,7 @@ class VendeurDraftCatalogSeeder extends Seeder
                     'quota_per_period' => number_format($terms['monthly'], 6, '.', ''),
                     'cumulative' => true,
                     'end_of_term' => 'keep',
-                    'eligible_person_types' => ['natural', 'legal'],
+                    'eligible_person_types' => ['natural'],
                     'rules' => [],
                     'reason' => 'Valeurs héritées du cahier des charges v4.0 (annexe A.1) ; cumul et fin de durée à ratifier (PO-05).',
                     'created_at' => now(),

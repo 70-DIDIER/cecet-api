@@ -109,6 +109,11 @@ class MemberDashboardController
                 ],
                 'available' => $pack->account?->available,
                 'reserved' => $pack->account?->reserved,
+                // Total contractual YEM across the pack lifespan. NOT the spendable balance.
+                // The dashboard keeps the posted ledger credits separate for audit.
+                'contractual_total' => $pack->version->isPeriodic()
+                    ? $pack->periods->reduce(fn (string $total, $period): string => YemQuantity::add($total, $period->quota), YemQuantity::zero())
+                    : null,
                 ...$this->packCredits($pack),
                 'consumed' => $pack->account?->consumed,
                 'period' => $this->currentPeriod($pack),

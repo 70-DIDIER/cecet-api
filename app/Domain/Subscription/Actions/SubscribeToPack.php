@@ -79,12 +79,22 @@ class SubscribeToPack
         $plan = PackPlan::query()->with('currentVersion')->findOrFail($plan->id);
         $version = $plan->currentVersion;
 
+        // Demonstration catalog entries must never create enforceable obligations in production.
+        // They deliberately remain ordinary seller packs within the isolated staging simulation.
+        if (str_starts_with($plan->code, 'TST-') && ! app()->environment(['staging', 'testing'])) {
+            throw SubscriptionException::planNotAvailable();
+        }
+
         if (! $plan->status->isSubscribable() || $version === null) {
             throw SubscriptionException::planNotAvailable();
         }
 
-        if (! in_array($member->person_type?->value, $version->eligible_person_types, true)) {
-            throw SubscriptionException::notEligible($version->eligible_person_types);
+        // Enforce the PF/PM family boundary even for already-published legacy versions
+        // that were configured before this decision. Eligibility metadata alone is insufficient.
+        $allowed = $plan->family->defaultEligiblePersonTypes();
+        if (! in_array($member->person_type?->value, $allowed, true)
+            || ! in_array($member->person_type?->value, $version->eligible_person_types, true)) {
+            throw SubscriptionException::notEligible($allowed);
         }
 
         $pack = UserPack::query()
@@ -171,6 +181,7 @@ class SubscribeToPack
     /**
      * A natural person may hold at most two active/pending SELLER pack
      * subscriptions, including two subscriptions of the same formula.
+     * Test-only staging plans have a separate one-pack demonstration allowance.
      * Consumer packs do not consume these seller slots; Personnel remains
      * a balance top-up product. User lock in prepare() serializes purchases.
      */
@@ -181,11 +192,24 @@ class SubscribeToPack
         }
 
         $max = $this->settings->integer('packs.max_structured_active');
-        $held = UserPack::query()
+        $demoIds = PackPlan::query()->where('code', 'like', 'TST-%')->select('id');
+        $base = UserPack::query()
             ->where('user_id', $member->id)
             ->where('family', PackFamily::Vendeur->value)
-            ->whereIn('status', [UserPackStatus::PendingPayment, UserPackStatus::Active])
-            ->count();
+            ->whereIn('status', [UserPackStatus::PendingPayment, UserPackStatus::Active]);
+
+        // Staging demonstrators can test an additional simulated seller pack
+        // without consuming either of the two commercial Seller slots.
+        // Restrict to ONE active/pending demo pack per member to avoid misuse.
+        if (str_starts_with($plan->code, 'TST-') && app()->environment(['staging', 'testing'])) {
+            $demoHeld = (clone $base)->whereIn('pack_plan_id', $demoIds)->count();
+            if ($demoHeld >= 1) {
+                throw SubscriptionException::limitReached(1);
+            }
+            return;
+        }
+
+        $held = $base->whereNotIn('pack_plan_id', $demoIds)->count();
 
         if ($held >= $max) {
             throw SubscriptionException::limitReached($max);

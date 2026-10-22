@@ -2,6 +2,7 @@
 
 use App\Domain\Catalog\Enums\PackFamily;
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Kyc\Models\MemberKycCase;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -61,20 +62,36 @@ it('summarises the member area: profile, YEM balance, active packs and latest mo
         ->assertJsonPath('data.payments_awaiting_action', []);
 });
 
-it('shows a membership payment still awaiting validation', function () {
+it('keeps a KYC-approved applicant on the membership checkout until payment succeeds', function () {
     $member = User::factory()->status(UserStatus::PendingPayment)->create();
+
+    // The current business sequence requires an approved KYC case before membership checkout.
+    // This is a test-only fixture, not a production KYC bypass.
+    config()->set('kyc.provider', 'manual');
+    MemberKycCase::query()->create([
+        'user_id' => $member->id,
+        'status' => 'approved',
+        'verification_mode' => 'manual',
+        'identity_payload' => ['document_type' => 'national_id'],
+        'document_front_path' => 'fixtures/member-kyc.enc',
+        'privacy_notice_accepted' => true,
+        'submitted_at' => now(),
+        'reviewed_at' => now(),
+    ]);
 
     $this->withToken(tokenFor($member))
         ->postJson('/api/v1/me/membership/payments', ['method' => 'CASH'], ['Idempotency-Key' => (string) Str::ulid()])
         ->assertCreated();
 
-    $this->withToken(tokenFor($member))->getJson('/api/v1/me/dashboard')
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')
         ->assertOk()
-        ->assertJsonPath('data.membership.paid', false)
-        ->assertJsonPath('data.active_packs', [])
-        ->assertJsonPath('data.yem.balance', '0.000000')
-        ->assertJsonPath('data.payments_awaiting_action.0.method', 'CASH')
-        ->assertJsonPath('data.payments_awaiting_action.0.mode', 'manual');
+        ->assertJsonPath('data.status', 'pending_payment')
+        ->assertJsonPath('data.membership.status', 'pending_payment')
+        ->assertJsonPath('data.payment_attempts.0.method', 'CASH')
+        ->assertJsonPath('data.payment_attempts.0.mode', 'manual');
+
+    // The full member dashboard only opens once the membership fee is settled.
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/dashboard')->assertForbidden();
 });
 
 it('requires authentication', function () {

@@ -81,13 +81,16 @@ class PackVersionValidator
                 }
             }
 
-            // Merchant rights belong to legal entities only, regardless of
-            // what an administrator or a crafted API request submits.
-            if ($family === PackFamily::Marchand && array_key_exists('eligible_person_types', $input)
-                && $input['eligible_person_types'] !== [PersonType::Legal->value]) {
+            // CECT business rule: PM (legal) may subscribe ONLY to Merchant packs;
+            // PF (natural) may subscribe ONLY to Seller / Consumer / Personal.
+            // This cannot be overridden by an administrator editing a version.
+            if (array_key_exists('eligible_person_types', $input)
+                && $input['eligible_person_types'] !== $family->defaultEligiblePersonTypes()) {
                 $validator->errors()->add(
                     'eligible_person_types',
-                    'Le pack Marchand est réservé aux personnes morales.',
+                    $family === PackFamily::Marchand
+                        ? 'Les packs Marchand sont exclusivement réservés aux personnes morales.'
+                        : 'Cette famille de packs est exclusivement réservée aux personnes physiques.',
                 );
             }
 
@@ -113,6 +116,13 @@ class PackVersionValidator
 
         $data = $validator->validate();
 
+        // Persist the resolved timing rule in every NEW immutable pack version.
+        // Legacy versions missing this key still use the same family default on activation.
+        $normalizedRules = $data['rules'] ?? [];
+        if ($periodic) {
+            $normalizedRules['first_credit_delay_periods'] ??= $family->defaultFirstCreditDelayPeriods();
+        }
+
         return [
             'price_xof' => (int) $data['price_xof'],
             'period_unit' => $periodic ? $data['period']['unit'] : null,
@@ -124,7 +134,7 @@ class PackVersionValidator
             'min_operation' => isset($data['min_operation']) ? YemQuantity::of($data['min_operation']) : null,
             'max_operation' => isset($data['max_operation']) ? YemQuantity::of($data['max_operation']) : null,
             'eligible_person_types' => array_values($data['eligible_person_types'] ?? $family->defaultEligiblePersonTypes()),
-            'rules' => $data['rules'] ?? [],
+            'rules' => $normalizedRules,
             'reason' => trim($data['reason']),
         ];
     }

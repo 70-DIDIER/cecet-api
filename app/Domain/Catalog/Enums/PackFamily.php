@@ -26,7 +26,20 @@ enum PackFamily: string
     {
         return $this === self::Marchand
             ? [PersonType::Legal->value]
-            : [PersonType::Natural->value, PersonType::Legal->value];
+            : [PersonType::Natural->value];
+    }
+
+    /**
+     * Contract default when an administrator does not explicitly set the first-credit delay.
+     * PERSONAL has no periodic credits. Defaults remain compatible with historical pack versions.
+     */
+    public function defaultFirstCreditDelayPeriods(): ?int
+    {
+        return match ($this) {
+            self::Vendeur => 1,
+            self::Consommateur, self::Marchand => 0,
+            self::Personnel => null,
+        };
     }
 
     /**
