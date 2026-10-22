@@ -23,12 +23,19 @@ final class DiditController
         abort_unless($member instanceof User && $member->isMember()
             && in_array($member->status, [UserStatus::PendingKyc, UserStatus::PendingPayment], true)
             && ! KycEligibility::approved($member), 403);
-        $request->validate(['privacy_notice_accepted' => ['required', 'accepted']]);
+        $request->validate([
+            'privacy_notice_accepted' => ['required', 'accepted'],
+            'restart_sandbox' => ['sometimes', 'boolean'],
+        ]);
+        // Existing sandbox sessions created before the ID-only workflow may contain
+        // selfie checks. Replacing ONLY the pending provider session is safe for tests.
+        $restartSandbox = config('kyc.didit.environment') === 'sandbox'
+            && $request->boolean('restart_sandbox');
         abort_unless(config('kyc.provider') === 'didit', 503, 'Le parcours Didit n’est pas actif.');
-        $result = DB::transaction(function () use ($member, $gateway, $audit): array {
+        $result = DB::transaction(function () use ($member, $gateway, $audit, $restartSandbox): array {
             User::query()->lockForUpdate()->findOrFail($member->id);
             $case = MemberKycCase::query()->where('user_id', $member->id)->lockForUpdate()->first();
-            if ($case && $case->verification_mode === 'didit'
+            if (! $restartSandbox && $case && $case->verification_mode === 'didit'
                 && in_array($case->status, ['provider_pending', 'submitted'], true)
                 && $case->provider_reference && $case->provider_session_url) {
                 return ['url' => $case->provider_session_url, 'status' => $case->status];
