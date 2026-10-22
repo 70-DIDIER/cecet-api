@@ -79,6 +79,12 @@ class SubscribeToPack
         $plan = PackPlan::query()->with('currentVersion')->findOrFail($plan->id);
         $version = $plan->currentVersion;
 
+        // Demonstration catalog entries must never create enforceable obligations in production.
+        // They deliberately remain ordinary seller packs within the isolated staging simulation.
+        if (str_starts_with($plan->code, 'TST-') && ! app()->environment(['staging', 'testing'])) {
+            throw SubscriptionException::planNotAvailable();
+        }
+
         if (! $plan->status->isSubscribable() || $version === null) {
             throw SubscriptionException::planNotAvailable();
         }
