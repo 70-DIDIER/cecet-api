@@ -9,6 +9,7 @@ enum PeriodUnit: string
     case Day = 'day';
     case Week = 'week';
     case Month = 'month';
+    case HalfMonth = 'half_month';
 
     /**
      * Instant reached after $count units, always computed from the same origin so that
@@ -20,6 +21,9 @@ enum PeriodUnit: string
             self::Day => $origin->addDays($count),
             self::Week => $origin->addWeeks($count),
             self::Month => $origin->addMonthsNoOverflow($count),
+            // A quinzaine is one half of an anchored calendar month: two periods always equal a calendar month.
+            self::HalfMonth => $origin->addMonthsNoOverflow(intdiv($count, 2))
+                ->addDays($count % 2 === 1 ? 15 : 0),
         };
     }
 }
