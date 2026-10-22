@@ -106,7 +106,10 @@ class SettlePayment
         match ($intent->purpose) {
             PaymentPurpose::Membership => $this->activateMembership->handle(
                 Membership::query()->lockForUpdate()->findOrFail($intent->payable_id),
-                ActivationMode::Payment,
+                app()->environment('staging')
+                    && $intent->attempts()->where('provider', \App\Domain\Payment\Providers\Fake\FakePaymentProvider::NAME)
+                        ->where('status', PaymentAttemptStatus::Approved)->exists()
+                    ? ActivationMode::SimulatedPayment : ActivationMode::Payment,
                 $intent,
             ),
             PaymentPurpose::PackSubscription => $this->activateUserPack->handle(
