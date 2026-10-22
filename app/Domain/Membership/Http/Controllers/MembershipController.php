@@ -43,6 +43,7 @@ class MembershipController
         // A Sandbox document check may unlock a READ-ONLY tour of the former
         // membership checkout. It is never sufficient to initiate a payment.
         $sandboxPreview = KycEligibility::sandboxDocumentTestCompleted($member);
+        $demoCheckout = KycEligibility::stagingMembershipDemo($member);
         abort_unless($member->status === UserStatus::Active
             || KycEligibility::approved($member) || $sandboxPreview,
             403, 'KYC obligatoire avant le paiement.');
@@ -81,9 +82,10 @@ class MembershipController
         }
 
         return response()->json(['data' => [
-            'status' => $sandboxPreview ? 'kyc_sandbox_preview' : $status->value,
+            'status' => $sandboxPreview && ! $demoCheckout ? 'kyc_sandbox_preview' : $status->value,
             'sandbox_preview' => $sandboxPreview,
-            'payment_enabled' => ! $sandboxPreview,
+            'payment_enabled' => ! $sandboxPreview || $demoCheckout,
+            'demo_checkout' => $demoCheckout,
             'account_status' => $member->status->value,
             'fee_due' => $status === MembershipStatus::Active ? 0 : $fee['amount'],
             'fee_currency' => MembershipFee::CURRENCY,
