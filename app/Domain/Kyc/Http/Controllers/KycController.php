@@ -28,6 +28,7 @@ class KycController
         return response()->json(['data' => [
             'account_status' => $member->status->value,
             'provider' => config('kyc.provider'),
+            'provider_environment' => config('kyc.provider') === 'didit' ? config('kyc.didit.environment') : null,
             'kyc' => $case ? $this->memberSummary($case) : null,
         ]])->header('Cache-Control', 'no-store');
     }
