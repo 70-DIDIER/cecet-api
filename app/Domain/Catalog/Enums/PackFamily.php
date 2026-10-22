@@ -26,7 +26,7 @@ enum PackFamily: string
     {
         return $this === self::Marchand
             ? [PersonType::Legal->value]
-            : [PersonType::Natural->value, PersonType::Legal->value];
+            : [PersonType::Natural->value];
     }
 
     /**
