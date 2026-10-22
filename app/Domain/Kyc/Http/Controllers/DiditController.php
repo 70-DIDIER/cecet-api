@@ -6,6 +6,7 @@ use App\Domain\Audit\AuditLogger;
 use App\Domain\Identity\Enums\UserStatus;
 use App\Domain\Kyc\Didit\DiditDecisionProcessor;
 use App\Domain\Kyc\Didit\DiditGateway;
+use App\Domain\Kyc\KycEligibility;
 use App\Domain\Kyc\Models\MemberKycCase;
 use App\Domain\Kyc\Jobs\ProcessDiditDecision;
 use App\Models\User;
@@ -20,7 +21,8 @@ final class DiditController
     {
         $member = $request->user();
         abort_unless($member instanceof User && $member->isMember()
-            && $member->status === UserStatus::PendingKyc, 403);
+            && in_array($member->status, [UserStatus::PendingKyc, UserStatus::PendingPayment], true)
+            && ! KycEligibility::approved($member), 403);
         $request->validate(['privacy_notice_accepted' => ['required', 'accepted']]);
         abort_unless(config('kyc.provider') === 'didit', 503, 'Le parcours Didit n’est pas actif.');
         $result = DB::transaction(function () use ($member, $gateway, $audit): array {
