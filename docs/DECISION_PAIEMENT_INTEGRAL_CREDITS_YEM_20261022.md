@@ -65,3 +65,13 @@ La page « Mes règlements et échéanciers » et la fiche individuelle d'un pac
 - Catalogue, dossier de souscription et fiche membre : **prix total fixé**, même historique, même date de période et même famille de pack.
 
 **Note historique :** la refonte a une sauvegarde applicative et PostgreSQL hors Git : `/home/ubuntu/cect-private-backups/redesign-stable-20261022/`. Ne jamais committer le dump, `.env`, les preuves KYC ou les clés privées.
+
+## 6. Implémentation du relevé de paiements (branche design uniquement)
+
+**Endpoint en lecture seule :** `GET /api/v1/me/payment-statement` (`auth:sanctum`, périmètre limité au membre connecté, `Cache-Control: no-store, private`).
+
+Ce relevé relit les `PaymentIntent` correspondant aux cotisations, souscriptions de packs et rechargements du membre. Une intention de paiement n'est comptabilisée dans `confirmed_total_xof` que si son statut est **succeeded**. Pour un même objet, une intention réglée l'emporte sur une tentative ultérieure non concluante. L'absence d'intention de paiement pour une formule de prix zéro activée est indiquée `free`, jamais `paid`.
+
+Le contrat renvoie `payment_mode=upfront_once`, `installments_allowed=false`, les montants de contrat / frais / total, la date de confirmation, le type PF/PM et le prestataire (une transaction du prestataire `fake` est explicitement étiquetée **simulation** par le frontend). Les crédits YEM continuent d'être lus depuis les **PackPeriod** propres au membre, sous l'API existante : les deux registres sont distincts.
+
+**Recette ciblée réussie sur la base de test** : 4 scénarios de paiement intégral et crédits périodiques (85 assertions) et 3 scénarios de relevé financier, frais, isolation et accès (42 assertions). Vérification TypeScript/Vite du frontend réussie. Aucun déploiement de ces nouveautés dans la version stable.
