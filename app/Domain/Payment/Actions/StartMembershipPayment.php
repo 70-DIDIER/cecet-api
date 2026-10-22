@@ -9,6 +9,7 @@ use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\MembershipFee;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Payment\CollectionRouter;
+use App\Domain\Payment\Providers\Fake\FakePaymentProvider;
 use App\Domain\Payment\Enums\PaymentPurpose;
 use App\Domain\Payment\Exceptions\PaymentException;
 use App\Domain\Payment\Models\PaymentAttempt;
@@ -45,15 +46,34 @@ class StartMembershipPayment
             throw PaymentException::alreadyMember();
         }
 
-        if ($member->status !== UserStatus::PendingPayment) {
+        $demo = KycEligibility::stagingMembershipDemo($member);
+        if ($member->status !== UserStatus::PendingPayment
+            && ! ($member->status === UserStatus::PendingKyc && $demo)) {
             throw PaymentException::notPayable();
         }
 
-        if (! KycEligibility::approved($member)) {
+        if (! KycEligibility::approved($member) && ! $demo) {
             throw PaymentException::notPayable();
         }
 
         $channel = $this->router->route($member, $method, $paymentPhone);
+        if ($demo) {
+            // Every presentation payment MUST go through the existing fake
+            // checkout; never create real/manual receivables from Sandbox ID.
+            if ($channel['provider'] !== FakePaymentProvider::NAME || $channel['gateway'] === null) {
+                throw PaymentException::notPayable();
+            }
+            if ($member->status === UserStatus::PendingKyc) {
+                DB::transaction(function () use ($member): void {
+                    $locked = User::query()->lockForUpdate()->findOrFail($member->id);
+                    if ($locked->status === UserStatus::PendingKyc
+                        && KycEligibility::stagingMembershipDemo($locked)) {
+                        $locked->forceFill(['status' => UserStatus::PendingPayment])->save();
+                    }
+                });
+                $member->refresh();
+            }
+        }
 
         ['attempt' => $attempt, 'reused' => $reused] = DB::transaction(fn (): array => $this->prepare($member, $channel['provider'], $channel['method']));
 
@@ -79,7 +99,7 @@ class StartMembershipPayment
     private function prepare(User $member, string $providerName, string $method): array
     {
         User::query()->lockForUpdate()->findOrFail($member->id);
-        if (! KycEligibility::approved($member)) {
+        if (! KycEligibility::approved($member) && ! KycEligibility::stagingMembershipDemo($member)) {
             throw PaymentException::notPayable();
         }
 
