@@ -33,7 +33,7 @@ l'adhésion était entièrement opérationnelle après le premier raccordement K
 ### Recette élargie post-correction
 
 - Tests inscription/KYC/membres/personnel : **63 réussis**
-  (338 assertions, base isolée `cectapi_test`).
+  (356 assertions, base isolée `cectapi_test`).
 - Scénario approfondi KYC → frais d'adhésion → checkout
   simulé → activation → acquisition d'un pack Consommateur
   → paiement simulé → crédit de quota → mouvements et dashboard :
@@ -46,7 +46,7 @@ l'adhésion était entièrement opérationnelle après le premier raccordement K
   vérifier le refus 403 pré-adhésion via le middleware.
   **Aucune permission de production n'a été modifiée**.
 - Total des deux familles disjointes : **113 tests réussis,
-  846 assertions**. Le total n'inclut pas un test
+  864 assertions**. Le total n'inclut pas un test
   visuel avec les cookies personnels d'un vrai membre.
 - Contrôle API et pages HTTP 200, invités API HTTP 401,
   mTLS Superadmin HTTP 403 sans certificat, audit
