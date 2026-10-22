@@ -1,3 +1,79 @@
+## DÉPLOIEMENT KYC DOCUMENT SEUL — interface intégrée CECT (22 octobre 2026)
+
+### Décision métier et réalisation
+
+- **Une seule étape pour le test** : scan ou import d'une **carte
+  d'identité** (recto et verso selon le document).
+- Workflow Didit PF stable `635693e0-768a-45fe-ad42-e7bae9c649b8`,
+  **version 2 publiée**, a été modifié exclusivement pour les
+  essais : graphe `OCR -> final_status`, `documents_allowed=ID`
+  (contrôlé sur 208 pays) ; pas de LIVENESS, FACE_MATCH ni IP_ANALYSIS.
+  Les anciens liens de sessions conservent leur propre version.
+- Vérification MCP indépendante : nouvelle session synthétique
+  sur l'application Didit en `sandbox` renvoie une seule
+  fonctionnalité `ID_VERIFICATION` et aucune biométrie.
+- `DIDIT_DOCUMENT_ONLY_TEST=true` activé uniquement lorsque
+  `DIDIT_ENVIRONMENT=sandbox`; les membres PF et PM testent
+  la carte du titulaire/représentant. Le workflow entreprise
+  KYB distinct est conservé pour sa réactivation ultérieure.
+- Le front membre CECT utilise la dépendance officielle
+  `@didit-protocol/sdk-web@0.4.0` **en mode embedded**.
+  Le module est rendu dans la page `/espace/kyc`,
+  sans redirection complète hors de l'espace membre.
+  La page et les boutons utilisent les libellés CECT et
+  affichent un avertissement explicite « Mode test ».
+- Notice utilisateur : mention explicite du sous-traitant
+  Didit en tant que prestataire technique. Il serait
+  trompeur de prétendre que CECT traite seule les
+  données d'identité.
+- Un membre ayant une session `provider_pending`
+  de l'ancien workflow peut demander `restart_sandbox=true`,
+  créant une nouvelle session carte-seule en conservant
+  son compte et son dossier CECT. Les anciennes sessions
+  ne peuvent plus servir de verdict CECT après remplacement
+  de `provider_reference`.
+- Statuts de vérification Sandbox : **jamais d'accès aux paiements**
+  ni activation YEM. `DIDIT_AUTO_APPROVE=false`, et la validation
+  de vrais contrôles exige notamment la preuve du liveness
+  en environnement Didit Live ; aucun contournement ajouté.
+
+### Version publiée et vérifications
+
+- Backend API sur site `b54de1a` (branche autorisée `custum`).
+- Frontend membre actif :
+  `/home/ubuntu/cect-releases/frontend-id-card-native-final-20261022` ;
+  version antérieure intacte pour un rollback instantané.
+- Le lien promotionnel de l'accueil mène directement à
+  `/connexion`, puis au contrôle membre, au lieu d'un lien
+  de session Didit non corrélé à un membre.
+- Ancienne page de présentation remplacée par un panneau
+  d'accès CECT montrant le nouveau flux carte-seule.
+- **44 tests ciblés passés, 243 assertions** sur
+  la seule base `cectapi_test` ; build React/Vite réussi.
+- Tests de production sans données sensibles :
+  200 pour accueil, `/espace/kyc`, présentation, `/admin/kyc`
+  et santé API ; 401 pour KYC anonyme et webhook non signé ;
+  403 sur Superadmin sans certificat ; worker actif.
+- `cectapi_live` non réinitialisée : 3 membres,
+  2 personnels, 1 clé d'accès Superadmin au contrôle.
+  Audit intègre (140 événements), ledger cohérent.
+
+### Limite majeure de marque blanche
+
+Le SDK **intègre** le parcours dans l'interface CECT, mais la
+console Didit indique encore `is_white_label_enabled=false`.
+La page embarquée peut donc présenter certains éléments de
+marque Didit. Un véritable habillage entièrement CECT
+(logo, palettes à l'intérieur du module, domaine propre)
+nécessite d'activer la fonction **White Label** dans
+les réglages de l'application et du workflow Didit.
+Le MCP actuel lit ce champ mais sa mise à jour de branding
+retourne HTTP 404 pour l'application ciblée ;
+ne pas déclarer cette activation réussie.
+La notice de confidentialité doit quoi qu'il arrive
+mentionner le sous-traitant.
+
+---
 ## MISE EN LIGNE INTÉGRÉE SUR CECT — 22 OCTOBRE 2026 (effectuée)
 
 **Cette section remplace la mention précédente « non déployé » pour
