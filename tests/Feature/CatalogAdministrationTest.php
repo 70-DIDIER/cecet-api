@@ -116,7 +116,7 @@ describe('versions', function () {
             ->assertJsonPath('data.published_at', null)
             ->assertJsonPath('data.quota_per_period', '125.500000')
             ->assertJsonPath('data.total_quota', '1506.000000')
-            ->assertJsonPath('data.eligible_person_types', ['natural', 'legal']);
+            ->assertJsonPath('data.eligible_person_types', ['natural']);
 
         adminPost($this->token, "/api/v1/admin/packs/plans/{$plan->id}/versions", periodicTerms())->assertJsonPath('data.version', 2);
 
