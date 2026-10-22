@@ -136,3 +136,38 @@ it('credits a delayed allowance only when due, and never twice, including after 
 
     $this->travelBack();
 });
+
+it('keeps an older published version without a delay rule on the historical family default', function (): void {
+    $superadmin = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
+    $catalog = app(\App\Domain\Catalog\CatalogManager::class);
+    $plan = $catalog->createPlan($superadmin, PackFamily::Vendeur, 'VL5', 'Vendeur historique', 1, null);
+    // Build a historical fixture *at insertion time*. The database forbids
+    // changing ANY version terms even before publication, by design.
+    $terms = app(\App\Domain\Catalog\PackVersionValidator::class)->validate(PackFamily::Vendeur, periodicTerms([
+        'price_xof' => 100000,
+        'quota_per_period' => '60',
+        'period' => ['unit' => 'month', 'every' => 1, 'cycles' => 3],
+    ]));
+    $version = PackVersion::query()->create([
+        ...$terms,
+        'pack_plan_id' => $plan->id,
+        'version' => 1,
+        'currency' => 'XOF',
+        'rules' => [],
+        'created_by' => $superadmin->id,
+        'created_at' => now(),
+    ]);
+    $catalog->publishVersion($superadmin, $plan, $version);
+    $catalog->transition($superadmin, $plan, \App\Domain\Catalog\Enums\PackPlanStatus::Published, 'Conservation contrat historique');
+    expect($version->refresh()->rules)->toBe([]);
+
+    $member = User::factory()->create();
+    $this->withToken(tokenFor($member))->getJson("/api/v1/packs/{$plan->id}")
+        ->assertOk()->assertJsonPath('data.current_version.first_credit_delay_periods', 1);
+
+    $pack = subscribeAndPay($member, $plan)->load(['account', 'periods']);
+    expect($pack->account->available)->toBe('0.000000')
+        ->and($pack->periods->first()->starts_at->toDateString())
+        ->toBe($pack->activated_at->addMonth()->toDateString())
+        ->and($pack->periods)->toHaveCount(3);
+});
