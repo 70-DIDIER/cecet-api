@@ -30,6 +30,13 @@ class KycController
             'provider' => config('kyc.provider'),
             'provider_environment' => config('kyc.provider') === 'didit' ? config('kyc.didit.environment') : null,
             'provider_document_only_test' => config('kyc.didit.environment') === 'sandbox' && config('kyc.didit.document_only_test'),
+            // Test-only presentation: never interpreted by membership/payment guards.
+            'sandbox_test_completed' => (bool) ($case && config('kyc.didit.environment') === 'sandbox'
+                && config('kyc.didit.document_only_test')
+                && $case->status === 'submitted'
+                && $case->provider_status === 'Approved'
+                && ($case->provider_checks['document'] ?? false)
+                && $case->provider_reviewed_at?->lte(now()->subMinutes(2))),
             'kyc' => $case ? $this->memberSummary($case) : null,
         ]])->header('Cache-Control', 'no-store');
     }
