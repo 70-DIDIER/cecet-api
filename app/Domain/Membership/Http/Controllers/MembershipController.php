@@ -47,8 +47,10 @@ class MembershipController
         abort_unless($member->status === UserStatus::Active
             || KycEligibility::approved($member) || $sandboxPreview,
             403, 'KYC obligatoire avant le paiement.');
-        $membership = $sandboxPreview
-            ? null : Membership::query()->where('user_id', $member->id)->first();
+        // Always load the existing membership, including after a Sandbox
+        // document was approved. The previous preview conditional hid the
+        // pending payment and tricked the frontend into reopening checkout.
+        $membership = Membership::query()->where('user_id', $member->id)->first();
 
         if ($membership !== null) {
             $checkout->expireStale($membership);
