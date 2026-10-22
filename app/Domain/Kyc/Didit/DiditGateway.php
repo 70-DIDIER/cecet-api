@@ -27,12 +27,19 @@ final class DiditGateway
         $workflowId = $isBusiness ? config('kyc.didit.kyb_workflow_id') : config('kyc.didit.workflow_id');
         abort_unless(is_string($workflowId) && $workflowId !== '', 503,
             'Le parcours KYB de l’entreprise n’est pas configuré.');
+        $payload = [
+            'workflow_id' => $workflowId,
+            'vendor_data' => 'cect-kyc:'.$case->id,
+        ];
+        // Sandbox-only outcome is selected by the server rather than a member.
+        // This never controls real identity approval or unlocks membership payments.
+        if (config('kyc.didit.environment') === 'sandbox'
+            && config('kyc.didit.document_only_test')) {
+            $payload['sandbox_scenario'] = 'approve';
+        }
         $response = Http::withHeaders(['x-api-key' => config('kyc.didit.api_key')])
             ->acceptJson()->timeout(12)
-            ->post(rtrim(config('kyc.didit.base_url'), '/').'/v3/session/', [
-                'workflow_id' => $workflowId,
-                'vendor_data' => 'cect-kyc:'.$case->id,
-            ]);
+            ->post(rtrim(config('kyc.didit.base_url'), '/').'/v3/session/', $payload);
         if (! $response->successful()) {
             report(new \RuntimeException('Didit session API HTTP '.$response->status()));
             abort(502, 'Impossible de démarrer le contrôle d’identité.');
