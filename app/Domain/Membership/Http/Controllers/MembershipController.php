@@ -40,8 +40,14 @@ class MembershipController
     public function show(Request $request, MembershipFee $fees, PaymentFeeCalculator $feeCalculator, PaymentCheckout $checkout, SettingsService $settings): JsonResponse
     {
         $member = $this->member($request);
-        abort_unless($member->status === UserStatus::Active || KycEligibility::approved($member), 403, 'KYC obligatoire avant le paiement.');
-        $membership = Membership::query()->where('user_id', $member->id)->first();
+        // A Sandbox document check may unlock a READ-ONLY tour of the former
+        // membership checkout. It is never sufficient to initiate a payment.
+        $sandboxPreview = KycEligibility::sandboxDocumentTestCompleted($member);
+        abort_unless($member->status === UserStatus::Active
+            || KycEligibility::approved($member) || $sandboxPreview,
+            403, 'KYC obligatoire avant le paiement.');
+        $membership = $sandboxPreview
+            ? null : Membership::query()->where('user_id', $member->id)->first();
 
         if ($membership !== null) {
             $checkout->expireStale($membership);
@@ -75,14 +81,16 @@ class MembershipController
         }
 
         return response()->json(['data' => [
-            'status' => $status->value,
+            'status' => $sandboxPreview ? 'kyc_sandbox_preview' : $status->value,
+            'sandbox_preview' => $sandboxPreview,
+            'payment_enabled' => ! $sandboxPreview,
             'account_status' => $member->status->value,
             'fee_due' => $status === MembershipStatus::Active ? 0 : $fee['amount'],
             'fee_currency' => MembershipFee::CURRENCY,
             'payment_quote' => $quote,
             'membership' => $membership === null ? null : new MembershipResource($membership),
             'payment_attempts' => PaymentAttemptResource::collection($attempts),
-        ]]);
+        ]])->header('Cache-Control', 'private, no-store');
     }
 
     /**
