@@ -71,8 +71,19 @@ final class DiditController
             $audit->record('kyc.didit_session_created', $case, after: [
                 'provider' => 'didit', 'status' => 'provider_pending',
             ], actor: $member);
-            return ['url' => $created['url'], 'status' => 'provider_pending'];
+            return ['url' => $created['url'], 'status' => 'provider_pending',
+                'created_case_id' => $case->id];
         });
+        // Automatic reconciliation after 2 and 5 minutes, even if the browser closes.
+        // Only provider responses can change review state; Sandbox NEVER grants membership.
+        if (isset($result['created_case_id'])
+            && config('kyc.didit.environment') === 'sandbox'
+            && config('kyc.didit.document_only_test')
+            && ! app()->environment('testing')) {
+            ProcessDiditDecision::dispatch($result['created_case_id'])->delay(now()->addMinutes(2));
+            ProcessDiditDecision::dispatch($result['created_case_id'])->delay(now()->addMinutes(5));
+        }
+        unset($result['created_case_id']);
         return response()->json(['data' => $result])->header('Cache-Control', 'no-store');
     }
 
