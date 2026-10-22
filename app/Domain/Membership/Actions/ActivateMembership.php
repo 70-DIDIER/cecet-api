@@ -40,7 +40,8 @@ class ActivateMembership
             $membership->paid_at = now();
         }
 
-        if ($user->status !== UserStatus::PendingPayment || ! KycEligibility::approved($user)) {
+        if ($user->status !== UserStatus::PendingPayment || ! (KycEligibility::approved($user)
+            || ($mode === ActivationMode::SimulatedPayment && KycEligibility::stagingMembershipDemo($user)))) {
             $membership->save();
 
             $this->auditLogger->record(
