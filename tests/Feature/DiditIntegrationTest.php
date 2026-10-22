@@ -422,6 +422,9 @@ it('never offers a membership preview for an unstarted or unapproved sandbox ide
 it('reuses the full existing fake checkout and activates a simulated membership after Sandbox KYC in staging', function () {
     config()->set('kyc.didit.document_only_test', true);
     app()->detectEnvironment(fn () => 'staging');
+    // Staging schedules delayed provider polls; isolated tests must not run
+    // those jobs outside their stubbed decision endpoint.
+    \Illuminate\Support\Facades\Queue::fake([\App\Domain\Kyc\Jobs\ProcessDiditDecision::class]);
 
     fakeDiditCreation();
     $member = User::factory()->status(UserStatus::PendingKyc)->create();
@@ -466,6 +469,9 @@ it('reuses the full existing fake checkout and activates a simulated membership 
 it('never permits a fake Sandbox KYC document to create real payment attempts', function () {
     config()->set('kyc.didit.document_only_test', true);
     app()->detectEnvironment(fn () => 'staging');
+    // Staging schedules delayed provider polls; isolated tests must not run
+    // those jobs outside their stubbed decision endpoint.
+    \Illuminate\Support\Facades\Queue::fake([\App\Domain\Kyc\Jobs\ProcessDiditDecision::class]);
 
     fakeDiditCreation();
     $member = User::factory()->status(UserStatus::PendingKyc)->create();
