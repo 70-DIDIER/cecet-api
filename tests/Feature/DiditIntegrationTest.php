@@ -76,6 +76,15 @@ it('creates only one hosted session and prevents manual document bypass', functi
         ->not->toContain('verify.didit.me');
     startDidit($member)->assertOk();
     expect(MemberKycCase::count())->toBe(1);
+
+    config()->set('kyc.didit.document_only_test', true);
+    $this->withToken(tokenFor($member))->postJson('/api/v1/me/kyc/didit/start', [
+        'privacy_notice_accepted' => true,
+        'restart_sandbox' => true,
+    ])->assertOk();
+    Http::assertSentCount(2);
+    expect(MemberKycCase::count())->toBe(1);
+
     $this->withToken(tokenFor($member))->postJson('/api/v1/me/kyc', [])->assertForbidden();
     $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
 });
