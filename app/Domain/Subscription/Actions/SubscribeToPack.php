@@ -181,6 +181,7 @@ class SubscribeToPack
     /**
      * A natural person may hold at most two active/pending SELLER pack
      * subscriptions, including two subscriptions of the same formula.
+     * Test-only staging plans have a separate one-pack demonstration allowance.
      * Consumer packs do not consume these seller slots; Personnel remains
      * a balance top-up product. User lock in prepare() serializes purchases.
      */
@@ -191,11 +192,24 @@ class SubscribeToPack
         }
 
         $max = $this->settings->integer('packs.max_structured_active');
-        $held = UserPack::query()
+        $demoIds = PackPlan::query()->where('code', 'like', 'TST-%')->select('id');
+        $base = UserPack::query()
             ->where('user_id', $member->id)
             ->where('family', PackFamily::Vendeur->value)
-            ->whereIn('status', [UserPackStatus::PendingPayment, UserPackStatus::Active])
-            ->count();
+            ->whereIn('status', [UserPackStatus::PendingPayment, UserPackStatus::Active]);
+
+        // Staging demonstrators can test an additional simulated seller pack
+        // without consuming either of the two commercial Seller slots.
+        // Restrict to ONE active/pending demo pack per member to avoid misuse.
+        if (str_starts_with($plan->code, 'TST-') && app()->environment(['staging', 'testing'])) {
+            $demoHeld = (clone $base)->whereIn('pack_plan_id', $demoIds)->count();
+            if ($demoHeld >= 1) {
+                throw SubscriptionException::limitReached(1);
+            }
+            return;
+        }
+
+        $held = $base->whereNotIn('pack_plan_id', $demoIds)->count();
 
         if ($held >= $max) {
             throw SubscriptionException::limitReached($max);
