@@ -1,3 +1,83 @@
+## CECT KYC — décision métier révisée et déployée le 22 octobre 2026
+
+Exigences opérationnelles : supprimer la sélection de résultat de test
+visible avant la capture, montrer **uniquement** la page
+« Dossier en vérification » dès l'envoi, traiter
+automatiquement les résultats de test après quelques minutes,
+et préserver la sécurité Superadmin existante.
+
+### Changements
+
+- Session Didit Sandbox ID-only : le backend positionne
+  `sandbox_scenario=approve` lors de la création,
+  **uniquement** en `DIDIT_ENVIRONMENT=sandbox` et avec
+  `DIDIT_DOCUMENT_ONLY_TEST=true`. Le membre ne choisit plus
+  un verdict dans CECT. Didit documente ce paramètre comme
+  alternative au sélecteur de scénario dans son interface ;
+  le comportement visuel de l'iframe doit être revérifié
+  sur une **nouvelle session** car les anciennes gardent
+  leur version et leur configuration.
+- Confirmation technique : création d'une nouvelle session Didit
+  avec ce paramètre à partir du gateway Laravel QA réussie.
+- `DiditController::start` planifie **deux synchronisations**
+  automatiques du résultat (2 et 5 minutes) dans la file Laravel
+  `database`, uniquement pour une nouvelle session de test.
+  Le worker `cect-queue` est actif.
+- Le retour d'événement `onComplete` du SDK intégré masque
+  immédiatement le module documentaire, interroge l'API CECT
+  et affiche **une seule carte de suivi** à la place du formulaire.
+  La même carte est affichée sur toute nouvelle visite dès que
+  `member_kyc_cases.status=submitted`.
+- La carte unique présente « Dossier en vérification »
+  et l'avertissement du blocage de paiement. Après
+  réception **confirmée par l'API Didit** d'un résultat
+  `Approved` sans anomalie documentaire et deux minutes
+  depuis la synchronisation, le libellé devient
+  « Contrôle documentaire terminé (test) ». Ceci est
+  un **résultat de simulation**, pas une identité réelle approuvée.
+- Le backend émet le booléen sans risque `sandbox_test_completed`
+  sur `/api/v1/me/kyc` ; il n'affecte **jamais** les
+  autorisations d'adhésion, de paiement ou les quotas.
+  `DIDIT_AUTO_APPROVE=false` reste inchangé.
+- Anciennes sessions et dossiers restent conservés ;
+  aucune purge ni suppression de comptes.
+
+### Recette / publication
+
+- 46 tests ciblés, 249 assertions : **OK** en base isolée
+  `cectapi_test` ; build front OK ; authentification Didit
+  et création de session Sandbox avec scénario prédéfini : OK.
+- API publiée `74f28d8` sur `/var/www/cect-api` ;
+  frontend publié sur
+  `/home/ubuntu/cect-releases/frontend-kyc-result-only-20261022`.
+  Anciennes versions et pointeurs du déploiement archivés
+  dans `/home/ubuntu/cect-private-backups/20261022-kyc-followup-ui`.
+- API, espace membre, backoffice, accueil : HTTP 200.
+  KYC sans authentification 401, webhook non signé 401,
+  Superadmin sans certificat client mTLS 403.
+  Audit et journaux de quotas cohérents, 2 personnels
+  internes et 1 clé Superadmin conservés.
+
+### Rappel Superadmin actuellement déployé
+
+- Lien :
+  `https://admin.13-49-203-235.sslip.io/superadmin/connexion`.
+- L'accès est **protégé par certificat mTLS**, puis
+  un fichier `.cectkey` v2 chiffré par phrase secrète
+  (v1 toléré pour migration), puis le **même OTP**
+  envoyé aux trois e-mails vérifiés et saisi une fois.
+- Trois OTP différents servent seulement aux démarches
+  exceptionnelles : enrôlement, remplacement, récupération
+  de clé ou modification des trois adresses.
+- Compte Superadmin activé, durée nominale de clé
+  30 jours, une clé enregistrée, accès sans certificat 403.
+  Ne pas toucher aux certificats ou aux enregistrements.
+- La CRL de démonstration était documentée comme valide
+  jusqu'au 24/10/2026 22:36 UTC ; renouveler et
+  vérifier la chaîne de certificats depuis la CA hors ligne
+  autorisée avant expiration.
+
+---
 ## DÉPLOIEMENT KYC DOCUMENT SEUL — interface intégrée CECT (22 octobre 2026)
 
 ### Décision métier et réalisation
