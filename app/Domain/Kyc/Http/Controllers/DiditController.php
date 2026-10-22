@@ -100,6 +100,10 @@ final class DiditController
             && ctype_digit($headerTime) && (int) $headerTime === (int) $timestamp
             && abs(time() - (int) $timestamp) <= 300, 401,
             'Notification Didit périmée.');
+        $expectedApplication = config('kyc.didit.application_id');
+        abort_unless(is_string($expectedApplication) && $expectedApplication !== ''
+            && ($data['application_id'] ?? null) === $expectedApplication, 409,
+            'Webhook Didit d’une autre application.');
         abort_unless(($data['environment'] ?? null) === config('kyc.didit.environment'), 409,
             'Événement d’un environnement Didit différent.');
         // Official console sample webhooks must not mutate real member identities.
