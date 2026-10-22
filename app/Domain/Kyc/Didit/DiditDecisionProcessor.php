@@ -56,11 +56,18 @@ final class DiditDecisionProcessor
                 default => 'provider_pending',
             };
             if ($old === 'approved' && $canApprove) $next = 'approved';
+            // Keep the first successful document decision time. Repeated browser
+            // refreshes and queued polls must not restart the two-minute test delay.
+            $firstDocumentDecisionAt = $status === 'Approved' && ($checks['document'] ?? false)
+                && $locked->provider_status === 'Approved'
+                && ($locked->provider_checks['document'] ?? false)
+                && $locked->provider_reviewed_at
+                    ? $locked->provider_reviewed_at : now();
             $locked->forceFill([
                 'provider_status' => $status,
                 'provider_checks' => $checks,
                 'provider_verified_at' => $canApprove ? now() : null,
-                'provider_reviewed_at' => now(),
+                'provider_reviewed_at' => $firstDocumentDecisionAt,
                 'status' => $next,
                 'review_reason' => $next === 'needs_information'
                     ? 'La vérification Didit nécessite une nouvelle tentative.' : null,
