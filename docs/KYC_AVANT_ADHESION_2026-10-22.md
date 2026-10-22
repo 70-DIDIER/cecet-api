@@ -1,3 +1,25 @@
+## Vérification des identifiants Didit — suivi opérationnel
+
+Le maître d'ouvrage a fourni une clé API et un secret webhook pour essais,
+mais les VALEURS ne doivent jamais être transcrites dans GitHub, la
+documentation ni les sorties des tests. Aucun secret fourni dans le chat
+n'a été copié dans `.env` lors de cette vérification.
+
+Contrôle de cohérence : la liste MCP des applications de l'organisation
+`CECT-test` indique une clé actuellement associée à l'application Sandbox
+avec aperçu `4NR-…AG0c`. La clé communiquée antérieurement dans le chat
+n'a pas cet aperçu. Elle peut appartenir à une autre application,
+avoir été remplacée ou ne pas être à jour. **Ne pas la considérer
+comme validée pour `CECT-test` avant contrôle API autorisé.**
+
+Le secret webhook de la destination CECT est masqué par le MCP,
+donc impossible de confirmer sa correspondance uniquement à partir
+des métadonnées affichées. Conserver la destination désactivée.
+
+Accès serveur aux secrets non finalisé. Suite de régression générale
+toujours en état NO-GO (121 échecs lors du dernier passage).
+
+---
 ## VERDICT DU DÉPLOIEMENT — 22 OCTOBRE 2026
 
 Demande explicite : « fais tous là et déploie ». Le MCP Didit a servi
