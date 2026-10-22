@@ -1,3 +1,79 @@
+## LIVRAISON EFFECTUÉE — KYC ajouté devant l'adhésion existante (22 octobre 2026, 08:08 UTC)
+
+**STATUT FINAL : DÉPLOYÉ SUR LE VPS CECT.** Remplace la mention
+« NON DÉPLOYÉ » qui figure plus bas dans le journal des étapes antérieures.
+
+### Principe métier respecté
+
+Seule une couche documentaire KYC est ajoutée devant le
+parcours normal déjà existant : inscription et OTP →
+vérification documentaire → **ancienne page d'adhésion**
+(frais paramétrés, pays, numéro, moyen de paiement) →
+paiement → activation de membre. Aucun nouveau module métier,
+pack, tarif, transaction ou compte n'a été créé.
+
+### Protection du Sandbox de test
+
+Le résultat `Approved` Didit Sandbox **n'est pas une identité réelle**.
+Après minimum deux minutes il donne **lecture seule** de
+la page d'adhésion et jamais un droit de paiement.
+Les champs et méthodes sont présentés normalement mais
+le bouton de paiement est désactivé, `payment_enabled=false`.
+Le middleware `EnsureStaffGuardianSession`, l'action
+`StartMembershipPayment` et le contrôle `KycEligibility::approved`
+refusent toujours les tentatives de débit et d'activation
+et maintiennent l'accès YEM fermé.
+
+### Correctif et recette
+
+- Le prédicat serveur `KycEligibility::sandboxDocumentTestCompleted()`
+  sert uniquement à l'aperçu. `KycController::mine()` et
+  `MembershipController::show()` sont cohérents.
+- Une route `GET /api/v1/me/membership` est désormais
+  autorisée après un vrai résultat de fournisseur
+  **Sandbox Approved documentaire**, sans ouverture des POST.
+- Le frontend `MemberLayout` laisse accéder à
+  `/espace/adhesion` pour afficher cet aperçu ; `KycPage`
+  redirige automatiquement quand le dossier est terminé.
+- Frontend : ancien `MembershipPage` conservé, bandeau explicatif
+  et paiement désactivé si `sandbox_preview=true`.
+- **61 tests ciblés réussis, 303 assertions** sur la seule
+  base isolée `cectapi_test`, build React/Vite réussi.
+
+### Déploiement réel / sauvegarde et contrôle
+
+- VPS autorisé `ip-172-31-25-53` reconnecté, API
+  `/var/www/cect-api` mise à jour en fast-forward
+  du SHA `b159507` au SHA **`e7560eb`**.
+- Frontend compilé de la branche `custum`, déployé par
+  lien atomique dans
+  `/home/ubuntu/cect-releases/frontend-kyc-adhesion-link-20261022`.
+- Dump privé avant déploiement
+  `/home/ubuntu/cect-private-backups/cect-adhesion-after-kyc-20261022/`
+  `cectapi_live_pre_adhesion_20261022_080429.dump`,
+  vérifié avec `pg_restore --list` (382 objets).
+  Anciennes versions backend et frontend documentées sous
+  le même répertoire de sauvegarde.
+- Caches Laravel actualisés ; worker Laravel actif.
+- HTTP 200 sur `/espace/kyc`, `/espace/adhesion`, API santé.
+  KYC anonyme HTTP 401, adhésion API anonyme HTTP 401,
+  webhook non signé HTTP 401, Superadmin sans mTLS HTTP 403.
+- Audit : 154 événements intègres ; ledger cohérent ;
+  4 membres, 2 personnels, 1 clé Superadmin ;
+  0 tentative de paiement créée par ce changement.
+- Trois dossiers liés à Didit visibles : deux
+  `Approved` disposent désormais du droit de présentation
+  `sandbox_adhesion_preview=true`, dont l'un est encore
+  `pending_kyc` ; un dossier `In Progress` reste
+  `sandbox_adhesion_preview=false`.
+  **Tous les trois ont `real_kyc_approved=false`**.
+
+**Étape suivante pour de véritables adhésions :** activer le
+parcours Didit Live et les contrôles d'identité réellement
+requis ; seulement alors permettre l'ancien paiement
+CECT de manière normale, avec vérification fournisseur.
+
+---
 ## Parcours adhésion après KYC documentaire — correctif du 22 octobre 2026
 
 ### Décision métier confirmée
