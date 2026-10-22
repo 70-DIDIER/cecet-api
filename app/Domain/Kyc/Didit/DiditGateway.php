@@ -21,13 +21,16 @@ final class DiditGateway
             && filled(config('kyc.didit.webhook_secret'));
     }
 
-    public function create(MemberKycCase $case): array
+    public function create(MemberKycCase $case, bool $isBusiness = false): array
     {
         abort_unless($this->configured(), 503, 'Didit n’est pas encore configuré.');
+        $workflowId = $isBusiness ? config('kyc.didit.kyb_workflow_id') : config('kyc.didit.workflow_id');
+        abort_unless(is_string($workflowId) && $workflowId !== '', 503,
+            'Le parcours KYB de l’entreprise n’est pas configuré.');
         $response = Http::withHeaders(['x-api-key' => config('kyc.didit.api_key')])
             ->acceptJson()->timeout(12)
             ->post(rtrim(config('kyc.didit.base_url'), '/').'/v3/session/', [
-                'workflow_id' => config('kyc.didit.workflow_id'),
+                'workflow_id' => $workflowId,
                 'vendor_data' => 'cect-kyc:'.$case->id,
             ]);
         if (! $response->successful()) {
@@ -41,7 +44,7 @@ final class DiditGateway
         $host = strtolower(parse_url($url, PHP_URL_HOST) ?: '');
         abort_unless(in_array($host, config('kyc.didit.allowed_redirect_hosts'), true), 502,
             'Lien de vérification invalide.');
-        return ['session_id' => $session, 'url' => $url];
+        return ['session_id' => $session, 'url' => $url, 'workflow_id' => $workflowId];
     }
 
     public function decision(string $session): array
