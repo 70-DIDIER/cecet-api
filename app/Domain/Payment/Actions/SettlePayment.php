@@ -88,7 +88,7 @@ class SettlePayment
             $attempt->forceFill(['status' => PaymentAttemptStatus::Approved, 'settled_at' => now()])->save();
             $intent->forceFill(['status' => PaymentIntentStatus::Succeeded, 'succeeded_at' => now()])->save();
 
-            $this->onPaid($intent);
+            $this->onPaid($intent, $attempt);
 
             return;
         }
@@ -101,14 +101,13 @@ class SettlePayment
         );
     }
 
-    private function onPaid(PaymentIntent $intent): void
+    private function onPaid(PaymentIntent $intent, PaymentAttempt $attempt): void
     {
         match ($intent->purpose) {
             PaymentPurpose::Membership => $this->activateMembership->handle(
                 Membership::query()->lockForUpdate()->findOrFail($intent->payable_id),
                 app()->environment('staging')
-                    && $intent->attempts()->where('provider', \App\Domain\Payment\Providers\Fake\FakePaymentProvider::NAME)
-                        ->where('status', PaymentAttemptStatus::Approved)->exists()
+                    && $attempt->provider === \App\Domain\Payment\Providers\Fake\FakePaymentProvider::NAME
                     ? ActivationMode::SimulatedPayment : ActivationMode::Payment,
                 $intent,
             ),
