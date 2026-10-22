@@ -10,6 +10,33 @@ use App\Models\User;
  */
 final class KycEligibility
 {
+    /**
+     * Presentation-only completion state for the OCR-only Didit Sandbox.
+     * Never use this in payment, membership activation, or YEM guards.
+     */
+    public static function sandboxDocumentTestCompleted(User $member): bool
+    {
+        if (! $member->isMember()
+            || config('kyc.provider') !== 'didit'
+            || config('kyc.didit.environment') !== 'sandbox'
+            || ! config('kyc.didit.document_only_test')
+            || ! filled(config('kyc.didit.workflow_id'))) {
+            return false;
+        }
+
+        return MemberKycCase::query()
+            ->where('user_id', $member->id)
+            ->where('verification_mode', 'didit')
+            ->where('provider_environment', 'sandbox')
+            ->where('provider_workflow_id', config('kyc.didit.workflow_id'))
+            ->whereNotNull('provider_reference')
+            ->where('status', 'submitted')
+            ->where('provider_status', 'Approved')
+            ->where('provider_reviewed_at', '<=', now()->subMinutes(2))
+            ->whereRaw("(provider_checks->>'document')::boolean = true")
+            ->exists();
+    }
+
     public static function approved(User $member): bool
     {
         if (! $member->isMember()) return false;
