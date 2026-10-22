@@ -15,6 +15,7 @@ beforeEach(function () {
     config()->set('kyc.provider', 'didit');
     config()->set('kyc.didit.api_key', 'test-no-real-key');
     config()->set('kyc.didit.workflow_id', 'test-workflow');
+    config()->set('kyc.didit.application_id', '3d71e41c-317b-49d8-ba1c-c220866328f5f');
     config()->set('kyc.didit.webhook_secret', 'test-secret-in-memory');
     config()->set('kyc.didit.environment', 'sandbox');
     config()->set('kyc.didit.auto_approve', false);
@@ -150,7 +151,7 @@ it('rejects wrong-environment signed callbacks before queuing and supports full 
     \Illuminate\Support\Facades\Queue::fake();
 
     $wrong = ['timestamp' => time(), 'session_id' => $case->provider_reference,
-        'environment' => 'live', 'event' => 'status.updated'];
+        'environment' => 'live', 'application_id' => '3d71e41c-317b-49d8-ba1c-c220866328f5f', 'event' => 'status.updated'];
     ksort($wrong, SORT_STRING);
     $rawWrong = json_encode($wrong, JSON_THROW_ON_ERROR);
     $this->call('POST', '/api/v1/webhooks/kyc/didit', [], [], [], [
@@ -161,7 +162,7 @@ it('rejects wrong-environment signed callbacks before queuing and supports full 
     \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Domain\Kyc\Jobs\ProcessDiditDecision::class);
 
     $correct = ['timestamp' => time(), 'session_id' => $case->provider_reference,
-        'environment' => 'sandbox', 'event' => 'status.updated'];
+        'environment' => 'sandbox', 'application_id' => '3d71e41c-317b-49d8-ba1c-c220866328f5f', 'event' => 'status.updated'];
     ksort($correct, SORT_STRING);
     $rawGood = json_encode($correct, JSON_THROW_ON_ERROR);
     $this->call('POST', '/api/v1/webhooks/kyc/didit', [], [], [], [
@@ -204,6 +205,7 @@ it('does not allow a console Try Webhook to enqueue a session and rejects a mism
         'timestamp' => $timestamp,
         'session_id' => $case->provider_reference,
         'environment' => 'sandbox',
+        'application_id' => '3d71e41c-317b-49d8-ba1c-c220866328f5f',
     ];
     $raw = json_encode($payload, JSON_THROW_ON_ERROR);
     $sig = hash_hmac('sha256', $raw, 'test-secret-in-memory');
