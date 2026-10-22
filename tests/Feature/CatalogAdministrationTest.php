@@ -19,7 +19,7 @@ use Illuminate\Testing\TestResponse;
 beforeEach(function () {
     seedCatalogs();
     Mail::fake();
-    $this->admin = User::factory()->staff(PermissionCatalog::ADMIN)->create();
+    $this->admin = User::factory()->staff(PermissionCatalog::SUPERADMIN)->create();
     $this->token = tokenFor($this->admin, withStepUp: true);
 });
 
@@ -339,4 +339,22 @@ describe('grid of the former site', function () {
             ->and($version('PRESTIGE')->eligible_person_types)->toBe(['legal'])
             ->and($version('BRONZE')->quota_per_period)->toBe('125.000000');
     });
+});
+
+it('reserves all catalog mutations to Superadmin while permitting administrator read-only access', function (): void {
+    $administrator = User::factory()->staff(PermissionCatalog::ADMIN)->create();
+    $plan = createDraftPlan($this->token, 'VENDEUR', 'ZX1');
+    $draft = adminPost($this->token, "/api/v1/admin/packs/plans/{$plan->id}/versions", periodicTerms())->assertCreated()->json('data.id');
+    // Resolve the next request as the administrator, not the previously authenticated superadmin.
+    $adminToken = tokenFor($administrator, withStepUp: true);
+
+    $this->withToken($adminToken)->getJson('/api/v1/admin/packs/plans')->assertOk();
+    $this->withToken($adminToken)->getJson("/api/v1/admin/packs/plans/{$plan->id}")->assertOk();
+    adminPost($adminToken, '/api/v1/admin/packs/plans', ['family' => 'VENDEUR', 'code' => 'ZZ9', 'name' => 'Indésirable'])->assertForbidden();
+    adminPost($adminToken, "/api/v1/admin/packs/plans/{$plan->id}/versions", periodicTerms())->assertForbidden();
+    $this->withToken($adminToken)->postJson("/api/v1/admin/packs/plans/{$plan->id}/versions/{$draft}/publish")->assertForbidden();
+    $this->withToken($adminToken)->postJson("/api/v1/admin/packs/plans/{$plan->id}/transition", ['to' => 'published', 'reason' => 'Pas de permission'])->assertForbidden();
+    adminPost($adminToken, "/api/v1/admin/packs/plans/{$plan->id}/duplicate", ['code' => 'ZZ8', 'name' => 'Non'])->assertForbidden();
+    $this->withToken($adminToken)->putJson("/api/v1/admin/packs/plans/{$plan->id}", ['name' => 'Interdit'], ['Idempotency-Key' => (string) Str::ulid()])->assertForbidden();
+    $this->withToken($adminToken)->deleteJson("/api/v1/admin/packs/plans/{$plan->id}/versions/{$draft}")->assertForbidden();
 });
