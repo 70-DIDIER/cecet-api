@@ -494,6 +494,22 @@ it('reuses the full existing fake checkout and activates a simulated membership 
         ->assertOk()->assertJsonPath('data.status', 'approved');
     expect(\App\Domain\Payment\Models\PaymentAttempt::query()
         ->where('provider', 'fake')->count())->toBe(1);
+
+    // Carry the same account into the pre-existing consumer pack flow.
+    $plan = makePlan(\App\Domain\Catalog\Enums\PackFamily::Consommateur, 'DEMO-C1');
+    $pack = $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/packs', ['plan_id' => $plan->id, 'method' => 'TMONEY'],
+            ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])
+        ->assertCreated()
+        ->assertJsonPath('data.user_pack.status', 'pending_payment')
+        ->assertJsonPath('data.payment.provider', 'fake');
+    $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/payments/'.$pack->json('data.payment.id').'/simulate', [])
+        ->assertOk()->assertJsonPath('data.status', 'approved');
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/packs')
+        ->assertOk()->assertJsonPath('data.0.status', 'active');
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/dashboard')->assertOk();
+    expect(\App\Domain\Quota\Models\QuotaLedgerEntry::query()->count())->toBeGreaterThanOrEqual(1);
 });
 
 it('never permits a fake Sandbox KYC document to create real payment attempts', function () {
