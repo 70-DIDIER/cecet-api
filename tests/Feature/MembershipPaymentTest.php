@@ -6,6 +6,7 @@ use App\Domain\Audit\Models\AuditEvent;
 use App\Domain\Audit\Models\SecurityEvent;
 use App\Domain\Identity\Enums\UserStatus;
 use App\Domain\Membership\Models\Membership;
+use App\Domain\Kyc\Models\MemberKycCase;
 use App\Domain\Payment\Enums\PaymentAttemptStatus;
 use App\Domain\Payment\Enums\PaymentIntentStatus;
 use App\Domain\Payment\Enums\ProviderPaymentStatus;
@@ -30,7 +31,24 @@ beforeEach(function () {
     Mail::fake();
     $this->fake = app(FakePaymentProvider::class);
     $this->member = User::factory()->status(UserStatus::PendingPayment)->create();
+    approveKycPaymentFixture($this->member);
 });
+
+/** Only the isolated test database receives this KYC fixture; the production KYC guard stays enabled. */
+function approveKycPaymentFixture(User $member): void
+{
+    config()->set('kyc.provider', 'manual');
+    MemberKycCase::query()->create([
+        'user_id' => $member->id,
+        'status' => 'approved',
+        'verification_mode' => 'manual',
+        'identity_payload' => ['document_type' => 'national_id'],
+        'document_front_path' => 'fixtures/member-kyc.enc',
+        'privacy_notice_accepted' => true,
+        'submitted_at' => now(),
+        'reviewed_at' => now(),
+    ]);
+}
 
 function startMembershipPayment(User $member): TestResponse
 {
@@ -40,6 +58,7 @@ function startMembershipPayment(User $member): TestResponse
 
 it('shows the fee due, computed by the server, before any payment', function (bool $legal, int $expectedFee) {
     $member = User::factory()->status(UserStatus::PendingPayment)->when($legal, fn ($factory) => $factory->legalPerson())->create();
+    approveKycPaymentFixture($member);
 
     test()->withToken(tokenFor($member))->getJson('/api/v1/me/membership')
         ->assertOk()
@@ -311,6 +330,7 @@ it('reconciles a lost webhook when the member asks for a refresh', function () {
 it('keeps attempts private to their owner', function () {
     $attemptId = startMembershipPayment($this->member)->json('data.id');
     $stranger = User::factory()->status(UserStatus::PendingPayment)->create();
+    approveKycPaymentFixture($stranger);
 
     $this->withToken(tokenFor($stranger))->getJson("/api/v1/me/membership/payments/{$attemptId}")->assertNotFound();
     $this->withToken(tokenFor($stranger))->postJson("/api/v1/me/membership/payments/{$attemptId}/refresh")->assertNotFound();
@@ -415,9 +435,9 @@ it('exposes neither the fake provider nor the demo bypass in production', functi
 
     expect(fn () => app(PaymentProviderManager::class)->provider('fake'))->toThrow(PaymentException::class);
 
+    // Outside testing, the former demo activation is denied before it can mutate anything.
     $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/demo-activation')
-        ->assertNotFound()
-        ->assertJsonPath('code', 'DEMO_MODE_UNAVAILABLE');
+        ->assertForbidden();
 
     $webhook = $this->fake->signedWebhook('transaction.approved', 'fake_x');
     sendFakeWebhook($webhook['body'], $webhook['headers'])->assertNotFound()->assertJsonPath('code', 'PAYMENT_PROVIDER_UNKNOWN');
@@ -426,26 +446,21 @@ it('exposes neither the fake provider nor the demo bypass in production', functi
 describe('demo gateway bypass', function () {
     it('is refused while the setting is off', function () {
         $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/demo-activation')
-            ->assertNotFound()
-            ->assertJsonPath('code', 'DEMO_MODE_UNAVAILABLE');
+            ->assertForbidden();
 
         expect($this->member->refresh()->status)->toBe(UserStatus::PendingPayment);
     });
 
-    it('activates the account without payment and marks it as a demo activation', function () {
-        app(SettingsService::class)->set('platform.demo_gateway_bypass', true, 'Démonstration au conseil d\'administration');
+    it('refuses direct activation even if the obsolete demo bypass setting was enabled', function () {
+        app(SettingsService::class)->set('platform.demo_gateway_bypass', true, 'Contrôle de sécurité de l\'ancien mode de démonstration');
 
+        // Current CECT decision: normal checkout + fake-provider settlement in staging,
+        // not a separate bypass that skips the validated payment lifecycle.
         $this->withToken(tokenFor($this->member))->postJson('/api/v1/me/membership/demo-activation')
-            ->assertOk()
-            ->assertJsonPath('data.membership.activation_mode', 'demo_gateway_bypass')
-            ->assertJsonPath('data.account_status', 'active');
+            ->assertForbidden();
 
-        $membership = Membership::query()->sole();
-        expect($this->member->refresh()->status)->toBe(UserStatus::Active)
-            ->and($membership->paid_at)->toBeNull()
-            ->and(PaymentIntent::query()->count())->toBe(0)
-            ->and(AuditEvent::query()->where('action', 'memberships.activated')->sole()->after['activation_mode'])->toBe('demo_gateway_bypass')
-            ->and(SecurityEvent::query()->where('event_type', 'membership.demo_gateway_bypass')->exists())->toBeTrue();
+        expect($this->member->refresh()->status)->toBe(UserStatus::PendingPayment)
+            ->and(PaymentIntent::query()->count())->toBe(0);
     });
 
     it('approves a fake-provider payment on demand and activates the account', function () {
