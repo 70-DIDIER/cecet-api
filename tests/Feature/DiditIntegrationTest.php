@@ -224,3 +224,24 @@ it('does not allow a console Try Webhook to enqueue a session and rejects a mism
     ], $raw)->assertOk()->assertJsonPath('test', true);
     \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Domain\Kyc\Jobs\ProcessDiditDecision::class);
 });
+
+
+it('migrates legacy pending-payment members through Didit before allowing membership', function () {
+    fakeDiditCreation();
+    $legacy = User::factory()->status(UserStatus::PendingPayment)->create();
+    $this->withToken(tokenFor($legacy))->getJson('/api/v1/me/membership')->assertForbidden();
+
+    startDidit($legacy)->assertOk();
+    $case = MemberKycCase::query()->where('user_id', $legacy->id)->sole();
+    expect($case->status)->toBe('provider_pending');
+
+    fakeDiditDecision('Approved', true);
+    $this->withToken(tokenFor($legacy))->postJson('/api/v1/me/kyc/didit/refresh', [])->assertOk();
+    expect($case->refresh()->provider_checks['complete'])->toBeTrue();
+    $reviewer = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
+    $this->withToken(tokenFor($reviewer, withStepUp: true))
+        ->postJson('/api/v1/kyc/cases/'.$case->id.'/decision', ['decision' => 'approved'])
+        ->assertOk();
+    expect($legacy->refresh()->status)->toBe(UserStatus::PendingPayment);
+    $this->withToken(tokenFor($legacy))->getJson('/api/v1/me/membership')->assertOk();
+});
