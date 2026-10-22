@@ -37,6 +37,19 @@ final class KycEligibility
             ->exists();
     }
 
+    /**
+     * Explicit permission to run the EXISTING checkout with its fake provider
+     * during the CECT staging presentation, without treating Sandbox KYC
+     * as a real identity approval. Never active in production.
+     */
+    public static function stagingMembershipDemo(User $member): bool
+    {
+        return app()->environment('staging')
+            && app(\App\Domain\Settings\SettingsService::class)
+                ->string('payment.inbound_provider') === 'fake'
+            && self::sandboxDocumentTestCompleted($member);
+    }
+
     public static function approved(User $member): bool
     {
         if (! $member->isMember()) return false;
