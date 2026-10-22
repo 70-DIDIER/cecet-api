@@ -55,6 +55,7 @@ class MemberPackController
         $plans = PackPlan::query()
             ->with('currentVersion')
             ->where('status', PackPlanStatus::Published)
+            ->when(! app()->environment(['staging', 'testing']), fn ($query) => $query->where('code', 'not like', 'TST-%'))
             ->whereHas('currentVersion')
             ->when($user?->person_type !== null, fn ($query) => $query
                 ->whereIn('family', $user->person_type->value === 'legal' ? ['MARCHAND'] : ['VENDEUR', 'CONSOMMATEUR', 'PERSONNEL'])
