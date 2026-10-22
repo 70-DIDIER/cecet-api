@@ -245,3 +245,22 @@ it('migrates legacy pending-payment members through Didit before allowing member
     expect($legacy->refresh()->status)->toBe(UserStatus::PendingPayment);
     $this->withToken(tokenFor($legacy))->getJson('/api/v1/me/membership')->assertOk();
 });
+
+
+it('uses the separate KYB workflow for a company and never silently falls back to person KYC', function () {
+    fakeDiditCreation();
+    $case = new MemberKycCase(['user_id' => (string) \Illuminate\Support\Str::ulid()]);
+    $case->id = (string) \Illuminate\Support\Str::ulid();
+    config()->set('kyc.didit.kyb_workflow_id', null);
+    try {
+        app(\App\Domain\Kyc\Didit\DiditGateway::class)->create($case, true);
+        throw new RuntimeException('KYB should fail closed without a company workflow');
+    } catch (\Symfony\Component\HttpKernel\Exception\HttpException $error) {
+        expect($error->getStatusCode())->toBe(503);
+    }
+
+    config()->set('kyc.didit.kyb_workflow_id', 'company-kyb-workflow');
+    $result = app(\App\Domain\Kyc\Didit\DiditGateway::class)->create($case, true);
+    expect($result['workflow_id'])->toBe('company-kyb-workflow');
+    Http::assertSent(fn ($request) => $request['workflow_id'] === 'company-kyb-workflow');
+});
