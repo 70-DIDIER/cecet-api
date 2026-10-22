@@ -299,7 +299,7 @@ Route::prefix('v1')->name('v1.')->group(function () {
 
             Route::get('packs/plans', [PackPlanAdminController::class, 'index'])->middleware('can:packs.view')->name('packs.plans.index');
             Route::get('packs/plans/{plan}', [PackPlanAdminController::class, 'show'])->middleware('can:packs.view')->name('packs.plans.show');
-            Route::middleware(['can:packs.manage', 'step-up'])->group(function () {
+            Route::middleware(['can:packs.manage', 'can:settings.update_critical', 'step-up'])->group(function () {
                 Route::post('packs/plans', [PackPlanAdminController::class, 'store'])->middleware('idempotent')->name('packs.plans.store');
                 Route::put('packs/plans/{plan}', [PackPlanAdminController::class, 'update'])->middleware('idempotent')->name('packs.plans.update');
                 Route::delete('packs/plans/{plan}', [PackPlanAdminController::class, 'destroy'])->middleware('can:settings.update_critical')->name('packs.plans.destroy');
