@@ -357,3 +357,58 @@ it('does not mark an unfinished Didit Sandbox session as complete merely because
         ->assertOk()->assertJsonPath('data.sandbox_test_completed', false);
     $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
 });
+
+
+it('continues to the original membership price preview after a completed sandbox document, without authorizing any payment', function () {
+    config()->set('kyc.didit.document_only_test', true);
+    fakeDiditCreation();
+
+    $member = User::factory()->status(UserStatus::PendingKyc)->create();
+    startDidit($member)->assertOk();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
+
+    fakeDiditDecision('Approved', false);
+    $this->withToken(tokenFor($member))->postJson('/api/v1/me/kyc/didit/refresh', [])
+        ->assertOk()->assertJsonPath('data.status', 'submitted');
+
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
+
+    $this->travel(3)->minutes();
+
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/kyc')
+        ->assertOk()->assertJsonPath('data.sandbox_test_completed', true);
+
+    $preview = $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')
+        ->assertOk()
+        ->assertJsonPath('data.status', 'kyc_sandbox_preview')
+        ->assertJsonPath('data.sandbox_preview', true)
+        ->assertJsonPath('data.payment_enabled', false)
+        ->assertJsonPath('data.account_status', 'pending_kyc');
+
+    expect($preview->json('data.fee_due'))->toBeInt();
+    expect($preview->json('data.payment_attempts'))->toBe([]);
+
+    $this->withToken(tokenFor($member))->postJson('/api/v1/me/membership/payments',
+        ['method' => 'TMONEY', 'payment_phone' => '+22890123456'],
+        ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])
+        ->assertForbidden();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/packs')->assertForbidden();
+    expect($member->refresh()->status)->toBe(UserStatus::PendingKyc);
+    expect(DB::table('memberships')->where('user_id', $member->id)->exists())->toBeFalse();
+});
+
+it('never offers a membership preview for an unstarted or unapproved sandbox identity session', function () {
+    config()->set('kyc.didit.document_only_test', true);
+    fakeDiditCreation();
+
+    $member = User::factory()->status(UserStatus::PendingKyc)->create();
+    startDidit($member)->assertOk();
+    $this->travel(6)->minutes();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
+
+    fakeDiditDecision('Declined', false);
+    $this->withToken(tokenFor($member))->postJson('/api/v1/me/kyc/didit/refresh', [])->assertOk();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/kyc')
+        ->assertJsonPath('data.sandbox_test_completed', false);
+});
