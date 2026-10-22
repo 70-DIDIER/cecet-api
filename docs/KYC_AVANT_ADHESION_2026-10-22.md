@@ -1,3 +1,60 @@
+## Mise en production du correctif de statut KYC Sandbox — 22 octobre 2026, 06:08 UTC
+
+**État : DÉPLOYÉ, vérifié sur le serveur CECT.** Cette note
+remplace le blocage « NON déployé / Remote Desktop Commander hors ligne »
+mentionné dans le rapport de diagnostic antérieur.
+
+- Desktop Commander de `ip-172-31-25-53` revenu **Online**.
+- Tests QA sur la seule base `cectapi_test` :
+  **59 réussis, 278 assertions** incluant KYC, inscription,
+  droits internes et statuts de comptes.
+- React/Vite membre compilé avec l'URL publique correcte et
+  vérifications de bundle : synchronisation
+  `/me/kyc/didit/refresh`, écran `sandbox_test_completed`,
+  SDK intégré, cible API sécurisée.
+- Dump de `cectapi_live` pré-déploiement privé :
+  `/home/ubuntu/cect-private-backups/kyc-stuck-hotfix-20261022/`
+  fichier `cectapi_live_pre_hotfix_20261022_060703.dump`
+  validé par `pg_restore --list`, **382 objets** ;
+  SHA API et symlink précédent sauvegardés.
+- API mise à jour en fast-forward dans `/var/www/cect-api` :
+  ancien SHA `74f28d8`, nouveau **`b159507`**, caches
+  Laravel config et routes reconstruits.
+- Release React activée par symlink atomique :
+  `/home/ubuntu/cect-releases/frontend-kyc-reconcile-hotfix-20261022`.
+- Signal `php artisan queue:restart` envoyé,
+  service `cect-queue` actif.
+- Synchronisation ponctuelle des sessions déjà existantes via
+  `DiditDecisionProcessor::sync` (sans forcer aucune décision) :
+  une session reste `Not Started`, une `In Progress`,
+  une session documentaire est **`Approved` côté Didit**.
+  Le dossier CECT de cette dernière est resté `submitted`,
+  mais le booléen calculé `sandbox_test_completed=true`
+  a été vérifié directement dans la base active.
+- Autres garde-fous : santé API, site et backoffice HTTP 200 ;
+  endpoint KYC sans authentification HTTP 401 ;
+  webhook non signé HTTP 401 ; Superadmin sans
+  certificat HTTP 403 ; audit intègre (149 événements),
+  ledger cohérent, zéro tâche échouée.
+- 4 membres / 2 personnels / 1 clé Superadmin
+  préservés à la dernière vérification ;
+  aucun membre approuvé automatiquement et
+  aucun paiement rendu éligible par une session Sandbox.
+
+**Résultat pour l'utilisateur :** après actualisation
+`Ctrl+Shift+R` dans l'espace membre, le dossier
+`Approved` chez Didit et plus ancien de deux minutes
+doit afficher « Contrôle documentaire terminé (test) ».
+Les dossiers `In Progress` et `Not Started` restent
+légitimement en attente d'un résultat fournisseur ;
+aucun chronomètre ne remplace la finalisation
+de la session Didit.
+
+Le comportement frontend dans le navigateur de chaque
+membre n'a pas été vérifié avec ses identifiants personnels ;
+seuls le bundle en ligne et la logique backend ont été contrôlés.
+
+---
 ## Correctif de synchronisation KYC Sandbox — 22 octobre 2026
 
 **État : correctifs versionnés sur GitHub, NON déployés lors de
