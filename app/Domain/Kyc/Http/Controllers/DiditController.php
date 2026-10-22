@@ -37,7 +37,10 @@ final class DiditController
                 'Ce dossier doit être traité avant une nouvelle vérification.');
             $case ??= new MemberKycCase(['user_id' => $member->id]);
             $case->id ??= (string) Str::ulid();
-            $created = $gateway->create($case, $member->person_type?->value === 'legal');
+            $documentOnlyTest = config('kyc.didit.environment') === 'sandbox'
+                && config('kyc.didit.document_only_test');
+            $created = $gateway->create($case,
+                $member->person_type?->value === 'legal' && ! $documentOnlyTest);
             $case->forceFill([
                 'verification_mode' => 'didit',
                 'status' => 'provider_pending',
