@@ -278,6 +278,8 @@ it('limits both PF and legal-person test applications to a document-only session
     Http::assertSent(fn ($request) => $request['workflow_id'] === 'test-workflow');
     $this->withToken(tokenFor($legal))->getJson('/api/v1/me/membership')->assertForbidden();
 
+    // Both fake sessions use the same test-only reference; free it before the second assertion.
+    $case->delete();
     config()->set('kyc.didit.document_only_test', false);
     fakeDiditCreation();
     $secondLegal = User::factory()->legalPerson()->status(UserStatus::PendingKyc)->create();
