@@ -30,6 +30,19 @@ enum PackFamily: string
     }
 
     /**
+     * Contract default when an administrator does not explicitly set the first-credit delay.
+     * PERSONAL has no periodic credits. Defaults remain compatible with historical pack versions.
+     */
+    public function defaultFirstCreditDelayPeriods(): ?int
+    {
+        return match ($this) {
+            self::Vendeur => 1,
+            self::Consommateur, self::Marchand => 0,
+            self::Personnel => null,
+        };
+    }
+
+    /**
      * Family-specific keys accepted in the free-form "rules" object, with their validation.
      *
      * @return array<string, list<string>>
