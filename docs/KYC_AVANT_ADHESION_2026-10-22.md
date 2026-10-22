@@ -1,3 +1,60 @@
+## Correctif de synchronisation KYC Sandbox — 22 octobre 2026
+
+**État : correctifs versionnés sur GitHub, NON déployés lors de
+cette intervention faute d'accès au serveur.** Le Remote Desktop Commander
+de `ip-172-31-25-53` est OFFLINE ; ne pas confondre commit GitHub
+avec déploiement réel.
+
+### Diagnostic corroboré
+
+- Le compte Didit Sandbox possède au moins une session
+  `Approved` avec une seule `ID_VERIFICATION`, comportant
+  des avertissements informatifs MRZ/QR non détectés, et une
+  session plus récente `Not Started`. Sans accès au dossier
+  de la base live, on ne peut pas affirmer quelle session
+  est actuellement référencée pour le membre utilisateur.
+- `DiditDecisionProcessor::sync()` écrivait à chaque
+  synchronisation `provider_reviewed_at=now()`.
+  `KycController::mine()` exige au contraire
+  `provider_reviewed_at <= now()->subMinutes(2)`.
+  Des rafraîchissements répétés pouvaient repousser
+  sans fin l'affichage « Contrôle documentaire terminé (test) ».
+
+### Modifications engagées
+
+- Commit backend `aef9d4f` : préserver l'heure de la
+  **première approbation documentaire Didit** sur toutes
+  les synchronisations ultérieures tant que l'approbation
+  est toujours la même.
+- Commit frontend `0a2429a` : interrogation authentifiée
+  `/me/kyc/didit/refresh` une fois par minute, et lors
+  du retour de focus dans le navigateur, lorsque le dossier
+  est en attente en mode test ; sans dépendance exclusive
+  au worker de la file de tâches.
+- Commit backend de tests `d8bcee4` : vérifier que
+  la synchronisation après 3 minutes montre un résultat
+  documentaire terminé mais **ne débloque ni paiement
+  ni adhésion** ; vérifier qu'une session non démarrée
+  ne devient jamais terminée avec le temps.
+
+### Actions avant toute affirmation de réussite
+
+1. Rétablir la connexion Remote Desktop Commander du serveur CECT
+   (hôte `ip-172-31-25-53`), sans désactiver mTLS.
+2. Inspecter le lien `provider_reference` de l'actuel dossier
+   et rapprocher le statut de la même session Didit
+   (Approved / Not Started / In Progress).
+3. Exécuter les tests ciblés sur `cectapi_test`,
+   compiler le frontend, préparer rollback, puis déployer
+   uniquement les repos `70-DIDIER` branche `custum`.
+4. Vérifier worker, files `jobs` / `failed_jobs`,
+   `provider_reviewed_at` stable, `sandbox_test_completed=true`
+   après le délai, navigation membre, santé API, audit
+   et accès Superadmin mTLS 403 sans certificat.
+5. **Ne jamais** transformer un statut Didit Sandbox en
+   identité réelle approuvée ou en autorisation de paiement.
+
+---
 ## CECT KYC — décision métier révisée et déployée le 22 octobre 2026
 
 Exigences opérationnelles : supprimer la sélection de résultat de test
