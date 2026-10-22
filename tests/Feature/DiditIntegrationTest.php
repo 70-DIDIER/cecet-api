@@ -316,3 +316,44 @@ it('never supplies a simulation result in a live Didit session', function () {
     Http::assertSent(fn ($request) => ! isset($request['sandbox_scenario']));
     $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
 });
+
+
+it('unblocks the Sandbox test-complete label after two minutes even with repeated Didit polls', function () {
+    config()->set('kyc.didit.document_only_test', true);
+    fakeDiditCreation();
+    $member = User::factory()->status(UserStatus::PendingKyc)->create();
+    startDidit($member)->assertOk();
+    $case = MemberKycCase::where('user_id', $member->id)->sole();
+
+    // Only documentary verification was performed; no liveness or face match.
+    fakeDiditDecision('Approved', false);
+    $this->withToken(tokenFor($member))->postJson('/api/v1/me/kyc/didit/refresh', [])
+        ->assertOk()->assertJsonPath('data.status', 'submitted');
+    $case->refresh();
+    expect($case->provider_checks['document'])->toBeTrue();
+    $firstApprovedAt = $case->provider_reviewed_at->toISOString();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/kyc')
+        ->assertOk()->assertJsonPath('data.sandbox_test_completed', false);
+
+    $this->travel(3)->minutes();
+    // Repeated refresh must preserve the original approval time, not reset it.
+    $this->withToken(tokenFor($member))->postJson('/api/v1/me/kyc/didit/refresh', [])->assertOk();
+    expect($case->refresh()->provider_reviewed_at->toISOString())->toBe($firstApprovedAt);
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/kyc')
+        ->assertOk()->assertJsonPath('data.sandbox_test_completed', true);
+
+    // A simulated OCR approval never changes the member's eligibility to pay.
+    expect($member->refresh()->status)->toBe(UserStatus::PendingKyc);
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
+});
+
+it('does not mark an unfinished Didit Sandbox session as complete merely because time passed', function () {
+    config()->set('kyc.didit.document_only_test', true);
+    fakeDiditCreation();
+    $member = User::factory()->status(UserStatus::PendingKyc)->create();
+    startDidit($member)->assertOk();
+    $this->travel(6)->minutes();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/kyc')
+        ->assertOk()->assertJsonPath('data.sandbox_test_completed', false);
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
+});
