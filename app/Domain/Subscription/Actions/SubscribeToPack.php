@@ -83,8 +83,12 @@ class SubscribeToPack
             throw SubscriptionException::planNotAvailable();
         }
 
-        if (! in_array($member->person_type?->value, $version->eligible_person_types, true)) {
-            throw SubscriptionException::notEligible($version->eligible_person_types);
+        // Enforce the PF/PM family boundary even for already-published legacy versions
+        // that were configured before this decision. Eligibility metadata alone is insufficient.
+        $allowed = $plan->family->defaultEligiblePersonTypes();
+        if (! in_array($member->person_type?->value, $allowed, true)
+            || ! in_array($member->person_type?->value, $version->eligible_person_types, true)) {
+            throw SubscriptionException::notEligible($allowed);
         }
 
         $pack = UserPack::query()
