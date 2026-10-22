@@ -75,3 +75,7 @@ Les cinq scénarios de premier crédit valident **85 assertions** : valeurs par 
 
 
 Le cinquième test protège la compatibilité avec les versions historiques sans clé `first_credit_delay_periods`. Le schéma PostgreSQL empêche de changer les termes d'une version **même non publiée** : l'essai de compatibilité crée un enregistrement historique autonome dans la base isolée, sans altérer un contrat existant.
+
+## Gouvernance des permissions — point à arbitrer
+
+Le droit Laravel historique `packs.manage` permet actuellement la création de versions **à l'Administrateur comme au Superadmin**. La décision C établit que le Superadmin **peut** configurer les délais, mais ne précise pas explicitement si ce droit doit lui être **exclusif**. La présente branche ne modifie pas silencieusement cette délégation historique ; une décision supplémentaire est nécessaire avant de verrouiller les rôles (contrôle API + contrôle UI, éventuellement circuit de validation). La protection d'immuabilité des versions, les limites des délais et l'audit restent obligatoires quelle que soit la décision de gouvernance.
