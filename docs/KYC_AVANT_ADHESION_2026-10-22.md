@@ -1,3 +1,51 @@
+## PUBLICATION VISIBLE SUR LA PLATEFORME — 22/10/2026
+
+À la demande de l'équipe (« on doit voir ça sur la plateforme »),
+une **prévisualisation publique authentique** du parcours CECT × Didit
+a été publiée sur le domaine officiel de démonstration CECT :
+
+`https://13-49-203-235.sslip.io/verification-kyc-demo.html`
+
+Cette page est également annoncée par un lien discret sur la
+page d'accueil de la plateforme. Les deux parcours PF/PM
+sont visibles et redirigent vers leurs workflows Didit **Sandbox**
+publiés : PF `635693e0-768a-45fe-ad42-e7bae9c649b8`,
+PM `96d81562-e65f-4694-b7a5-c2552d92c83c`.
+
+**Important : la prévisualisation n'est pas l'adhésion réelle.**
+Elle ne traite aucun document dans l'application CECT,
+ne crée aucune adhésion et ne permet aucun déblocage de paiement
+ou quotas. Les utilisateurs sont explicitement informés de
+ne pas fournir de véritables documents en Sandbox.
+
+Code source versionné sur les repos 70-DIDIER, branche `custum` :
+`CECT-frontend/public/verification-kyc-demo.html` et
+`CECT-frontend/public/cect-kyc-demo-link.js`.
+
+Déploiement ciblé sans basculer les applications existantes :
+`/home/ubuntu/cect-releases/frontend-qa-v59-20261018/`.
+Une copie réversible d'`index.html` a été sauvegardée dans
+`index.html.pre-kyc-demo-20261022` avant l'ajout du script
+du lien. Aucun backend, schéma de la base `cectapi_live`,
+compte ou portail Superadmin n'a été modifié par cette publication.
+
+**Tests de production après publication :** accueil 200,
+page de prévisualisation 200, script de l'accueil 200,
+API santé 200, Superadmin sans certificat 403,
+worker actif, commit backend `b1143de` inchangé.
+
+**Rollback UI** : supprimer la page de preview et le script
+`cect-kyc-demo-link.js` de la release active et restaurer
+`index.html` depuis `index.html.pre-kyc-demo-20261022` ;
+aucune migration SQL n'est à annuler.
+
+**À faire pour l'adhésion réelle :** obtenir une application
+Didit LIVE (distincte du Sandbox), garanties de confidentialité
+et minimisation des données retournées, liaison PM KYB complète,
+qualification des régressions et déploiement versionné
+du backend + frontend avec QA et vérifications de production.
+
+---
 ## Mise à jour d'exécution — recette QA et sauvegarde (22 octobre 2026)
 
 **Le déploiement public de CECT n'a PAS eu lieu à cette étape.**
