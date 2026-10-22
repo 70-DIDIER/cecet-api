@@ -66,3 +66,9 @@ Le `PeriodRoller` ne crédite qu'une période dont `starts_at <= maintenant` et 
 ## Déploiement
 
 Ce contrat reste cantonné aux branches `design/pf-pm-premium-20261022` des dépôts `70-DIDIER/cecet-api`, `CECT-frontend`, `cect-admin` ; pas de migration SQL nécessaire. Base live, fichiers publiés et `custum` inchangés. Sauvegarde vérifiée sous `/home/ubuntu/cect-private-backups/redesign-stable-20261022/`. La recette autonome de navigation et d'affichage dans un navigateur de validation reste distincte des tests automatisés.
+
+## Résultats des contrôles automatisés (22 octobre 2026)
+
+Les quatre nouveaux scénarios de premier crédit valident **77 assertions** : valeurs par défaut PF/PM, override Superadmin par nouvelle version, conservation des conditions antérieures, rejet des délais invalides, exclusion Personnel, calendrier décalé en semaines, absence de crédit avant échéance et idempotence.
+
+**Recette combinée finale : 88 tests réussis, 711 assertions** sur `cectapi_test` isolée, incluant souscriptions, catalogue, limites PF/PM, période, règlement intégral, relevé de paiements privé et validation des contrôles KYC. Compilations TypeScript/Vite **frontend membre et administration réussies**. La validation navigateur reste à faire séparément et aucune publication n'est autorisée automatiquement par ces succès techniques.
