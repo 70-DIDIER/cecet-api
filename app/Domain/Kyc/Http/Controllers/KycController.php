@@ -29,6 +29,7 @@ class KycController
             'account_status' => $member->status->value,
             'provider' => config('kyc.provider'),
             'provider_environment' => config('kyc.provider') === 'didit' ? config('kyc.didit.environment') : null,
+            'provider_document_only_test' => config('kyc.didit.environment') === 'sandbox' && config('kyc.didit.document_only_test'),
             'kyc' => $case ? $this->memberSummary($case) : null,
         ]])->header('Cache-Control', 'no-store');
     }
