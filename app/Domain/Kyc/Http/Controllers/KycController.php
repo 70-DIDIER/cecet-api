@@ -4,6 +4,7 @@ namespace App\Domain\Kyc\Http\Controllers;
 
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Kyc\KycEligibility;
 use App\Domain\Kyc\Models\MemberKycCase;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -31,12 +32,7 @@ class KycController
             'provider_environment' => config('kyc.provider') === 'didit' ? config('kyc.didit.environment') : null,
             'provider_document_only_test' => config('kyc.didit.environment') === 'sandbox' && config('kyc.didit.document_only_test'),
             // Test-only presentation: never interpreted by membership/payment guards.
-            'sandbox_test_completed' => (bool) ($case && config('kyc.didit.environment') === 'sandbox'
-                && config('kyc.didit.document_only_test')
-                && $case->status === 'submitted'
-                && $case->provider_status === 'Approved'
-                && ($case->provider_checks['document'] ?? false)
-                && $case->provider_reviewed_at?->lte(now()->subMinutes(2))),
+            'sandbox_test_completed' => KycEligibility::sandboxDocumentTestCompleted($member),
             'kyc' => $case ? $this->memberSummary($case) : null,
         ]])->header('Cache-Control', 'no-store');
     }
