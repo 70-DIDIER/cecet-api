@@ -118,6 +118,7 @@ it('verifies the webhook signature and fetches the independent session decision'
     $body = json_encode([
         'event' => 'status.updated',
         'environment' => 'sandbox',
+        'application_id' => '3d71e41c-317b-49d8-ba1c-c220866328f5f',
         'session_id' => $case->provider_reference,
         'status' => 'Approved', // forged verdict must NOT override independent decision
         'timestamp' => time(),
