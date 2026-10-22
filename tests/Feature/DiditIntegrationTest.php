@@ -446,7 +446,7 @@ it('reuses the full existing fake checkout and activates a simulated membership 
 
     $attempt = $this->withToken(tokenFor($member))
         ->postJson('/api/v1/me/membership/payments',
-            ['method' => 'MIXX', 'payment_phone' => '+22890123456'],
+            ['method' => 'TMONEY', 'payment_phone' => '+22890123456'],
             ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])
         ->assertCreated()->assertJsonPath('data.provider', 'fake')
         ->assertJsonPath('data.simulation_available', true);
@@ -485,7 +485,7 @@ it('never permits a fake Sandbox KYC document to create real payment attempts', 
         ->set('payment.inbound_provider', 'fedapay', 'Negative provider guard test');
     $this->withToken(tokenFor($member))
         ->postJson('/api/v1/me/membership/payments',
-            ['method' => 'MIXX', 'payment_phone' => '+22890123456'],
+            ['method' => 'TMONEY', 'payment_phone' => '+22890123456'],
             ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])
         ->assertForbidden();
     expect(\App\Domain\Payment\Models\PaymentAttempt::query()->count())->toBe(0);
