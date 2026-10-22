@@ -9,6 +9,7 @@ return [
         'base_url' => 'https://verification.didit.me',
         'api_key' => env('DIDIT_API_KEY'),
         'workflow_id' => env('DIDIT_WORKFLOW_ID'),
+        'kyb_workflow_id' => env('DIDIT_KYB_WORKFLOW_ID'),
         'application_id' => env('DIDIT_APPLICATION_ID'),
         'webhook_secret' => env('DIDIT_WEBHOOK_SECRET'),
         'auto_approve' => filter_var(env('DIDIT_AUTO_APPROVE', false), FILTER_VALIDATE_BOOLEAN),
