@@ -33,6 +33,9 @@ class PackVersionResource extends JsonResource
             'total_quota' => $periodic && $this->quota_per_period !== null && $this->period_cycles !== null
                 ? YemQuantity::times($this->quota_per_period, $this->period_cycles)
                 : null,
+            'first_credit_delay_periods' => $periodic
+                ? ($this->rules['first_credit_delay_periods'] ?? $this->plan->family->defaultFirstCreditDelayPeriods())
+                : null,
             'cumulative' => $periodic ? $this->cumulative : null,
             'end_of_term' => $this->end_of_term?->value,
             'min_operation' => $this->min_operation,
