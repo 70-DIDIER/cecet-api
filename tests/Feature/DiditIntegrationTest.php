@@ -264,3 +264,24 @@ it('uses the separate KYB workflow for a company and never silently falls back t
     expect($result['workflow_id'])->toBe('company-kyb-workflow');
     Http::assertSent(fn ($request) => $request['workflow_id'] === 'company-kyb-workflow');
 });
+
+
+it('limits both PF and legal-person test applications to a document-only session, but preserves company KYB for real mode', function () {
+    config()->set('kyc.didit.kyb_workflow_id', 'company-kyb-workflow');
+    config()->set('kyc.didit.document_only_test', true);
+    fakeDiditCreation();
+
+    $legal = User::factory()->legalPerson()->status(UserStatus::PendingKyc)->create();
+    startDidit($legal)->assertOk();
+    $case = MemberKycCase::where('user_id', $legal->id)->sole();
+    expect($case->provider_workflow_id)->toBe('test-workflow');
+    Http::assertSent(fn ($request) => $request['workflow_id'] === 'test-workflow');
+    $this->withToken(tokenFor($legal))->getJson('/api/v1/me/membership')->assertForbidden();
+
+    config()->set('kyc.didit.document_only_test', false);
+    fakeDiditCreation();
+    $secondLegal = User::factory()->legalPerson()->status(UserStatus::PendingKyc)->create();
+    startDidit($secondLegal)->assertOk();
+    expect(MemberKycCase::where('user_id', $secondLegal->id)->sole()->provider_workflow_id)
+        ->toBe('company-kyb-workflow');
+});
