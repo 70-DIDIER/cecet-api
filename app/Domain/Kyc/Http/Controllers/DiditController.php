@@ -37,7 +37,7 @@ final class DiditController
                 'Ce dossier doit être traité avant une nouvelle vérification.');
             $case ??= new MemberKycCase(['user_id' => $member->id]);
             $case->id ??= (string) Str::ulid();
-            $created = $gateway->create($case);
+            $created = $gateway->create($case, $member->person_type?->value === 'legal');
             $case->forceFill([
                 'verification_mode' => 'didit',
                 'status' => 'provider_pending',
@@ -50,7 +50,7 @@ final class DiditController
                 'provider_reference' => $created['session_id'],
                 'provider_session_url' => $created['url'],
                 'provider_environment' => config('kyc.didit.environment'),
-                'provider_workflow_id' => config('kyc.didit.workflow_id'),
+                'provider_workflow_id' => $created['workflow_id'],
                 'provider_status' => 'Not Started',
                 'provider_checks' => [],
                 'provider_verified_at' => null,
