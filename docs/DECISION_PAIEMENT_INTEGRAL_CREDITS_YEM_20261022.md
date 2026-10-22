@@ -75,3 +75,13 @@ Ce relevé relit les `PaymentIntent` correspondant aux cotisations, souscription
 Le contrat renvoie `payment_mode=upfront_once`, `installments_allowed=false`, les montants de contrat / frais / total, la date de confirmation, le type PF/PM et le prestataire (une transaction du prestataire `fake` est explicitement étiquetée **simulation** par le frontend). Les crédits YEM continuent d'être lus depuis les **PackPeriod** propres au membre, sous l'API existante : les deux registres sont distincts.
 
 **Recette ciblée réussie sur la base de test** : 4 scénarios de paiement intégral et crédits périodiques (85 assertions) et 3 scénarios de relevé financier, frais, isolation et accès (42 assertions). Vérification TypeScript/Vite du frontend réussie. Aucun déploiement de ces nouveautés dans la version stable.
+
+## 7. Recette consolidée du 22 octobre 2026
+
+Exécution sur la base PostgreSQL de test `cectapi_test`, avec fichiers de la branche design injectés **temporairement** dans l'environnement de tests existant puis restaurés. Aucun test n'a été exécuté sur la base active de démonstration.
+
+**Résultat : 84 tests réussis, 634 assertions.** Scénarios : éligibilité PF/PM, souscriptions, administration du catalogue, périodicité et idempotence, dashboard, paiement intégral, paiement partiel refusé, accès au relevé comptable, protection des données, règles de KYC préalables à l'adhésion.
+
+La recette a également permis d'actualiser un ancien test de dashboard qui demandait une cotisation sans KYC : son nouveau jeu de données présente un dossier KYC approuvé, vérifie le paiement en attente depuis l'écran d'adhésion et confirme que l'accueil membre demeure inaccessible avant activation.
+
+La compilation du frontend TypeScript + Vite est réussie avec la fiche de règlements branchée sur `GET /api/v1/me/payment-statement`. Aucune validation visuelle navigateur de la nouvelle branche, aucun déploiement et aucune fusion GitHub n'ont été effectués.
