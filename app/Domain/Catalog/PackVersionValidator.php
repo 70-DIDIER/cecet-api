@@ -116,6 +116,13 @@ class PackVersionValidator
 
         $data = $validator->validate();
 
+        // Persist the resolved timing rule in every NEW immutable pack version.
+        // Legacy versions missing this key still use the same family default on activation.
+        $normalizedRules = $data['rules'] ?? [];
+        if ($periodic) {
+            $normalizedRules['first_credit_delay_periods'] ??= $family->defaultFirstCreditDelayPeriods();
+        }
+
         return [
             'price_xof' => (int) $data['price_xof'],
             'period_unit' => $periodic ? $data['period']['unit'] : null,
@@ -127,7 +134,7 @@ class PackVersionValidator
             'min_operation' => isset($data['min_operation']) ? YemQuantity::of($data['min_operation']) : null,
             'max_operation' => isset($data['max_operation']) ? YemQuantity::of($data['max_operation']) : null,
             'eligible_person_types' => array_values($data['eligible_person_types'] ?? $family->defaultEligiblePersonTypes()),
-            'rules' => $data['rules'] ?? [],
+            'rules' => $normalizedRules,
             'reason' => trim($data['reason']),
         ];
     }
