@@ -1,3 +1,84 @@
+## MISE EN LIGNE INTÉGRÉE SUR CECT — 22 OCTOBRE 2026 (effectuée)
+
+**Cette section remplace la mention précédente « non déployé » pour
+l'intégration dans l'espace membre.** L'API Laravel et les frontends
+membre et administration ont été déployés sur les endpoints publics
+existants, sans supprimer ni recréer la base de production.
+
+### URLs réelles vérifiées
+
+- Espace membre KYC : https://13-49-203-235.sslip.io/espace/kyc
+- Backoffice de revue (requiert droit `kyc.review`) :
+  https://admin.13-49-203-235.sslip.io/admin/kyc
+- API : https://api.13-49-203-235.sslip.io/api/v1/health
+- Présentation publique Sandbox :
+  https://13-49-203-235.sslip.io/verification-kyc-demo.html
+
+### Code, infrastructure et contrôle d'intégrité
+
+- Backend prod commit `6c1b2a5` de `70-DIDIER/cecet-api`
+  branche `custum`, fusion fast-forward de l'ancien `b1143de`.
+- Nouvelles migrations KYC
+  `2026_10_22_000001_create_member_kyc_cases` et
+  `2026_10_22_000002_add_didit_to_kyc_cases` exécutées
+  avec succès dans la **base existante** `cectapi_live`.
+- Environnement backend : `KYC_PROVIDER=didit`,
+  `DIDIT_ENVIRONMENT=sandbox`, workflows PF et PM distincts,
+  `DIDIT_AUTO_APPROVE=false`; les secrets restent uniquement
+  dans le fichier `.env` privé du serveur et ne figurent pas
+  dans cette documentation.
+- PF → workflow `635693e0-768a-45fe-ad42-e7bae9c649b8` ;
+  PM → workflow KYB `96d81562-e65f-4694-b7a5-c2552d92c83c`.
+  L'orchestration PM crée bien une session société distincte.
+- Frontend membre :
+  `/home/ubuntu/cect-releases/frontend-didit-kyb-20261022` ;
+  frontend administrateur :
+  `/home/ubuntu/cect-releases/admin-didit-qa-20261022` ;
+  liens actifs `/home/ubuntu/cect-current/{frontend,admin}`.
+  ACL de lecture du serveur HTTP vérifiées.
+- Ancienne version et configuration API conservées en sauvegarde
+  privée `/home/ubuntu/cect-private-backups/20261022-kyc-member-integration/`
+  (ancien SHA backend, ancien .env et anciens liens des deux interfaces).
+- Dump PostgreSQL privé préalable `cectapi_live_pre_didit_20261022_004125.dump`
+  vérifié par `pg_restore --list` (372 entrées) ; aucune
+  suppression d'utilisateurs ou remise à zéro.
+- Après bascule, HTTP 200 pour accueil, espace KYC, backoffice KYC,
+  prévisualisation Sandbox et santé API ; accès KYC sans
+  connexion HTTP 401 ; webhook non signé HTTP 401 ;
+  Superadmin sans certificat HTTP 403.
+- Deux comptes internes et une clé Superadmin présents ;
+  chaîne d'audit intacte (137 événements), ledger cohérent,
+  worker de queue actif.
+- Tests ciblés KYC/permissions/OTP/audit/comptes :
+  **61 réussis, 263 assertions** ; addition du parcours KYB :
+  **13 réussis, 94 assertions** (sélection KYC/KYB).
+  La suite globale historique garde 121 échecs précédemment
+  identifiés et n'a PAS été représentée comme intégralement verte.
+
+### Limites de cette publication
+
+1. La connexion Didit n'est **pas LIVE** : fournisseur `sandbox`,
+   résultats simulés, avertissement visible sur la page membre ;
+   les utilisateurs ne doivent pas soumettre de véritables documents
+   ou biométries à cet essai.
+2. Aucune approbation Sandbox n'active une adhésion ou un paiement réel :
+   la logique métier et le moteur de décision sont **fail-closed**
+   hors environnement `testing`, auto-approbation désactivée.
+3. Le flux KYB PM crée sa session fournisseur, mais le
+   rapprochement complet des statuts business/UBO et la conformité
+   sont encore nécessaires avant une approbation réelle.
+4. Le webhook Didit reste désactivé. Les clients membres peuvent
+   demander la réconciliation explicite `/me/kyc/didit/refresh`
+   sur leurs sessions autorisées.
+5. La file de revue interne exige la permission `kyc.review` ;
+   l'interface ne peut pas à elle seule accorder cette permission
+   aux comptes actuels.
+
+**Verdict vérifié : oui pour l'intégration et la visualisation
+sur la plateforme opérationnelle ; non pour une vérification
+juridique LIVE et le paiement après succès simulé.**
+
+---
 ## PUBLICATION VISIBLE SUR LA PLATEFORME — 22/10/2026
 
 À la demande de l'équipe (« on doit voir ça sur la plateforme »),
