@@ -107,3 +107,24 @@ it('runs the fake-provider demonstration chain from subscription through seller 
     expect(\App\Domain\Payout\Models\PayoutBatch::query()->count())->toBe(1)
         ->and(\App\Domain\Payout\Models\PayoutBatch::query()->sole()->total_amount)->toBe(1275000);
 });
+
+it('allows one demonstration pack beside two official seller packs without relaxing the official limit', function () {
+    $this->artisan('db:seed', ['--class' => \Database\Seeders\VendeurHorizonDemoSeeder::class])->assertSuccessful();
+    $member = User::factory()->create();
+    $official1 = makePlan(PackFamily::Vendeur, 'OFF-01');
+    $official2 = makePlan(PackFamily::Vendeur, 'OFF-02');
+    $official3 = makePlan(PackFamily::Vendeur, 'OFF-03');
+    subscribeAndPay($member, $official1);
+    subscribeAndPay($member, $official2);
+    $demo = PackPlan::query()->where('code', 'TST-VND-HORIZON')->sole();
+    $testPack = subscribeAndPay($member, $demo);
+    expect($testPack->status->value)->toBe('active')
+        ->and(\App\Domain\Subscription\Models\UserPack::query()->where('user_id', $member->id)->count())->toBe(3);
+
+    $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/packs', ['plan_id' => $official3->id], ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])
+        ->assertStatus(409)->assertJsonPath('code', 'PACK_LIMIT_REACHED');
+    $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/packs', ['plan_id' => $demo->id], ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])
+        ->assertStatus(409)->assertJsonPath('code', 'PACK_LIMIT_REACHED');
+});
