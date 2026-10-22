@@ -96,3 +96,58 @@ it('rejects partial payment without activating pack or generating a YEM calendar
         ->and(PackPeriod::query()->where('user_pack_id', $packId)->count())->toBe(0)
         ->and(QuotaLedgerEntry::query()->where('user_pack_id', $packId)->count())->toBe(0);
 });
+
+it('delays the first PF Vendeur credit when the contractual first-credit delay is one period', function (): void {
+    $member = User::factory()->create();
+    $plan = makePlan(PackFamily::Vendeur, 'VT1', periodicTerms([
+        'price_xof' => 60000,
+        'period' => ['unit' => 'month', 'every' => 1, 'cycles' => 3],
+        'quota_per_period' => '25',
+    ]), sellableImmediately: false);
+
+    $response = $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/packs', ['plan_id' => $plan->id], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated();
+    $packId = $response->json('data.user_pack.id');
+
+    settleFakeAttempt($response->json('data.payment.id'), ProviderPaymentStatus::Approved)->assertOk();
+
+    $pack = UserPack::query()->with(['periods', 'account'])->findOrFail($packId);
+    expect($pack->status)->toBe(UserPackStatus::Active)
+        ->and($pack->periods)->toHaveCount(3)
+        ->and($pack->periods->first()->starts_at->greaterThan($pack->activated_at))->toBeTrue()
+        ->and($pack->account->available)->toBe('0.000000')
+        ->and(QuotaLedgerEntry::query()->where('user_pack_id', $packId)->count())->toBe(0);
+
+    $this->travelTo($pack->periods->first()->starts_at->copy()->addSecond());
+    $this->artisan('packs:roll-periods')->assertSuccessful();
+
+    expect($pack->account()->firstOrFail()->available)->toBe('25.000000')
+        ->and(QuotaLedgerEntry::query()->where('user_pack_id', $packId)->count())->toBe(1);
+    $this->travelBack();
+});
+
+it('treats a PF Personnel base subscription as a single upfront payment without monthly quota deadlines', function (): void {
+    $member = User::factory()->create();
+    $plan = makePlan(PackFamily::Personnel, 'PT1', personnelTerms(['price_xof' => 5000]));
+
+    $response = $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/packs', ['plan_id' => $plan->id], ['Idempotency-Key' => (string) Str::ulid()])
+        ->assertCreated();
+    $packId = $response->json('data.user_pack.id');
+    expect(PackPeriod::query()->where('user_pack_id', $packId)->count())->toBe(0);
+
+    settleFakeAttempt($response->json('data.payment.id'), ProviderPaymentStatus::Approved)->assertOk();
+    $pack = UserPack::query()->with(['account', 'periods'])->findOrFail($packId);
+
+    expect($pack->status)->toBe(UserPackStatus::Active)
+        ->and($pack->paid_at)->not->toBeNull()
+        ->and($pack->periods)->toHaveCount(0)
+        ->and($pack->account->available)->toBe('0.000000')
+        ->and(PaymentIntent::query()->where('payable_id', $packId)->count())->toBe(1);
+
+    $this->travel(3)->months();
+    $this->artisan('packs:roll-periods')->assertSuccessful();
+    expect(QuotaLedgerEntry::query()->where('user_pack_id', $packId)->count())->toBe(0);
+    $this->travelBack();
+});
