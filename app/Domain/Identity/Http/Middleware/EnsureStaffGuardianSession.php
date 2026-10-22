@@ -45,7 +45,9 @@ final class EnsureStaffGuardianSession
             $payment = str_starts_with($path, 'api/v1/me/membership/payments')
                 || preg_match('#^api/v1/me/payments/[^/]+/(declare|simulate)$#', $path);
             if (! in_array($path, $allow, true)
-                && ! ($user->status === UserStatus::PendingPayment && $payment)) {
+                && ! (($user->status === UserStatus::PendingPayment
+                    || ($user->status === UserStatus::PendingKyc
+                        && KycEligibility::stagingMembershipDemo($user))) && $payment)) {
                 abort(403, 'Finalisez votre vérification KYC et votre adhésion.');
             }
             if ($user->status === UserStatus::PendingKyc && $path === 'api/v1/me/membership') {
