@@ -417,3 +417,71 @@ it('never offers a membership preview for an unstarted or unapproved sandbox ide
     $this->withToken(tokenFor($member))->getJson('/api/v1/me/kyc')
         ->assertJsonPath('data.sandbox_test_completed', false);
 });
+
+
+it('reuses the full existing fake checkout and activates a simulated membership after Sandbox KYC in staging', function () {
+    config()->set('kyc.didit.document_only_test', true);
+    app()->detectEnvironment(fn () => 'staging');
+
+    fakeDiditCreation();
+    $member = User::factory()->status(UserStatus::PendingKyc)->create();
+    startDidit($member)->assertOk();
+    fakeDiditDecision('Approved', false);
+
+    $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/kyc/didit/refresh', [])->assertOk();
+    $this->travel(3)->minutes();
+
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/kyc')
+        ->assertOk()->assertJsonPath('data.sandbox_test_completed', true);
+
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')
+        ->assertOk()
+        ->assertJsonPath('data.payment_enabled', true)
+        ->assertJsonPath('data.demo_checkout', true)
+        ->assertJsonPath('data.fee_due', 25000);
+
+    $attempt = $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/membership/payments',
+            ['method' => 'MIXX', 'payment_phone' => '+22890123456'],
+            ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])
+        ->assertCreated()->assertJsonPath('data.provider', 'fake')
+        ->assertJsonPath('data.simulation_available', true);
+
+    expect($member->refresh()->status)->toBe(UserStatus::PendingPayment);
+    $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/payments/'.$attempt->json('data.id').'/simulate', [])
+        ->assertOk()->assertJsonPath('data.status', 'approved');
+
+    expect($member->refresh()->status)->toBe(UserStatus::Active);
+    $membership = \App\Domain\Membership\Models\Membership::query()
+        ->where('user_id', $member->id)->sole();
+    expect($membership->activation_mode->value)->toBe('simulated_payment')
+        ->and($membership->paid_at)->toBeNull();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/dashboard')->assertOk();
+    expect(\App\Domain\Payment\Models\PaymentAttempt::query()
+        ->where('provider', 'fake')->count())->toBe(1);
+});
+
+it('never permits a fake Sandbox KYC document to create real payment attempts', function () {
+    config()->set('kyc.didit.document_only_test', true);
+    app()->detectEnvironment(fn () => 'staging');
+
+    fakeDiditCreation();
+    $member = User::factory()->status(UserStatus::PendingKyc)->create();
+    startDidit($member)->assertOk();
+    fakeDiditDecision('Approved', false);
+    $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/kyc/didit/refresh', [])->assertOk();
+    $this->travel(3)->minutes();
+
+    app(\App\Domain\Settings\SettingsService::class)
+        ->set('payment.inbound_provider', 'fedapay', 'Negative provider guard test');
+    $this->withToken(tokenFor($member))
+        ->postJson('/api/v1/me/membership/payments',
+            ['method' => 'MIXX', 'payment_phone' => '+22890123456'],
+            ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])
+        ->assertForbidden();
+    expect(\App\Domain\Payment\Models\PaymentAttempt::query()->count())->toBe(0);
+    expect($member->refresh()->status)->toBe(UserStatus::PendingKyc);
+});
