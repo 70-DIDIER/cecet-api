@@ -49,9 +49,10 @@ describe('catalog as seen by a member', function () {
         $this->withToken(tokenFor($this->member))->getJson("/api/v1/packs/{$merchant->id}")->assertNotFound();
 
         $legal = User::factory()->legalPerson()->create();
-        $legalResponse = $this->withToken(tokenFor($legal))->getJson('/api/v1/packs')->assertOk()->assertJsonCount(2, 'data');
-        expect(collect($legalResponse->json('data'))->pluck('code')->all())->toEqualCanonicalizing(['V1', 'M1']);
+        $legalResponse = $this->withToken(tokenFor($legal))->getJson('/api/v1/packs')->assertOk()->assertJsonCount(1, 'data');
+        expect(collect($legalResponse->json('data'))->pluck('code')->all())->toEqualCanonicalizing(['M1']);
         $this->withToken(tokenFor($legal))->getJson("/api/v1/packs/{$merchant->id}")->assertOk();
+        $this->withToken(tokenFor($legal))->getJson("/api/v1/packs/{$byCode['V1']['id']}")->assertNotFound();
     });
 
     it('provides an authenticated catalog that never exposes ineligible packs', function () {
@@ -65,7 +66,7 @@ describe('catalog as seen by a member', function () {
 
         $legal = User::factory()->legalPerson()->create();
         $legalCatalog = $this->withToken(tokenFor($legal))->getJson('/api/v1/me/catalog-packs')->assertOk();
-        expect(collect($legalCatalog->json('data'))->pluck('code')->all())->toEqualCanonicalizing(['V1', 'M1']);
+        expect(collect($legalCatalog->json('data'))->pluck('code')->all())->toEqualCanonicalizing(['M1']);
     });
 
     it('hides unpublished plans', function () {
@@ -166,6 +167,16 @@ describe('subscription', function () {
         subscribeTo($this->member, $plan->id)->assertStatus(422)->assertJsonPath('code', 'PACK_NOT_ELIGIBLE')->assertJsonPath('details.eligible_person_types', ['legal']);
 
         subscribeTo(User::factory()->legalPerson()->create(), $plan->id)->assertCreated();
+    });
+
+    it('refuses seller, consumer and personnel subscriptions by a legal person including legacy catalog metadata', function () {
+        $legal = User::factory()->legalPerson()->create();
+        foreach ([PackFamily::Vendeur, PackFamily::Consommateur, PackFamily::Personnel] as $family) {
+            $plan = makePlan($family, $family->value[0].Str::upper(Str::random(3)));
+            subscribeTo($legal, $plan->id)->assertStatus(422)
+                ->assertJsonPath('code', 'PACK_NOT_ELIGIBLE')
+                ->assertJsonPath('details.eligible_person_types', ['natural']);
+        }
     });
 
     it('activates a free pack immediately without any payment', function () {
