@@ -1,3 +1,97 @@
+## Démonstration commerciale : rétablissement du parcours métier existant — 22 octobre 2026, 08:33 UTC
+
+**DÉPLOYÉ sur le VPS autorisé**. Cette section constitue le
+dernier état effectif ; les sections plus anciennes intitulées
+« aperçu en lecture seule » décrivent une étape abandonnée.
+
+### Décision d'architecture
+
+Le seul ajout par rapport au fonctionnement métier d'origine
+est **la vérification documentaire KYC avant l'adhésion**.
+Aucune modification de packs, tarifs, règles YEM, rôles
+ou intégrations réelles de paiement n'a été nécessaire.
+Le portail public étant une **présentation en mode staging**
+et Didit opérant en Sandbox, le paiement est traité
+par le prestataire interne `fake` déjà existant :
+aucun débit Mobile Money réel, SMS payant ou transaction
+FedaPay n'est lancé.
+
+### Parcours bout en bout
+
+- Inscription et confirmation OTP : inchangées.
+- Contrôle documentaire Didit en Sandbox :
+  résultat `Approved` avec preuve documentaire + délai requis.
+- Ouverture automatique de `/espace/adhesion` :
+  page traditionnelle, frais d'adhésion en FCFA, téléphone,
+  choix des opérateurs disponibles du pays.
+- **Bouton de paiement réactivé en staging** lorsque
+  `KycEligibility::stagingMembershipDemo()` confirme les
+  vérifications et le fournisseur de paiement configuré est
+  exclusivement `fake`. Les opérateurs `CASH` et
+  `BANK_TRANSFER` sont retirés du sélecteur de cette
+  présentation, car ce sont des paiements manuels,
+  non simulés instantanément.
+- Le parcours `StartMembershipPayment`, `PaymentCheckout`,
+  `FakePaymentProvider`, `RefreshPaymentAttempt`,
+  `SettlePayment`, `ActivateMembership` reste
+  l'implémentation originale, avec un raccordement
+  `pending_kyc -> pending_payment -> active`.
+- Paiement enregistré uniquement via `fake`,
+  confirmation par `/me/payments/{attempt}/simulate`
+  puis activation test et accès normal à `/espace`.
+- Provenance comptable explicite `activation_mode=simulated_payment`
+  ; `paid_at=null` pour ne pas faire passer une simulation
+  pour un encaissement réel. Les mouvements démo restent
+  dans la base du site de staging et ne doivent jamais être
+  utilisés comme opérations financières réelles.
+- Hors environnement `staging`, `stagingMembershipDemo()`
+  est désactivé. La méthode `KycEligibility::approved()`
+  n'est jamais modifiée ou contournée pour de la vérification
+  réelle. Si le provider de paiement est remplacé par
+  FedaPay, le parcours staging issu du Sandbox KYC
+  échoue de manière sécurisée.
+- Interface : plus de gros bandeau « aperçu de test »
+  sur l'adhésion ; simple transparence « simulation »
+  à proximité de l'interaction de paiement.
+
+### Recette et publication
+
+- Tests ciblés avant publication : **63 réussis,
+  327 assertions** sur `cectapi_test` (Didit, KYC,
+  inscription, personnel, droits d'accès) ; scénario
+  complet KYC Sandbox → checkout `fake` →
+  paiement simulé → activation → dashboard testé.
+- `npm run build` React/Vite réussi avec la cible API publique.
+- Sauvegarde PostgreSQL avant publication :
+  `/home/ubuntu/cect-private-backups/cect-adhesion-presentation-20261022/`
+  `cectapi_live_pre_presentation_20261022_083026.dump`,
+  validé via `pg_restore --list` (382 objets) ;
+  ancien SHA API et chemin frontend enregistrés.
+- API livrée `9a2a95d` sur `/var/www/cect-api`
+  depuis `e7560eb`, via merge Git fast-forward ;
+  frontend `4f36f23` compilé et activé dans
+  `/home/ubuntu/cect-releases/frontend-kyc-normal-adhesion-demo-20261022`.
+- Pages d'accueil, KYC, adhésion et santé API
+  HTTP 200 ; invités sur API KYC et Adhésion
+  HTTP 401 ; webhook Didit non signé HTTP 401 ;
+  Superadmin sans certificat mTLS HTTP 403.
+- Audit 154 événements intègres, journaux cohérents,
+  4 comptes membres, 2 comptes personnels,
+  1 clé Superadmin conservés ; worker actif ;
+  0 tâche échouée et 0 tentative de paiement créée
+  pendant les contrôles de déploiement.
+- Deux dossiers Didit sont éligibles au parcours
+  de simulation d'adhésion, un reste en attente
+  (`In Progress`). L'authentification dans le
+  navigateur de chaque membre n'a pas été
+  testée avec ses secrets : la recette bout en bout
+  fut réalisée dans la base QA isolée.
+
+**IMPORTANT** : ceci est une démonstration de fonctionnement
+et ne constitue pas une approbation KYC réelle, une
+transaction bancaire ou un contrat FedaPay réel.
+
+---
 ## LIVRAISON EFFECTUÉE — KYC ajouté devant l'adhésion existante (22 octobre 2026, 08:08 UTC)
 
 **STATUT FINAL : DÉPLOYÉ SUR LE VPS CECT.** Remplace la mention
