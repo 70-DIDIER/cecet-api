@@ -56,10 +56,11 @@ class MemberPackController
             ->with('currentVersion')
             ->where('status', PackPlanStatus::Published)
             ->whereHas('currentVersion')
-            ->when($user?->person_type !== null, fn ($query) => $query->whereHas(
-                'currentVersion',
-                fn ($versionQuery) => $versionQuery->whereJsonContains('eligible_person_types', $user->person_type->value),
-            ))
+            ->when($user?->person_type !== null, fn ($query) => $query
+                ->whereIn('family', $user->person_type->value === 'legal' ? ['MARCHAND'] : ['VENDEUR', 'CONSOMMATEUR', 'PERSONNEL'])
+                ->whereHas('currentVersion',
+                    fn ($versionQuery) => $versionQuery->whereJsonContains('eligible_person_types', $user->person_type->value),
+                ))
             ->orderBy('family')
             ->orderBy('level')
             ->orderBy('code')
@@ -80,7 +81,7 @@ class MemberPackController
 
             return [
                 ...(new PackPlanResource($plan))->resolve(),
-                'eligible' => $user === null || $version === null ? null : in_array($user->person_type?->value, $version->eligible_person_types, true),
+                'eligible' => $user === null || $version === null ? null : in_array($user->person_type?->value, $plan->family->defaultEligiblePersonTypes(), true) && in_array($user->person_type?->value, $version->eligible_person_types, true),
                 'payment_quote' => $quote,
             ];
         });
@@ -96,7 +97,7 @@ class MemberPackController
         $viewer = $request->user('sanctum');
         if ($viewer instanceof User && $viewer->isMember()) {
             $version = $plan->currentVersion;
-            abort_unless($version !== null && in_array($viewer->person_type?->value, $version->eligible_person_types, true), 404);
+            abort_unless($version !== null && in_array($viewer->person_type?->value, $plan->family->defaultEligiblePersonTypes(), true) && in_array($viewer->person_type?->value, $version->eligible_person_types, true), 404);
         }
 
         return new PackPlanResource($plan);
