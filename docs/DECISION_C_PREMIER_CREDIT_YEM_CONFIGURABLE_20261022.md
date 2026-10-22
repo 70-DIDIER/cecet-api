@@ -69,6 +69,9 @@ Ce contrat reste cantonné aux branches `design/pf-pm-premium-20261022` des dép
 
 ## Résultats des contrôles automatisés (22 octobre 2026)
 
-Les quatre nouveaux scénarios de premier crédit valident **77 assertions** : valeurs par défaut PF/PM, override Superadmin par nouvelle version, conservation des conditions antérieures, rejet des délais invalides, exclusion Personnel, calendrier décalé en semaines, absence de crédit avant échéance et idempotence.
+Les cinq scénarios de premier crédit valident **85 assertions** : valeurs par défaut PF/PM, override Superadmin par nouvelle version, conservation des conditions antérieures, rejet des délais invalides, exclusion Personnel, calendrier décalé en semaines, absence de crédit avant échéance et idempotence.
 
-**Recette combinée finale : 88 tests réussis, 711 assertions** sur `cectapi_test` isolée, incluant souscriptions, catalogue, limites PF/PM, période, règlement intégral, relevé de paiements privé et validation des contrôles KYC. Compilations TypeScript/Vite **frontend membre et administration réussies**. La validation navigateur reste à faire séparément et aucune publication n'est autorisée automatiquement par ces succès techniques.
+**Recette combinée finale : 89 tests réussis, 719 assertions** sur `cectapi_test` isolée, incluant souscriptions, catalogue, limites PF/PM, période, règlement intégral, relevé de paiements privé et validation des contrôles KYC. Compilations TypeScript/Vite **frontend membre et administration réussies**. La validation navigateur reste à faire séparément et aucune publication n'est autorisée automatiquement par ces succès techniques.
+
+
+Le cinquième test protège la compatibilité avec les versions historiques sans clé `first_credit_delay_periods`. Le schéma PostgreSQL empêche de changer les termes d'une version **même non publiée** : l'essai de compatibilité crée un enregistrement historique autonome dans la base isolée, sans altérer un contrat existant.
