@@ -342,9 +342,14 @@ it('unblocks the Sandbox test-complete label after two minutes even with repeate
     $this->withToken(tokenFor($member))->getJson('/api/v1/me/kyc')
         ->assertOk()->assertJsonPath('data.sandbox_test_completed', true);
 
-    // A simulated OCR approval never changes the member's eligibility to pay.
+    // A simulated OCR approval only exposes the read-only membership preview.
     expect($member->refresh()->status)->toBe(UserStatus::PendingKyc);
-    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')->assertForbidden();
+    $this->withToken(tokenFor($member))->getJson('/api/v1/me/membership')
+        ->assertOk()->assertJsonPath('data.payment_enabled', false);
+    $this->withToken(tokenFor($member))->postJson('/api/v1/me/membership/payments',
+        ['method' => 'TMONEY', 'payment_phone' => '+22890123456'],
+        ['Idempotency-Key' => (string) \Illuminate\Support\Str::ulid()])
+        ->assertForbidden();
 });
 
 it('does not mark an unfinished Didit Sandbox session as complete merely because time passed', function () {
