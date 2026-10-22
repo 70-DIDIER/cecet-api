@@ -193,7 +193,8 @@ class KycController
             $locked = MemberKycCase::query()->lockForUpdate()->findOrFail($case->id);
             abort_unless($locked->status === 'submitted', 409, 'Le dossier a déjà été traité.');
             $member = User::query()->lockForUpdate()->findOrFail($locked->user_id);
-            abort_unless($member->status === UserStatus::PendingKyc, 409, 'Le membre a changé de statut.');
+            abort_unless(in_array($member->status, [UserStatus::PendingKyc, UserStatus::PendingPayment], true),
+                409, 'Le membre a changé de statut.');
             $decision = $data['decision'];
             if (config('kyc.provider') === 'didit' && $decision === 'approved') {
                 $checks = $locked->provider_checks ?? [];
