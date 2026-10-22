@@ -81,13 +81,16 @@ class PackVersionValidator
                 }
             }
 
-            // Merchant rights belong to legal entities only, regardless of
-            // what an administrator or a crafted API request submits.
-            if ($family === PackFamily::Marchand && array_key_exists('eligible_person_types', $input)
-                && $input['eligible_person_types'] !== [PersonType::Legal->value]) {
+            // CECT business rule: PM (legal) may subscribe ONLY to Merchant packs;
+            // PF (natural) may subscribe ONLY to Seller / Consumer / Personal.
+            // This cannot be overridden by an administrator editing a version.
+            if (array_key_exists('eligible_person_types', $input)
+                && $input['eligible_person_types'] !== $family->defaultEligiblePersonTypes()) {
                 $validator->errors()->add(
                     'eligible_person_types',
-                    'Le pack Marchand est réservé aux personnes morales.',
+                    $family === PackFamily::Marchand
+                        ? 'Les packs Marchand sont exclusivement réservés aux personnes morales.'
+                        : 'Cette famille de packs est exclusivement réservée aux personnes physiques.',
                 );
             }
 
