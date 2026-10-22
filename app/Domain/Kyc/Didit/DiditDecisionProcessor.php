@@ -28,6 +28,12 @@ final class DiditDecisionProcessor
         if (isset($response['session_id']) && $response['session_id'] !== $case->provider_reference) {
             abort(409, 'Identifiant de session Didit incohérent.');
         }
+        if (isset($response['workflow_id']) && $response['workflow_id'] !== $case->provider_workflow_id) {
+            abort(409, 'Workflow de vérification Didit incorrect.');
+        }
+        if (isset($response['application_id']) && $response['application_id'] !== config('kyc.didit.application_id')) {
+            abort(409, 'Application Didit incorrecte.');
+        }
         if (isset($response['vendor_data']) && $response['vendor_data'] !== 'cect-kyc:'.$case->id) {
             abort(409, 'Référence de dossier Didit incohérente.');
         }
