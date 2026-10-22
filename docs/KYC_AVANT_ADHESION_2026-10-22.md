@@ -1,3 +1,36 @@
+## VALIDATION DES IDENTIFIANTS DE TEST (22/10/2026)
+
+Une nouvelle clé API a été fournie par le responsable du projet.
+**Aucune valeur secrète ne figure dans GitHub, le code ni ce document.**
+
+Depuis le serveur CECT autorisé, un essai HTTP uniquement en lecture
+`GET https://verification.didit.me/v2/sessions?limit=1` a répondu **HTTP 200**
+avec cette nouvelle clé (`count=0`). L'authentification API Didit
+fonctionne donc bien ; l'application exacte liée à la clé doit encore
+être identifiée avant ouverture de sessions facturables.
+
+La clé API de test et le secret webhook reçus ont été déposés
+**uniquement dans un répertoire privé hors dépôts / hors site servi**
+`/home/ubuntu/.config/cect-kyc-test/`, permissions `0700`
+sur le dossier et `0600` sur chacun des fichiers.
+
+Le connecteur Laravel dans l'espace de QA, en `APP_ENV=testing` et
+sur la seule base `cectapi_test`, indique :
+`provider=configured`, `signed_callback=validated`
+avec un callback HMAC factice signé localement. Ce test n'est
+**pas** un webhook réel Didit et ne prouve pas la correspondance du
+secret avec la destination du compte.
+
+**PAS DE DÉPLOIEMENT** dans `/var/www/cect-api/.env`, pas de webhook
+activé ni de capture documentaire/biométrique. La suite complète
+reste NO-GO : 121 échecs au dernier contrôle. Pour déployer :
+résoudre les régressions, obtenir la preuve du mode sandbox réel,
+vérifier le compte propriétaire de cette clé et une notification
+webhook réelle, valider le KYB/les règles de confidentialité,
+puis contrôler sauvegarde, migrations, intégrité des comptes
+internes et rollback.
+
+---
 ## Vérification des identifiants Didit — suivi opérationnel
 
 Le maître d'ouvrage a fourni une clé API et un secret webhook pour essais,
