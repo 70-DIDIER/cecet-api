@@ -1,3 +1,77 @@
+## Parcours adhésion après KYC documentaire — correctif du 22 octobre 2026
+
+### Décision métier confirmée
+
+Une fois la carte d'identité contrôlée et l'issue Sandbox de Didit
+`Approved` synchronisée, le parcours de présentation doit poursuivre
+vers **l'ancienne page Adhésion**, qui présente les frais configurés
+par CECT, le numéro de téléphone et les moyens de paiement du pays.
+
+Le fournisseur étant encore en mode Sandbox, cela constitue
+**une prévisualisation de l'adhésion, et non une autorisation de paiement**.
+Ni les statuts financiers, ni les quotas YEM, ni l'activation des
+adhérents ne doivent être modifiés sur la base d'une identité simulée.
+
+### Code versionné — dépôt API `70-DIDIER/cecet-api` branche `custum`
+
+- `KycEligibility::sandboxDocumentTestCompleted(User)` vérifie en
+  lecture seule tous les critères Sandbox : provider didit,
+  mode documentaire test activé, session liée au workflow configuré,
+  environnement `sandbox`, état du dossier `submitted`,
+  résultat `Approved`, preuve documentaire `true`,
+  décision datant d'au moins deux minutes.
+- `KycController::mine()` réutilise ce prédicat, afin que
+  le backend KYC et le calcul de l'aperçu Adhésion ne
+  divergent pas.
+- `MembershipController::show()` permet **uniquement GET**
+  de prévisualisation si le prédicat vaut `true` : frais
+  d'adhésion et coût du provider calculés à partir des
+  réglages métier courants. La réponse porte les marqueurs
+  `sandbox_preview=true`, `payment_enabled=false`,
+  `status=kyc_sandbox_preview`. Aucune création de
+  `memberships`, `payment_attempts` ou de transaction.
+- Les méthodes POST de paiement et les protections d'accès
+  commercial utilisent toujours `KycEligibility::approved()`
+  (jamais `sandboxDocumentTestCompleted()`).
+
+### Code versionné — frontend `70-DIDIER/CECT-frontend` branche `custum`
+
+- `KycPage` navigue automatiquement vers `/espace/adhesion`
+  lorsque la vérification de test est terminée.
+- `MemberLayout` autorise cette route à être affichée
+  après connexion pour les comptes `pending_kyc` ;
+  le backend autorise l'aperçu seulement si Didit est
+  effectivement terminé. Sinon l'utilisateur revient
+  à la vérification.
+- `MembershipPage` réutilise les contrôles habituels
+  (montant, pays, numéro Mobile Money, moyens de paiement)
+  avec bandeau `Adhésion — aperçu de test` et bouton de
+  paiement **désactivé**. Les requêtes de paiement sont
+  également refusées côté code client et côté API.
+- Tests de régression ajoutés : aperçu après succès
+  documentaire, frais côté serveur, absence de
+  création de paiement, refus avant le KYC ou après
+  refus, absence d'accès aux packs.
+
+### État de publication
+
+**NON DÉPLOYÉ à cette étape.** Le serveur Desktop Commander
+`ip-172-31-25-53` est retombé OFFLINE avant compilation et
+tests de recette sur la base isolée `cectapi_test`.
+Ne pas annoncer cette évolution comme disponible sur le
+site public tant que l'API et le frontend n'ont pas
+été déployés ensemble et les contrôles Superadmin
+et de paiement vérifiés. Aucune base live modifiée.
+
+Pour sortie : rétablir connexion du serveur,
+tester modules Didit + adhésion sur `cectapi_test`,
+construire React/Vite avec l'URL de l'API publique,
+faire sauvegarde privée de l'ancienne release et de
+`cectapi_live`, déployer en fast-forward, vérifier
+les endpoints et s'assurer que le bouton de paiement
+demeure inactif pour tout Sandbox.
+
+---
 ## Mise en production du correctif de statut KYC Sandbox — 22 octobre 2026, 06:08 UTC
 
 **État : DÉPLOYÉ, vérifié sur le serveur CECT.** Cette note
