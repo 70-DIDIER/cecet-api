@@ -5,6 +5,7 @@ namespace App\Domain\Membership\Actions;
 use App\Domain\Audit\Enums\SecuritySeverity;
 use App\Domain\Audit\SecurityEventLogger;
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Kyc\KycEligibility;
 use App\Domain\Membership\Enums\ActivationMode;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\MembershipFee;
@@ -37,7 +38,7 @@ class DemoActivateMembership
             throw PaymentException::demoUnavailable();
         }
 
-        if (! $member->isMember() || $member->status !== UserStatus::PendingPayment) {
+        if (! $member->isMember() || $member->status !== UserStatus::PendingPayment || ! KycEligibility::approved($member)) {
             throw PaymentException::notPayable();
         }
 

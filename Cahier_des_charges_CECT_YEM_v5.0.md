@@ -3,6 +3,113 @@ Date : 17 octobre 2026
 Statut : référence fonctionnelle de recette et développement évolutif.
 Référentiel : cette version 5.0 reprend intégralement le cahier v4.0 en annexe historique ; les nouvelles dispositions v5.0 priment sur toute ancienne formulation contradictoire.
 
+## ADDENDUM V5.16 — PRESTATAIRE KYC DIDIT RETENU (22 octobre 2026)
+
+**Decision du responsable du projet : DIDIT devient le fournisseur retenu
+pour la vérification KYC documentaire et biométrique chez CECT.**
+
+L'inscription reste OTP -> KYC -> approbation -> paiement adhésion.
+Le parcours KYC requiert : documents officiels vérifiables, selfie en
+direct, **liveness actif 3D/vidéo**, confrontation visage/pièce, traitement
+antifraude et intervention du rôle Validateur pour les cas douteux.
+La PM ajoute la vérification KYB de la société et de son représentant.
+
+Integration retenue : API Didit v3 create session, interface de capture
+hébergée Didit sur smartphone/web (pas de stockage de vidéo en clair
+dans CECT), webhook HTTPS `status.updated` signature HMAC, puis lecture
+serveur du résultat réel et des modules de vérification avant décision.
+Rien ne peut débloquer les frais avant validation effective des contrôles.
+
+Clés API, identifiant workflow et secret webhook à stocker exclusivement
+dans les secrets serveur. `DIDIT_AUTO_APPROVE=false` par défaut ;
+examen humain obligatoire tant que l'entreprise n'autorise pas l'auto
+validation via politique conformité. Liveness passif SEUL insuffisant.
+
+Avancement : connecteur Laravel, endpoints, interface Didit, contrôle de
+résultat et tests isolés sont ajoutés dans les branches `custum`.
+**Pas déployé, pas lié à un compte Didit réel, pas encore validé par
+la suite complète de non-régression et la conformité biométrique.**
+Voir `docs/KYC_AVANT_ADHESION_2026-10-22.md` pour configuration sandbox
+et critères d'acceptation. Ne pas annoncer une mise en service.
+## ADDENDUM V5.15 — SELFIE EN DIRECT ET VIDEO BIOMETRIQUE OBLIGATOIRES (22 octobre 2026)
+
+**Decision metier du donneur d'ordre : le KYC doit comporter toutes les
+etapes d'un controle d'identite approfondi, y compris un SELFIE EN DIRECT
+et une VIDEO / SEQUENCE ACTIVE DE PREUVE DE VIE (LIVENESS).**
+Ce niveau est obligatoire pour la PF et pour le representant physique
+d'une PM en complement de la verification de la societe.
+
+Exigences : controle documentaire et authenticite, qualite recto/verso,
+OCR, selfie camera, sequence video dynamique avec actions aleatoires,
+liveness anti-photo/video rejouee/deepfake, comparaison faciale avec la
+photo d'identite, detection de doublons, signaux de fraude, controle
+des documents et de la personne morale, revue manuelle des cas douteux,
+recours et nouvelle tentative, piste d'audit et controle de risque.
+Le prestataire doit etre integre via SDK/API + webhooks signes et autoriser
+la validation seulement si le resultat externe et la preuve de vie sont
+authentifies cote backend. Le simple depot d'images et la prise d'une
+video par notre application ne constituent PAS une preuve de vie.
+
+**Garde-fou fonctionnel obligatoire AVANT ouverture publique** : un
+dossier d'identite valide uniquement sur la base de documents manuels
+ne satisfait plus le KYC complet exigé ; le paiement des frais d'adhesion
+doit etre interdit jusqu'au controle selfie/video et face match valides
+(sauf derogation formelle, justifiee et auditee selon les regles du projet).
+Le mode automatique doit utiliser un veritable prestataire contractuel ;
+la validation manuelle accompagne et arbitre, sans inventer des resultats
+biometriques.
+
+Priorite experience mobile Afrique/UEMOA : capture en faible bande
+passante, permission camera explicite, reessai si flou / reseau coupe,
+support smartphone moyen de gamme, retour d'avancement et dossier.
+Les pieces, selfies et videos doivent etre minimises, chiffres et proteges
+et leur conservation justifiee et documentee.
+
+Tarification exploratoire octobre 2026 : Didit (500 KYC de base
+gratuits/mois, puis 0,33 USD ; liveness actif +0,15 USD depuis le
+premier usage), Sumsub Basic (1,35 USD/verification, minimum 149
+USD/mois), iDenfy Basic (1,35 USD/verification, minimum 135 USD/mois),
+Smile ID (devis, documents Togo repertories). Tarifs a revalider
+avant contractualisation. Faire confirmer au fournisseur que le
+SDK accepte effectivement la **video/liveness actif** et les
+documents africains cibles, et ne pas assimiler du liveness passif
+a un enregistrement video guide.
+
+**Statut a la date de cet addendum : DOCUMENTS + VALIDATEUR MANUEL
+developpes sur branche custum, SELFIE / VIDEO / PRESTATAIRE encore
+A REALISER ; aucune fonctionnalite biométrique ne doit etre revendiquee
+comme deployée.**
+
+Fiche technique et conformite : docs/KYC_AVANT_ADHESION_2026-10-22.md.
+## ADDENDUM V5.14 — KYC obligatoire avant frais d'adhésion (22 octobre 2026)
+
+**Exigence prioritaire du maître d'ouvrage :** l'entreprise demande une vérification
+d'identité KYC entre la validation OTP e-mail et le paiement des frais d'adhésion.
+Un **rôle interne Validateur KYC** distinct de Comptabilité est réintroduit.
+Le parcours est : inscription PF/PM -> OTP -> pending_kyc -> dépôt KYC ->
+contrôle manuel ou prestataire de vérification réellement connecté -> approbation
+KYC -> pending_payment -> paiement -> active.
+**Cet addendum remplace la transition OTP -> pending_payment de l'addendum V5.13.**
+
+Dossier PF : justificatif officiel d'identité, date de naissance, adresse et
+contrôle document/titulaire. PM : pièces de société et identité du représentant.
+Documents accessibles seulement aux agents habilités, stockés en privé et
+données personnelles chiffrées. Rejet/motif/complément et resoumission prévus.
+**Aucun paiement ni activation ne doit passer sans un KYC approuvé côté backend**.
+Les frais sont affichés seulement après cette approbation.
+
+Le **Validateur KYC** ne possède ni privilège comptable, ni droits de validation
+des YEM. Le Validateur historique YEM demeure absorbé par Comptabilité.
+Les comptes et accès administratifs existants (notamment mTLS Superadmin)
+sont préservés. Le mode manuel est implémenté dans le code ; le mode automatique
+requiert encore la sélection d'un prestataire de confiance, un contrat et une
+API vérifiable signée. Aucune approbation automatique par OCR seul.
+
+L'exigence de protection des données personnelles et de conservation des pièces,
+ainsi que la qualification réglementaire exacte de la coopérative, doivent être
+validées avant traitement de pièces réelles. Référence technique et registre
+des décisions : docs/KYC_AVANT_ADHESION_2026-10-22.md.
+
 ## ADDENDUM V5.13 — Décision métier validée : opération 01, inscription PF (20 octobre 2026)
 
 **PRIORITÉ FONCTIONNELLE : ces quatre décisions du maître d'ouvrage prévalent sur les dispositions anciennes contradictoires des sections v5 et des annexes historiques.** Le détail des choix et de leurs écarts d'implémentation est conservé dans `docs/DECISIONS_METIER_CECT_2026-10-20.md`.

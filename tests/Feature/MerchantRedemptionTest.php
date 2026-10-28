@@ -36,7 +36,7 @@ beforeEach(function () {
         ->json('data.id');
     $this->withToken(tokenFor($this->merchant))->postJson("/api/v1/merchant/payments/{$paymentId}/confirm", [], ['Idempotency-Key' => (string) Str::ulid()])->assertOk();
 
-    $this->validator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
+    $this->validator = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
 });
 
 function redeem(User $merchant, UserPack $pack, string $quantity): TestResponse

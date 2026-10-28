@@ -8,6 +8,7 @@ use App\Domain\Identity\Enums\UserStatus;
 use App\Domain\Identity\Models\IdentityVerification;
 use App\Domain\Identity\Models\Organization;
 use App\Domain\Identity\Models\PernumIdentity;
+use App\Domain\Kyc\KycEligibility;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
@@ -82,10 +83,11 @@ class User extends Authenticatable implements FilamentUser, HasName
 
     /**
      * Whether the CECT approved the identity document and selfie of this member, the condition to subscribe a pack.
+     * An approved membership KYC already proves the identity: the member is not asked to verify it a second time.
      */
     public function hasVerifiedIdentity(): bool
     {
-        return $this->identity_verified_at !== null;
+        return $this->identity_verified_at !== null || KycEligibility::approved($this);
     }
 
     /**

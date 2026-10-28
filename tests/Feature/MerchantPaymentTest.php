@@ -35,7 +35,7 @@ beforeEach(function () {
         ->assertCreated()
         ->json('data.code');
 
-    $this->validator = User::factory()->staff(PermissionCatalog::VALIDATOR)->create();
+    $this->validator = User::factory()->staff(PermissionCatalog::ACCOUNTING)->create();
 });
 
 function payMerchant(User $payer, UserPack $pack, string $token, string $quantity): TestResponse

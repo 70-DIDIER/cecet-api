@@ -10,8 +10,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Confirms the email of a newly registered member, moves the account to PENDING_PAYMENT
- * and opens a session so the member can pay the membership fee.
+ * Confirms the email of a newly registered member, moves the account to PENDING_KYC
+ * and opens a session so the member can submit identity documents.
  */
 class VerifyMemberEmail
 {
@@ -30,7 +30,7 @@ class VerifyMemberEmail
             }
 
             $user->forceFill([
-                'status' => UserStatus::PendingPayment,
+                'status' => UserStatus::PendingKyc,
                 'email_verified_at' => now(),
             ])->save();
 
@@ -38,7 +38,7 @@ class VerifyMemberEmail
                 action: 'members.email_verified',
                 subject: $user,
                 before: ['status' => UserStatus::PendingEmailVerification->value],
-                after: ['status' => UserStatus::PendingPayment->value],
+                after: ['status' => UserStatus::PendingKyc->value],
                 actor: $user,
             );
         });

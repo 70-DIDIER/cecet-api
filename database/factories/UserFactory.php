@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Domain\Access\Actions\SyncAccessCatalog;
-use App\Domain\Access\PermissionCatalog;
 use App\Domain\Identity\Enums\PersonType;
 use App\Domain\Identity\Enums\UserKind;
 use App\Domain\Identity\Enums\UserStatus;
@@ -83,14 +82,8 @@ class UserFactory extends Factory
         ])->afterCreating(function (User $user) use ($roles): void {
             if ($roles !== []) {
                 app(SyncAccessCatalog::class)->handle();
-                // Historical tests request the removed Validator role. Route that
-                // fixture to Accounting; never recreate or assign a Validator role.
-                $mapped = array_map(
-                    fn (string $role): string => $role === PermissionCatalog::VALIDATOR
-                        ? PermissionCatalog::ACCOUNTING : $role,
-                    $roles
-                );
-                $user->syncRoles(array_values(array_unique($mapped)));
+                // Dedicated KYC validator is now an approved system role.
+                $user->syncRoles(array_values(array_unique($roles)));
             }
         });
     }

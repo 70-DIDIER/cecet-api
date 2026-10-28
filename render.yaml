@@ -1,0 +1,70 @@
+# Render Blueprint for the CECT API. Secrets use sync: false: Render asks for them at creation.
+services:
+  - type: web
+    name: cect-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_NAME
+        value: CECT API
+      - key: APP_ENV
+        value: staging
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: APP_LOCALE
+        value: fr
+      - key: APP_FALLBACK_LOCALE
+        value: fr
+      - key: TRUSTED_PROXIES
+        value: "*"
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      # Neon pooled endpoint (host with -pooler) for the application.
+      - key: DB_URL
+        sync: false
+      # Neon direct endpoint (host without -pooler), used only to run migrations at startup.
+      - key: DB_MIGRATION_URL
+        sync: false
+      - key: DB_SSLMODE
+        value: require
+      - key: SESSION_DRIVER
+        value: database
+      - key: SESSION_SECURE_COOKIE
+        value: "true"
+      - key: SESSION_DOMAIN
+        sync: false
+      - key: SANCTUM_STATEFUL_DOMAINS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: FILESYSTEM_DISK
+        value: local
+      - key: MAIL_MAILER
+        sync: false
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_PORT
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM_ADDRESS
+        sync: false
+    # KYC and identity documents are stored on the local disk: without a persistent disk they are
+    # lost at every deploy. Uncomment on a paid plan (or move the files to S3-compatible storage).
+    # disk:
+    #   name: cect-storage
+    #   mountPath: /var/www/html/storage/app
+    #   sizeGB: 1

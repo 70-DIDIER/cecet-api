@@ -20,6 +20,8 @@ use App\Domain\Identity\Http\Controllers\StaffActivationController;
 use App\Domain\Identity\Http\Controllers\StaffGuardianLoginController;
 use App\Domain\Identity\Http\Controllers\StepUpController;
 use App\Domain\Identity\Http\Controllers\SuperadminSecurityController;
+use App\Domain\Kyc\Http\Controllers\DiditController;
+use App\Domain\Kyc\Http\Controllers\KycController;
 use App\Domain\Membership\Http\Controllers\MemberDashboardController;
 use App\Domain\Membership\Http\Controllers\MemberDocumentController;
 use App\Domain\Membership\Http\Controllers\MembershipController;
@@ -111,6 +113,9 @@ Route::prefix('v1')->name('v1.')->group(function () {
         ->middleware('throttle:webhooks')
         ->name('webhooks.payments');
 
+    Route::post('webhooks/kyc/didit', [DiditController::class, 'webhook'])
+        ->middleware('throttle:webhooks')->name('webhooks.kyc.didit');
+
     /*
      * Authenticated account (members and staff).
      */
@@ -134,6 +139,15 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::get('me/dashboard', MemberDashboardController::class)->name('me.dashboard');
         Route::get('me/documents', [MemberDocumentController::class, 'index'])->name('me.documents.index');
         Route::get('me/documents/{type}.pdf', [MemberDocumentController::class, 'download'])->middleware('throttle:20,1')->name('me.documents.download');
+        Route::get('me/kyc', [KycController::class, 'mine'])->name('me.kyc.show');
+        Route::post('me/kyc', [KycController::class, 'submit'])
+            ->middleware('throttle:5,1')->name('me.kyc.submit');
+
+        Route::post('me/kyc/didit/start', [DiditController::class, 'start'])
+            ->middleware('throttle:3,1')->name('me.kyc.didit.start');
+        Route::post('me/kyc/didit/refresh', [DiditController::class, 'refresh'])
+            ->middleware('throttle:2,1')->name('me.kyc.didit.refresh');
+
         Route::get('me/identity-verification', [IdentityVerificationController::class, 'show'])->name('me.identity-verification.show');
         Route::post('me/identity-verification', [IdentityVerificationController::class, 'store'])->middleware('throttle:5,1')->name('me.identity-verification.store');
         Route::get('me/membership', [MembershipController::class, 'show'])->name('me.membership.show');
@@ -232,6 +246,15 @@ Route::prefix('v1')->name('v1.')->group(function () {
         /*
          * Back-office: active internal accounts only, fine-grained permissions per route.
          */
+        Route::prefix('kyc')->name('kyc.')->middleware(['staff', 'can:kyc.review'])->group(function () {
+            Route::get('cases', [KycController::class, 'queue'])->name('cases.index');
+            Route::get('cases/{case}', [KycController::class, 'show'])->name('cases.show');
+            Route::get('cases/{case}/documents/{type}', [KycController::class, 'document'])
+                ->middleware('throttle:30,1')->name('cases.documents');
+            Route::post('cases/{case}/decision', [KycController::class, 'decide'])
+                ->middleware(['step-up', 'throttle:10,1'])->name('cases.decision');
+        });
+
         Route::prefix('admin')->name('admin.')->middleware('staff')->group(function () {
             Route::get('permissions', [RoleController::class, 'permissions'])->middleware('can:roles.view')->name('permissions.index');
             Route::get('roles', [RoleController::class, 'index'])->middleware('can:roles.view')->name('roles.index');

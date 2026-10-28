@@ -5,6 +5,7 @@ namespace App\Domain\Identity\Enums;
 enum UserStatus: string
 {
     case PendingEmailVerification = 'pending_email_verification';
+    case PendingKyc = 'pending_kyc';
     case PendingPayment = 'pending_payment';
     case PendingActivation = 'pending_activation';
     case Active = 'active';
@@ -16,6 +17,6 @@ enum UserStatus: string
      */
     public function canAuthenticate(): bool
     {
-        return in_array($this, [self::PendingPayment, self::Active], true);
+        return in_array($this, [self::PendingKyc, self::PendingPayment, self::Active], true);
     }
 }

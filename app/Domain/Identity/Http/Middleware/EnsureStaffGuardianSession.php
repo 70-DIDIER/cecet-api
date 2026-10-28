@@ -4,6 +4,7 @@ namespace App\Domain\Identity\Http\Middleware;
 
 use App\Domain\Identity\StaffAccessPolicy;
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Kyc\KycEligibility;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
@@ -36,6 +37,29 @@ final class EnsureStaffGuardianSession
             || ($user->isStaff() && $user->status !== UserStatus::Active)) {
             abort(401, 'Compte suspendu, non activé ou clôturé.');
         }
+        // Only KYC and adhesion are allowed before account activation.
+        if ($user->isMember() && $user->status !== UserStatus::Active) {
+            $path = $request->path();
+            $allow = ['api/v1/me', 'api/v1/me/kyc', 'api/v1/me/membership',
+                'api/v1/me/kyc/didit/start', 'api/v1/me/kyc/didit/refresh'];
+            $payment = str_starts_with($path, 'api/v1/me/membership/payments')
+                || preg_match('#^api/v1/me/payments/[^/]+/(declare|simulate)$#', $path);
+            if (! in_array($path, $allow, true)
+                && ! (($user->status === UserStatus::PendingPayment
+                    || ($user->status === UserStatus::PendingKyc
+                        && KycEligibility::stagingMembershipDemo($user))) && $payment)) {
+                abort(403, 'Finalisez votre vérification KYC et votre adhésion.');
+            }
+            if ($user->status === UserStatus::PendingKyc && $path === 'api/v1/me/membership') {
+                // A completed Sandbox ID test can only preview the existing
+                // membership screen. Payment routes remain forbidden by status
+                // here and require real KYC approval in the payment action.
+                abort_unless($request->isMethod('GET')
+                    && KycEligibility::sandboxDocumentTestCompleted($user),
+                    403, 'KYC obligatoire avant le paiement.');
+            }
+        }
+
         if (! config('staff_guardian.enabled') || ! $user->isStaff() || $user->isSuperadmin()) {
             return $next($request);
         }

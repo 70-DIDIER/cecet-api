@@ -31,7 +31,6 @@ it('never exposes Vendeur sale capacity as spendable YEM on the member dashboard
     expect((float) $response->json('data.yem.balance'))->toBeLessThan((float) $consumerAvailable + (float) $sellerAvailable);
 });
 
-
 it('summarises the member area: profile, YEM balance, active packs and latest movements', function () {
     $member = User::factory()->create(['city' => 'Lomé']);
     $member->pernumIdentities()->create(['pernum' => '1001043953', 'kind' => 'personal', 'status' => 'declared']);

@@ -26,6 +26,7 @@ final class PermissionCatalog
         return [
             'members.view' => ['description' => 'Consulter les membres et leurs fiches.'],
             'members.manage' => ['description' => 'Suspendre ou réactiver un membre.'],
+            'kyc.review' => ['description' => 'Consulter les pièces KYC confidentielles et décider du contrôle d’identité.'],
             'identity_verifications.view' => ['description' => 'Consulter les pièces d\'identité et selfies envoyés par les membres.'],
             'identity_verifications.review' => ['description' => 'Valider ou rejeter la vérification d\'identité d\'un membre.'],
             'staff.view' => ['description' => 'Consulter les comptes internes.'],
@@ -73,6 +74,7 @@ final class PermissionCatalog
                 'settings.view', 'settings.update', 'audit.view', 'packs.view', 'packs.manage',
                 'yem_validations.view', 'payments.view', 'payouts.view', 'reports.view', 'reports.export', 'imports.manage', 'api_docs.view',
             ]],
+            self::VALIDATOR => ['label' => 'Validateur KYC', 'permissions' => ['kyc.review']],
             self::ACCOUNTING => ['label' => 'Comptabilité', 'permissions' => [
                 'yem_validations.view', 'yem_validations.confirm', 'yem_validations.dispute',
                 'payments.validate_manual', 'payments.view', 'user_packs.view',
@@ -88,10 +90,12 @@ final class PermissionCatalog
      */
     public function incompatiblePairs(): array
     {
-        // Comptabilité now carries the former Validator duties (v5).
-        // Conflict control is per-operation (e.g. maker/checker IDs on payouts),
-        // not a blanket prohibition on holding accounting/validation permissions.
-        return [];
+        // KYC identity approval and financial validation are different functions.
+        // The Superadmin remains governed by its own explicit security controls.
+        return [
+            ['kyc.review', 'payments.validate_manual'],
+            ['kyc.review', 'yem_validations.confirm'],
+        ];
     }
 
     public function exists(string $permission): bool

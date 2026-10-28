@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 class AccessSeeder extends Seeder
 {
     /**
-     * Create catalog permissions and system roles (Superadmin, Admin, Validateur, Comptabilité).
+     * Create catalog permissions and system roles (Superadmin, Admin, Validateur KYC, Comptabilité).
      */
     public function run(SyncAccessCatalog $sync): void
     {

@@ -1,0 +1,1398 @@
+## RECETTE DE RÉGRESSION ET CORRECTION PAIEMENT — 22 octobre 2026, 08:50 UTC
+
+**Statut : correctif applicatif DÉPLOYÉ, recettes complètes CECT VALIDÉES en QA.**
+Cette section remplace les conclusions plus anciennes selon lesquelles
+l'adhésion était entièrement opérationnelle après le premier raccordement KYC.
+
+### Bug constaté et corrigé
+
+- `MembershipController::show()` contenait `$membership = $sandboxPreview ? null : ...`.
+  Pour tout membre terminé en Didit Sandbox, le serveur renvoyait
+  **toujours une adhésion fictivement absente**, même quand un
+  vrai dossier `memberships` et des tentatives `fake` étaient en cours.
+- Conséquence observée sur `cectapi_live` : le membre a commencé
+  quatre essais successifs (~08:38–08:39 UTC),
+  trois expirés par changement de moyen et un encore `pending`.
+  L'écran d'adhésion ne pouvait pas récupérer l'essai en cours
+  pour offrir le bouton de confirmation simulée.
+- Fix Git `86e8be0` : requête `Membership` exécutée pour
+  **tous** les membres y compris KYC Sandbox, préservant les
+  règles de démonstration et de sécurité. Aucun montant
+  ou compte supprimé ; aucun essai de paiement forcé.
+- Déployé API commit `0c51ba7` dans `/var/www/cect-api`,
+  Laravel caches reconstruits ; frontend courant et
+  Admin/Superadmin inchangés.
+- Recette QA reproduisant la régression : après KYC
+  `Approved`, **GET /me/membership** fournit la tentative
+  existante `pending` et son drapeau de simulation,
+  nouvel appel avec la même méthode réutilise la même
+  tentative (aucun doublon), confirmation `simulate` →
+  adhésion `active` puis dashboard, catalogue, packs,
+  notifications et quota-ledger accessibles.
+
+### Recette élargie post-correction
+
+- Tests inscription/KYC/membres/personnel : **63 réussis**
+  (356 assertions, base isolée `cectapi_test`).
+- Scénario approfondi KYC → frais d'adhésion → checkout
+  simulé → activation → acquisition d'un pack Consommateur
+  → paiement simulé → crédit de quota → mouvements et dashboard :
+  **18 réussis, 164 assertions** (sous-ensemble des 63).
+- Packs / paiement marchand / rééchange marchand :
+  **50 réussis, 508 assertions** après réconciliation des
+  *fixtures de test* avec les rôles métier actuels :
+  `Comptabilité` et non l'ancien `Validateur`.
+  Une assertion historique a été actualisée pour
+  vérifier le refus 403 pré-adhésion via le middleware.
+  **Aucune permission de production n'a été modifiée**.
+- Total des deux familles disjointes : **113 tests réussis,
+  864 assertions**. Le total n'inclut pas un test
+  visuel avec les cookies personnels d'un vrai membre.
+- Contrôle API et pages HTTP 200, invités API HTTP 401,
+  mTLS Superadmin HTTP 403 sans certificat, audit
+  intègre 154 événements, worker actif, zéro job échoué.
+
+### Restauration / conservation
+
+- Dump avant le correctif :
+  `/home/ubuntu/cect-private-backups/cect-restore-checkout-20261022/cectapi_live_pre_checkout_fix_20261022_084751.dump`
+  382 objets PostgreSQL confirmés, et SHA précédent
+  `9a2a95d` archivés dans le même dossier privé.
+- 4 membres, 2 personnels et 1 clé Superadmin conservés.
+  Les quatre tentatives de paiement simulées restent
+  en base ; la plus récente, `FLOOZ`, était `pending`
+  au dernier contrôle, **éligible à la confirmation
+  via le composant de paiement original**.
+- Les opérations `fake` sont des simulations,
+  sans débit FedaPay ou Mobile Money. La validation
+  réelle de l'identité ne doit jamais être inférée
+  du statut Sandbox.
+
+### Vérification navigateur à effectuer par le membre
+
+Actualisation forcée `Ctrl+Shift+R`, ouverture
+`/espace/adhesion`, reprise du paiement FLOOZ encore en
+attente s'il n'a pas expiré, clic sur bouton de confirmation
+simulée, puis vérification de la redirection au dashboard.
+Si un blocage persiste, relever la réponse API
+`/api/v1/me/membership` et le message d'erreur réseau
+sans demander le mot de passe ou l'OTP au membre.
+
+---
+## Démonstration commerciale : rétablissement du parcours métier existant — 22 octobre 2026, 08:33 UTC
+
+**DÉPLOYÉ sur le VPS autorisé**. Cette section constitue le
+dernier état effectif ; les sections plus anciennes intitulées
+« aperçu en lecture seule » décrivent une étape abandonnée.
+
+### Décision d'architecture
+
+Le seul ajout par rapport au fonctionnement métier d'origine
+est **la vérification documentaire KYC avant l'adhésion**.
+Aucune modification de packs, tarifs, règles YEM, rôles
+ou intégrations réelles de paiement n'a été nécessaire.
+Le portail public étant une **présentation en mode staging**
+et Didit opérant en Sandbox, le paiement est traité
+par le prestataire interne `fake` déjà existant :
+aucun débit Mobile Money réel, SMS payant ou transaction
+FedaPay n'est lancé.
+
+### Parcours bout en bout
+
+- Inscription et confirmation OTP : inchangées.
+- Contrôle documentaire Didit en Sandbox :
+  résultat `Approved` avec preuve documentaire + délai requis.
+- Ouverture automatique de `/espace/adhesion` :
+  page traditionnelle, frais d'adhésion en FCFA, téléphone,
+  choix des opérateurs disponibles du pays.
+- **Bouton de paiement réactivé en staging** lorsque
+  `KycEligibility::stagingMembershipDemo()` confirme les
+  vérifications et le fournisseur de paiement configuré est
+  exclusivement `fake`. Les opérateurs `CASH` et
+  `BANK_TRANSFER` sont retirés du sélecteur de cette
+  présentation, car ce sont des paiements manuels,
+  non simulés instantanément.
+- Le parcours `StartMembershipPayment`, `PaymentCheckout`,
+  `FakePaymentProvider`, `RefreshPaymentAttempt`,
+  `SettlePayment`, `ActivateMembership` reste
+  l'implémentation originale, avec un raccordement
+  `pending_kyc -> pending_payment -> active`.
+- Paiement enregistré uniquement via `fake`,
+  confirmation par `/me/payments/{attempt}/simulate`
+  puis activation test et accès normal à `/espace`.
+- Provenance comptable explicite `activation_mode=simulated_payment`
+  ; `paid_at=null` pour ne pas faire passer une simulation
+  pour un encaissement réel. Les mouvements démo restent
+  dans la base du site de staging et ne doivent jamais être
+  utilisés comme opérations financières réelles.
+- Hors environnement `staging`, `stagingMembershipDemo()`
+  est désactivé. La méthode `KycEligibility::approved()`
+  n'est jamais modifiée ou contournée pour de la vérification
+  réelle. Si le provider de paiement est remplacé par
+  FedaPay, le parcours staging issu du Sandbox KYC
+  échoue de manière sécurisée.
+- Interface : plus de gros bandeau « aperçu de test »
+  sur l'adhésion ; simple transparence « simulation »
+  à proximité de l'interaction de paiement.
+
+### Recette et publication
+
+- Tests ciblés avant publication : **63 réussis,
+  327 assertions** sur `cectapi_test` (Didit, KYC,
+  inscription, personnel, droits d'accès) ; scénario
+  complet KYC Sandbox → checkout `fake` →
+  paiement simulé → activation → dashboard testé.
+- `npm run build` React/Vite réussi avec la cible API publique.
+- Sauvegarde PostgreSQL avant publication :
+  `/home/ubuntu/cect-private-backups/cect-adhesion-presentation-20261022/`
+  `cectapi_live_pre_presentation_20261022_083026.dump`,
+  validé via `pg_restore --list` (382 objets) ;
+  ancien SHA API et chemin frontend enregistrés.
+- API livrée `9a2a95d` sur `/var/www/cect-api`
+  depuis `e7560eb`, via merge Git fast-forward ;
+  frontend `4f36f23` compilé et activé dans
+  `/home/ubuntu/cect-releases/frontend-kyc-normal-adhesion-demo-20261022`.
+- Pages d'accueil, KYC, adhésion et santé API
+  HTTP 200 ; invités sur API KYC et Adhésion
+  HTTP 401 ; webhook Didit non signé HTTP 401 ;
+  Superadmin sans certificat mTLS HTTP 403.
+- Audit 154 événements intègres, journaux cohérents,
+  4 comptes membres, 2 comptes personnels,
+  1 clé Superadmin conservés ; worker actif ;
+  0 tâche échouée et 0 tentative de paiement créée
+  pendant les contrôles de déploiement.
+- Deux dossiers Didit sont éligibles au parcours
+  de simulation d'adhésion, un reste en attente
+  (`In Progress`). L'authentification dans le
+  navigateur de chaque membre n'a pas été
+  testée avec ses secrets : la recette bout en bout
+  fut réalisée dans la base QA isolée.
+
+**IMPORTANT** : ceci est une démonstration de fonctionnement
+et ne constitue pas une approbation KYC réelle, une
+transaction bancaire ou un contrat FedaPay réel.
+
+---
+## LIVRAISON EFFECTUÉE — KYC ajouté devant l'adhésion existante (22 octobre 2026, 08:08 UTC)
+
+**STATUT FINAL : DÉPLOYÉ SUR LE VPS CECT.** Remplace la mention
+« NON DÉPLOYÉ » qui figure plus bas dans le journal des étapes antérieures.
+
+### Principe métier respecté
+
+Seule une couche documentaire KYC est ajoutée devant le
+parcours normal déjà existant : inscription et OTP →
+vérification documentaire → **ancienne page d'adhésion**
+(frais paramétrés, pays, numéro, moyen de paiement) →
+paiement → activation de membre. Aucun nouveau module métier,
+pack, tarif, transaction ou compte n'a été créé.
+
+### Protection du Sandbox de test
+
+Le résultat `Approved` Didit Sandbox **n'est pas une identité réelle**.
+Après minimum deux minutes il donne **lecture seule** de
+la page d'adhésion et jamais un droit de paiement.
+Les champs et méthodes sont présentés normalement mais
+le bouton de paiement est désactivé, `payment_enabled=false`.
+Le middleware `EnsureStaffGuardianSession`, l'action
+`StartMembershipPayment` et le contrôle `KycEligibility::approved`
+refusent toujours les tentatives de débit et d'activation
+et maintiennent l'accès YEM fermé.
+
+### Correctif et recette
+
+- Le prédicat serveur `KycEligibility::sandboxDocumentTestCompleted()`
+  sert uniquement à l'aperçu. `KycController::mine()` et
+  `MembershipController::show()` sont cohérents.
+- Une route `GET /api/v1/me/membership` est désormais
+  autorisée après un vrai résultat de fournisseur
+  **Sandbox Approved documentaire**, sans ouverture des POST.
+- Le frontend `MemberLayout` laisse accéder à
+  `/espace/adhesion` pour afficher cet aperçu ; `KycPage`
+  redirige automatiquement quand le dossier est terminé.
+- Frontend : ancien `MembershipPage` conservé, bandeau explicatif
+  et paiement désactivé si `sandbox_preview=true`.
+- **61 tests ciblés réussis, 303 assertions** sur la seule
+  base isolée `cectapi_test`, build React/Vite réussi.
+
+### Déploiement réel / sauvegarde et contrôle
+
+- VPS autorisé `ip-172-31-25-53` reconnecté, API
+  `/var/www/cect-api` mise à jour en fast-forward
+  du SHA `b159507` au SHA **`e7560eb`**.
+- Frontend compilé de la branche `custum`, déployé par
+  lien atomique dans
+  `/home/ubuntu/cect-releases/frontend-kyc-adhesion-link-20261022`.
+- Dump privé avant déploiement
+  `/home/ubuntu/cect-private-backups/cect-adhesion-after-kyc-20261022/`
+  `cectapi_live_pre_adhesion_20261022_080429.dump`,
+  vérifié avec `pg_restore --list` (382 objets).
+  Anciennes versions backend et frontend documentées sous
+  le même répertoire de sauvegarde.
+- Caches Laravel actualisés ; worker Laravel actif.
+- HTTP 200 sur `/espace/kyc`, `/espace/adhesion`, API santé.
+  KYC anonyme HTTP 401, adhésion API anonyme HTTP 401,
+  webhook non signé HTTP 401, Superadmin sans mTLS HTTP 403.
+- Audit : 154 événements intègres ; ledger cohérent ;
+  4 membres, 2 personnels, 1 clé Superadmin ;
+  0 tentative de paiement créée par ce changement.
+- Trois dossiers liés à Didit visibles : deux
+  `Approved` disposent désormais du droit de présentation
+  `sandbox_adhesion_preview=true`, dont l'un est encore
+  `pending_kyc` ; un dossier `In Progress` reste
+  `sandbox_adhesion_preview=false`.
+  **Tous les trois ont `real_kyc_approved=false`**.
+
+**Étape suivante pour de véritables adhésions :** activer le
+parcours Didit Live et les contrôles d'identité réellement
+requis ; seulement alors permettre l'ancien paiement
+CECT de manière normale, avec vérification fournisseur.
+
+---
+## Parcours adhésion après KYC documentaire — correctif du 22 octobre 2026
+
+### Décision métier confirmée
+
+Une fois la carte d'identité contrôlée et l'issue Sandbox de Didit
+`Approved` synchronisée, le parcours de présentation doit poursuivre
+vers **l'ancienne page Adhésion**, qui présente les frais configurés
+par CECT, le numéro de téléphone et les moyens de paiement du pays.
+
+Le fournisseur étant encore en mode Sandbox, cela constitue
+**une prévisualisation de l'adhésion, et non une autorisation de paiement**.
+Ni les statuts financiers, ni les quotas YEM, ni l'activation des
+adhérents ne doivent être modifiés sur la base d'une identité simulée.
+
+### Code versionné — dépôt API `70-DIDIER/cecet-api` branche `custum`
+
+- `KycEligibility::sandboxDocumentTestCompleted(User)` vérifie en
+  lecture seule tous les critères Sandbox : provider didit,
+  mode documentaire test activé, session liée au workflow configuré,
+  environnement `sandbox`, état du dossier `submitted`,
+  résultat `Approved`, preuve documentaire `true`,
+  décision datant d'au moins deux minutes.
+- `KycController::mine()` réutilise ce prédicat, afin que
+  le backend KYC et le calcul de l'aperçu Adhésion ne
+  divergent pas.
+- `MembershipController::show()` permet **uniquement GET**
+  de prévisualisation si le prédicat vaut `true` : frais
+  d'adhésion et coût du provider calculés à partir des
+  réglages métier courants. La réponse porte les marqueurs
+  `sandbox_preview=true`, `payment_enabled=false`,
+  `status=kyc_sandbox_preview`. Aucune création de
+  `memberships`, `payment_attempts` ou de transaction.
+- Les méthodes POST de paiement et les protections d'accès
+  commercial utilisent toujours `KycEligibility::approved()`
+  (jamais `sandboxDocumentTestCompleted()`).
+
+### Code versionné — frontend `70-DIDIER/CECT-frontend` branche `custum`
+
+- `KycPage` navigue automatiquement vers `/espace/adhesion`
+  lorsque la vérification de test est terminée.
+- `MemberLayout` autorise cette route à être affichée
+  après connexion pour les comptes `pending_kyc` ;
+  le backend autorise l'aperçu seulement si Didit est
+  effectivement terminé. Sinon l'utilisateur revient
+  à la vérification.
+- `MembershipPage` réutilise les contrôles habituels
+  (montant, pays, numéro Mobile Money, moyens de paiement)
+  avec bandeau `Adhésion — aperçu de test` et bouton de
+  paiement **désactivé**. Les requêtes de paiement sont
+  également refusées côté code client et côté API.
+- Tests de régression ajoutés : aperçu après succès
+  documentaire, frais côté serveur, absence de
+  création de paiement, refus avant le KYC ou après
+  refus, absence d'accès aux packs.
+
+### État de publication
+
+**NON DÉPLOYÉ à cette étape.** Le serveur Desktop Commander
+`ip-172-31-25-53` est retombé OFFLINE avant compilation et
+tests de recette sur la base isolée `cectapi_test`.
+Ne pas annoncer cette évolution comme disponible sur le
+site public tant que l'API et le frontend n'ont pas
+été déployés ensemble et les contrôles Superadmin
+et de paiement vérifiés. Aucune base live modifiée.
+
+Pour sortie : rétablir connexion du serveur,
+tester modules Didit + adhésion sur `cectapi_test`,
+construire React/Vite avec l'URL de l'API publique,
+faire sauvegarde privée de l'ancienne release et de
+`cectapi_live`, déployer en fast-forward, vérifier
+les endpoints et s'assurer que le bouton de paiement
+demeure inactif pour tout Sandbox.
+
+---
+## Mise en production du correctif de statut KYC Sandbox — 22 octobre 2026, 06:08 UTC
+
+**État : DÉPLOYÉ, vérifié sur le serveur CECT.** Cette note
+remplace le blocage « NON déployé / Remote Desktop Commander hors ligne »
+mentionné dans le rapport de diagnostic antérieur.
+
+- Desktop Commander de `ip-172-31-25-53` revenu **Online**.
+- Tests QA sur la seule base `cectapi_test` :
+  **59 réussis, 278 assertions** incluant KYC, inscription,
+  droits internes et statuts de comptes.
+- React/Vite membre compilé avec l'URL publique correcte et
+  vérifications de bundle : synchronisation
+  `/me/kyc/didit/refresh`, écran `sandbox_test_completed`,
+  SDK intégré, cible API sécurisée.
+- Dump de `cectapi_live` pré-déploiement privé :
+  `/home/ubuntu/cect-private-backups/kyc-stuck-hotfix-20261022/`
+  fichier `cectapi_live_pre_hotfix_20261022_060703.dump`
+  validé par `pg_restore --list`, **382 objets** ;
+  SHA API et symlink précédent sauvegardés.
+- API mise à jour en fast-forward dans `/var/www/cect-api` :
+  ancien SHA `74f28d8`, nouveau **`b159507`**, caches
+  Laravel config et routes reconstruits.
+- Release React activée par symlink atomique :
+  `/home/ubuntu/cect-releases/frontend-kyc-reconcile-hotfix-20261022`.
+- Signal `php artisan queue:restart` envoyé,
+  service `cect-queue` actif.
+- Synchronisation ponctuelle des sessions déjà existantes via
+  `DiditDecisionProcessor::sync` (sans forcer aucune décision) :
+  une session reste `Not Started`, une `In Progress`,
+  une session documentaire est **`Approved` côté Didit**.
+  Le dossier CECT de cette dernière est resté `submitted`,
+  mais le booléen calculé `sandbox_test_completed=true`
+  a été vérifié directement dans la base active.
+- Autres garde-fous : santé API, site et backoffice HTTP 200 ;
+  endpoint KYC sans authentification HTTP 401 ;
+  webhook non signé HTTP 401 ; Superadmin sans
+  certificat HTTP 403 ; audit intègre (149 événements),
+  ledger cohérent, zéro tâche échouée.
+- 4 membres / 2 personnels / 1 clé Superadmin
+  préservés à la dernière vérification ;
+  aucun membre approuvé automatiquement et
+  aucun paiement rendu éligible par une session Sandbox.
+
+**Résultat pour l'utilisateur :** après actualisation
+`Ctrl+Shift+R` dans l'espace membre, le dossier
+`Approved` chez Didit et plus ancien de deux minutes
+doit afficher « Contrôle documentaire terminé (test) ».
+Les dossiers `In Progress` et `Not Started` restent
+légitimement en attente d'un résultat fournisseur ;
+aucun chronomètre ne remplace la finalisation
+de la session Didit.
+
+Le comportement frontend dans le navigateur de chaque
+membre n'a pas été vérifié avec ses identifiants personnels ;
+seuls le bundle en ligne et la logique backend ont été contrôlés.
+
+---
+## Correctif de synchronisation KYC Sandbox — 22 octobre 2026
+
+**État : correctifs versionnés sur GitHub, NON déployés lors de
+cette intervention faute d'accès au serveur.** Le Remote Desktop Commander
+de `ip-172-31-25-53` est OFFLINE ; ne pas confondre commit GitHub
+avec déploiement réel.
+
+### Diagnostic corroboré
+
+- Le compte Didit Sandbox possède au moins une session
+  `Approved` avec une seule `ID_VERIFICATION`, comportant
+  des avertissements informatifs MRZ/QR non détectés, et une
+  session plus récente `Not Started`. Sans accès au dossier
+  de la base live, on ne peut pas affirmer quelle session
+  est actuellement référencée pour le membre utilisateur.
+- `DiditDecisionProcessor::sync()` écrivait à chaque
+  synchronisation `provider_reviewed_at=now()`.
+  `KycController::mine()` exige au contraire
+  `provider_reviewed_at <= now()->subMinutes(2)`.
+  Des rafraîchissements répétés pouvaient repousser
+  sans fin l'affichage « Contrôle documentaire terminé (test) ».
+
+### Modifications engagées
+
+- Commit backend `aef9d4f` : préserver l'heure de la
+  **première approbation documentaire Didit** sur toutes
+  les synchronisations ultérieures tant que l'approbation
+  est toujours la même.
+- Commit frontend `0a2429a` : interrogation authentifiée
+  `/me/kyc/didit/refresh` une fois par minute, et lors
+  du retour de focus dans le navigateur, lorsque le dossier
+  est en attente en mode test ; sans dépendance exclusive
+  au worker de la file de tâches.
+- Commit backend de tests `d8bcee4` : vérifier que
+  la synchronisation après 3 minutes montre un résultat
+  documentaire terminé mais **ne débloque ni paiement
+  ni adhésion** ; vérifier qu'une session non démarrée
+  ne devient jamais terminée avec le temps.
+
+### Actions avant toute affirmation de réussite
+
+1. Rétablir la connexion Remote Desktop Commander du serveur CECT
+   (hôte `ip-172-31-25-53`), sans désactiver mTLS.
+2. Inspecter le lien `provider_reference` de l'actuel dossier
+   et rapprocher le statut de la même session Didit
+   (Approved / Not Started / In Progress).
+3. Exécuter les tests ciblés sur `cectapi_test`,
+   compiler le frontend, préparer rollback, puis déployer
+   uniquement les repos `70-DIDIER` branche `custum`.
+4. Vérifier worker, files `jobs` / `failed_jobs`,
+   `provider_reviewed_at` stable, `sandbox_test_completed=true`
+   après le délai, navigation membre, santé API, audit
+   et accès Superadmin mTLS 403 sans certificat.
+5. **Ne jamais** transformer un statut Didit Sandbox en
+   identité réelle approuvée ou en autorisation de paiement.
+
+---
+## CECT KYC — décision métier révisée et déployée le 22 octobre 2026
+
+Exigences opérationnelles : supprimer la sélection de résultat de test
+visible avant la capture, montrer **uniquement** la page
+« Dossier en vérification » dès l'envoi, traiter
+automatiquement les résultats de test après quelques minutes,
+et préserver la sécurité Superadmin existante.
+
+### Changements
+
+- Session Didit Sandbox ID-only : le backend positionne
+  `sandbox_scenario=approve` lors de la création,
+  **uniquement** en `DIDIT_ENVIRONMENT=sandbox` et avec
+  `DIDIT_DOCUMENT_ONLY_TEST=true`. Le membre ne choisit plus
+  un verdict dans CECT. Didit documente ce paramètre comme
+  alternative au sélecteur de scénario dans son interface ;
+  le comportement visuel de l'iframe doit être revérifié
+  sur une **nouvelle session** car les anciennes gardent
+  leur version et leur configuration.
+- Confirmation technique : création d'une nouvelle session Didit
+  avec ce paramètre à partir du gateway Laravel QA réussie.
+- `DiditController::start` planifie **deux synchronisations**
+  automatiques du résultat (2 et 5 minutes) dans la file Laravel
+  `database`, uniquement pour une nouvelle session de test.
+  Le worker `cect-queue` est actif.
+- Le retour d'événement `onComplete` du SDK intégré masque
+  immédiatement le module documentaire, interroge l'API CECT
+  et affiche **une seule carte de suivi** à la place du formulaire.
+  La même carte est affichée sur toute nouvelle visite dès que
+  `member_kyc_cases.status=submitted`.
+- La carte unique présente « Dossier en vérification »
+  et l'avertissement du blocage de paiement. Après
+  réception **confirmée par l'API Didit** d'un résultat
+  `Approved` sans anomalie documentaire et deux minutes
+  depuis la synchronisation, le libellé devient
+  « Contrôle documentaire terminé (test) ». Ceci est
+  un **résultat de simulation**, pas une identité réelle approuvée.
+- Le backend émet le booléen sans risque `sandbox_test_completed`
+  sur `/api/v1/me/kyc` ; il n'affecte **jamais** les
+  autorisations d'adhésion, de paiement ou les quotas.
+  `DIDIT_AUTO_APPROVE=false` reste inchangé.
+- Anciennes sessions et dossiers restent conservés ;
+  aucune purge ni suppression de comptes.
+
+### Recette / publication
+
+- 46 tests ciblés, 249 assertions : **OK** en base isolée
+  `cectapi_test` ; build front OK ; authentification Didit
+  et création de session Sandbox avec scénario prédéfini : OK.
+- API publiée `74f28d8` sur `/var/www/cect-api` ;
+  frontend publié sur
+  `/home/ubuntu/cect-releases/frontend-kyc-result-only-20261022`.
+  Anciennes versions et pointeurs du déploiement archivés
+  dans `/home/ubuntu/cect-private-backups/20261022-kyc-followup-ui`.
+- API, espace membre, backoffice, accueil : HTTP 200.
+  KYC sans authentification 401, webhook non signé 401,
+  Superadmin sans certificat client mTLS 403.
+  Audit et journaux de quotas cohérents, 2 personnels
+  internes et 1 clé Superadmin conservés.
+
+### Rappel Superadmin actuellement déployé
+
+- Lien :
+  `https://admin.13-49-203-235.sslip.io/superadmin/connexion`.
+- L'accès est **protégé par certificat mTLS**, puis
+  un fichier `.cectkey` v2 chiffré par phrase secrète
+  (v1 toléré pour migration), puis le **même OTP**
+  envoyé aux trois e-mails vérifiés et saisi une fois.
+- Trois OTP différents servent seulement aux démarches
+  exceptionnelles : enrôlement, remplacement, récupération
+  de clé ou modification des trois adresses.
+- Compte Superadmin activé, durée nominale de clé
+  30 jours, une clé enregistrée, accès sans certificat 403.
+  Ne pas toucher aux certificats ou aux enregistrements.
+- La CRL de démonstration était documentée comme valide
+  jusqu'au 24/10/2026 22:36 UTC ; renouveler et
+  vérifier la chaîne de certificats depuis la CA hors ligne
+  autorisée avant expiration.
+
+---
+## DÉPLOIEMENT KYC DOCUMENT SEUL — interface intégrée CECT (22 octobre 2026)
+
+### Décision métier et réalisation
+
+- **Une seule étape pour le test** : scan ou import d'une **carte
+  d'identité** (recto et verso selon le document).
+- Workflow Didit PF stable `635693e0-768a-45fe-ad42-e7bae9c649b8`,
+  **version 2 publiée**, a été modifié exclusivement pour les
+  essais : graphe `OCR -> final_status`, `documents_allowed=ID`
+  (contrôlé sur 208 pays) ; pas de LIVENESS, FACE_MATCH ni IP_ANALYSIS.
+  Les anciens liens de sessions conservent leur propre version.
+- Vérification MCP indépendante : nouvelle session synthétique
+  sur l'application Didit en `sandbox` renvoie une seule
+  fonctionnalité `ID_VERIFICATION` et aucune biométrie.
+- `DIDIT_DOCUMENT_ONLY_TEST=true` activé uniquement lorsque
+  `DIDIT_ENVIRONMENT=sandbox`; les membres PF et PM testent
+  la carte du titulaire/représentant. Le workflow entreprise
+  KYB distinct est conservé pour sa réactivation ultérieure.
+- Le front membre CECT utilise la dépendance officielle
+  `@didit-protocol/sdk-web@0.4.0` **en mode embedded**.
+  Le module est rendu dans la page `/espace/kyc`,
+  sans redirection complète hors de l'espace membre.
+  La page et les boutons utilisent les libellés CECT et
+  affichent un avertissement explicite « Mode test ».
+- Notice utilisateur : mention explicite du sous-traitant
+  Didit en tant que prestataire technique. Il serait
+  trompeur de prétendre que CECT traite seule les
+  données d'identité.
+- Un membre ayant une session `provider_pending`
+  de l'ancien workflow peut demander `restart_sandbox=true`,
+  créant une nouvelle session carte-seule en conservant
+  son compte et son dossier CECT. Les anciennes sessions
+  ne peuvent plus servir de verdict CECT après remplacement
+  de `provider_reference`.
+- Statuts de vérification Sandbox : **jamais d'accès aux paiements**
+  ni activation YEM. `DIDIT_AUTO_APPROVE=false`, et la validation
+  de vrais contrôles exige notamment la preuve du liveness
+  en environnement Didit Live ; aucun contournement ajouté.
+
+### Version publiée et vérifications
+
+- Backend API sur site `b54de1a` (branche autorisée `custum`).
+- Frontend membre actif :
+  `/home/ubuntu/cect-releases/frontend-id-card-native-final-20261022` ;
+  version antérieure intacte pour un rollback instantané.
+- Le lien promotionnel de l'accueil mène directement à
+  `/connexion`, puis au contrôle membre, au lieu d'un lien
+  de session Didit non corrélé à un membre.
+- Ancienne page de présentation remplacée par un panneau
+  d'accès CECT montrant le nouveau flux carte-seule.
+- **44 tests ciblés passés, 243 assertions** sur
+  la seule base `cectapi_test` ; build React/Vite réussi.
+- Tests de production sans données sensibles :
+  200 pour accueil, `/espace/kyc`, présentation, `/admin/kyc`
+  et santé API ; 401 pour KYC anonyme et webhook non signé ;
+  403 sur Superadmin sans certificat ; worker actif.
+- `cectapi_live` non réinitialisée : 3 membres,
+  2 personnels, 1 clé d'accès Superadmin au contrôle.
+  Audit intègre (140 événements), ledger cohérent.
+
+### Limite majeure de marque blanche
+
+Le SDK **intègre** le parcours dans l'interface CECT, mais la
+console Didit indique encore `is_white_label_enabled=false`.
+La page embarquée peut donc présenter certains éléments de
+marque Didit. Un véritable habillage entièrement CECT
+(logo, palettes à l'intérieur du module, domaine propre)
+nécessite d'activer la fonction **White Label** dans
+les réglages de l'application et du workflow Didit.
+Le MCP actuel lit ce champ mais sa mise à jour de branding
+retourne HTTP 404 pour l'application ciblée ;
+ne pas déclarer cette activation réussie.
+La notice de confidentialité doit quoi qu'il arrive
+mentionner le sous-traitant.
+
+---
+## MISE EN LIGNE INTÉGRÉE SUR CECT — 22 OCTOBRE 2026 (effectuée)
+
+**Cette section remplace la mention précédente « non déployé » pour
+l'intégration dans l'espace membre.** L'API Laravel et les frontends
+membre et administration ont été déployés sur les endpoints publics
+existants, sans supprimer ni recréer la base de production.
+
+### URLs réelles vérifiées
+
+- Espace membre KYC : https://13-49-203-235.sslip.io/espace/kyc
+- Backoffice de revue (requiert droit `kyc.review`) :
+  https://admin.13-49-203-235.sslip.io/admin/kyc
+- API : https://api.13-49-203-235.sslip.io/api/v1/health
+- Présentation publique Sandbox :
+  https://13-49-203-235.sslip.io/verification-kyc-demo.html
+
+### Code, infrastructure et contrôle d'intégrité
+
+- Backend prod commit `6c1b2a5` de `70-DIDIER/cecet-api`
+  branche `custum`, fusion fast-forward de l'ancien `b1143de`.
+- Nouvelles migrations KYC
+  `2026_10_22_000001_create_member_kyc_cases` et
+  `2026_10_22_000002_add_didit_to_kyc_cases` exécutées
+  avec succès dans la **base existante** `cectapi_live`.
+- Environnement backend : `KYC_PROVIDER=didit`,
+  `DIDIT_ENVIRONMENT=sandbox`, workflows PF et PM distincts,
+  `DIDIT_AUTO_APPROVE=false`; les secrets restent uniquement
+  dans le fichier `.env` privé du serveur et ne figurent pas
+  dans cette documentation.
+- PF → workflow `635693e0-768a-45fe-ad42-e7bae9c649b8` ;
+  PM → workflow KYB `96d81562-e65f-4694-b7a5-c2552d92c83c`.
+  L'orchestration PM crée bien une session société distincte.
+- Frontend membre :
+  `/home/ubuntu/cect-releases/frontend-didit-kyb-20261022` ;
+  frontend administrateur :
+  `/home/ubuntu/cect-releases/admin-didit-qa-20261022` ;
+  liens actifs `/home/ubuntu/cect-current/{frontend,admin}`.
+  ACL de lecture du serveur HTTP vérifiées.
+- Ancienne version et configuration API conservées en sauvegarde
+  privée `/home/ubuntu/cect-private-backups/20261022-kyc-member-integration/`
+  (ancien SHA backend, ancien .env et anciens liens des deux interfaces).
+- Dump PostgreSQL privé préalable `cectapi_live_pre_didit_20261022_004125.dump`
+  vérifié par `pg_restore --list` (372 entrées) ; aucune
+  suppression d'utilisateurs ou remise à zéro.
+- Après bascule, HTTP 200 pour accueil, espace KYC, backoffice KYC,
+  prévisualisation Sandbox et santé API ; accès KYC sans
+  connexion HTTP 401 ; webhook non signé HTTP 401 ;
+  Superadmin sans certificat HTTP 403.
+- Deux comptes internes et une clé Superadmin présents ;
+  chaîne d'audit intacte (137 événements), ledger cohérent,
+  worker de queue actif.
+- Tests ciblés KYC/permissions/OTP/audit/comptes :
+  **61 réussis, 263 assertions** ; addition du parcours KYB :
+  **13 réussis, 94 assertions** (sélection KYC/KYB).
+  La suite globale historique garde 121 échecs précédemment
+  identifiés et n'a PAS été représentée comme intégralement verte.
+
+### Limites de cette publication
+
+1. La connexion Didit n'est **pas LIVE** : fournisseur `sandbox`,
+   résultats simulés, avertissement visible sur la page membre ;
+   les utilisateurs ne doivent pas soumettre de véritables documents
+   ou biométries à cet essai.
+2. Aucune approbation Sandbox n'active une adhésion ou un paiement réel :
+   la logique métier et le moteur de décision sont **fail-closed**
+   hors environnement `testing`, auto-approbation désactivée.
+3. Le flux KYB PM crée sa session fournisseur, mais le
+   rapprochement complet des statuts business/UBO et la conformité
+   sont encore nécessaires avant une approbation réelle.
+4. Le webhook Didit reste désactivé. Les clients membres peuvent
+   demander la réconciliation explicite `/me/kyc/didit/refresh`
+   sur leurs sessions autorisées.
+5. La file de revue interne exige la permission `kyc.review` ;
+   l'interface ne peut pas à elle seule accorder cette permission
+   aux comptes actuels.
+
+**Verdict vérifié : oui pour l'intégration et la visualisation
+sur la plateforme opérationnelle ; non pour une vérification
+juridique LIVE et le paiement après succès simulé.**
+
+---
+## PUBLICATION VISIBLE SUR LA PLATEFORME — 22/10/2026
+
+À la demande de l'équipe (« on doit voir ça sur la plateforme »),
+une **prévisualisation publique authentique** du parcours CECT × Didit
+a été publiée sur le domaine officiel de démonstration CECT :
+
+`https://13-49-203-235.sslip.io/verification-kyc-demo.html`
+
+Cette page est également annoncée par un lien discret sur la
+page d'accueil de la plateforme. Les deux parcours PF/PM
+sont visibles et redirigent vers leurs workflows Didit **Sandbox**
+publiés : PF `635693e0-768a-45fe-ad42-e7bae9c649b8`,
+PM `96d81562-e65f-4694-b7a5-c2552d92c83c`.
+
+**Important : la prévisualisation n'est pas l'adhésion réelle.**
+Elle ne traite aucun document dans l'application CECT,
+ne crée aucune adhésion et ne permet aucun déblocage de paiement
+ou quotas. Les utilisateurs sont explicitement informés de
+ne pas fournir de véritables documents en Sandbox.
+
+Code source versionné sur les repos 70-DIDIER, branche `custum` :
+`CECT-frontend/public/verification-kyc-demo.html` et
+`CECT-frontend/public/cect-kyc-demo-link.js`.
+
+Déploiement ciblé sans basculer les applications existantes :
+`/home/ubuntu/cect-releases/frontend-qa-v59-20261018/`.
+Une copie réversible d'`index.html` a été sauvegardée dans
+`index.html.pre-kyc-demo-20261022` avant l'ajout du script
+du lien. Aucun backend, schéma de la base `cectapi_live`,
+compte ou portail Superadmin n'a été modifié par cette publication.
+
+**Tests de production après publication :** accueil 200,
+page de prévisualisation 200, script de l'accueil 200,
+API santé 200, Superadmin sans certificat 403,
+worker actif, commit backend `b1143de` inchangé.
+
+**Rollback UI** : supprimer la page de preview et le script
+`cect-kyc-demo-link.js` de la release active et restaurer
+`index.html` depuis `index.html.pre-kyc-demo-20261022` ;
+aucune migration SQL n'est à annuler.
+
+**À faire pour l'adhésion réelle :** obtenir une application
+Didit LIVE (distincte du Sandbox), garanties de confidentialité
+et minimisation des données retournées, liaison PM KYB complète,
+qualification des régressions et déploiement versionné
+du backend + frontend avec QA et vérifications de production.
+
+---
+## Mise à jour d'exécution — recette QA et sauvegarde (22 octobre 2026)
+
+**Le déploiement public de CECT n'a PAS eu lieu à cette étape.**
+Le site et l'API actifs sont volontairement restés sur la version
+`b1143de` ; l'API publique répond HTTP 200.
+
+Actions concrètes exécutées sur le serveur, sans affecter `cectapi_live` :
+
+- Application Didit `CECT-test` confirmée en mode `sandbox` par la
+  lecture authentifiée d'une session synthétique Didit.
+- Session Didit sandbox réellement créée via `DiditGateway::create()`
+  depuis PHP Laravel QA ; résultat : identifiant de session
+  et lien HTTPS autorisé `verify.didit.me` retournés.
+- `.env` de QA seulement configuré avec les secrets Didit
+  test (non journalisés, non versés dans GitHub), application
+  et workflow Didit verrouillés. Dossier privé
+  `/home/ubuntu/.config/cect-kyc-test/` permissions 0700,
+  fichiers des secrets permissions 0600.
+- API QA locale lancée sur `127.0.0.1:18100` :
+  endpoint de santé HTTP 200, accès KYC anonyme HTTP 401,
+  webhook sans signature HTTP 401 et webhook synthétique
+  correctement signé HTTP 200 (session inconnue sans mutation).
+  Ce n'est pas une vérification biométrique réelle.
+- Vérification serveur Didit renforcée : HMAC entier, vérification
+  `DIDIT_APPLICATION_ID`, environnement `sandbox`, correspondance
+  du `workflow_id`, liveness strict `ACTIVE_3D`, contrôle
+  indépendant de la décision du fournisseur.
+- Cas de l'unique membre existant `pending_payment` traité sans
+  modification de son compte en production : l'application
+  QA permet désormais de démarrer le KYC rétroactif et de
+  garder les paiements bloqués jusqu'à l'approbation réelle.
+- **42 tests ciblés réussis, 231 assertions**, dont membres historiques,
+  contrôle des droits Superadmin, OTP et traitement Didit.
+- Builds React membre et admin en version API publique réalisés
+  avec `VITE_API_URL=https://api.13-49-203-235.sslip.io`,
+  artefacts préassemblés dans
+  `/home/ubuntu/cect-releases/frontend-didit-qa-20261022`
+  et `/home/ubuntu/cect-releases/admin-didit-qa-20261022`.
+- Base live sauvegardée sans mutation dans
+  `/home/ubuntu/cect-private-backups/` : dump PostgreSQL
+  format custom `pg_restore --list` OK, fichier privé mode 0600.
+
+**Blocage du basculement public :** l'application Didit actuelle est
+un SANDBOX (les verdicts ne constituent pas un vrai KYC).
+Le code interdit explicitement une approbation sandbox sur un
+service de production. Le KYB PM exige encore sa liaison avec
+les sessions business réelles ; la suite de 604 tests comporte
+121 échecs historiques non qualifiés. La conformité et les
+restrictions de données biométriques ne sont pas finalisées.
+
+Pour une mise en production sûre, obtenir une application Didit
+`live` et des secrets propres à cette application, faire qualifier
+les tests globaux, finaliser l'orchestration KYB PM et obtenir
+la validation de la notice biométrique ; puis sauvegarde,
+migration, bascule backend/frontends et activation du webhook
+après contrôle d'intégrité.
+
+---
+## VALIDATION DES IDENTIFIANTS DE TEST (22/10/2026)
+
+Une nouvelle clé API a été fournie par le responsable du projet.
+**Aucune valeur secrète ne figure dans GitHub, le code ni ce document.**
+
+Depuis le serveur CECT autorisé, un essai HTTP uniquement en lecture
+`GET https://verification.didit.me/v2/sessions?limit=1` a répondu **HTTP 200**
+avec cette nouvelle clé (`count=0`). L'authentification API Didit
+fonctionne donc bien ; l'application exacte liée à la clé doit encore
+être identifiée avant ouverture de sessions facturables.
+
+La clé API de test et le secret webhook reçus ont été déposés
+**uniquement dans un répertoire privé hors dépôts / hors site servi**
+`/home/ubuntu/.config/cect-kyc-test/`, permissions `0700`
+sur le dossier et `0600` sur chacun des fichiers.
+
+Le connecteur Laravel dans l'espace de QA, en `APP_ENV=testing` et
+sur la seule base `cectapi_test`, indique :
+`provider=configured`, `signed_callback=validated`
+avec un callback HMAC factice signé localement. Ce test n'est
+**pas** un webhook réel Didit et ne prouve pas la correspondance du
+secret avec la destination du compte.
+
+**PAS DE DÉPLOIEMENT** dans `/var/www/cect-api/.env`, pas de webhook
+activé ni de capture documentaire/biométrique. La suite complète
+reste NO-GO : 121 échecs au dernier contrôle. Pour déployer :
+résoudre les régressions, obtenir la preuve du mode sandbox réel,
+vérifier le compte propriétaire de cette clé et une notification
+webhook réelle, valider le KYB/les règles de confidentialité,
+puis contrôler sauvegarde, migrations, intégrité des comptes
+internes et rollback.
+
+---
+## Vérification des identifiants Didit — suivi opérationnel
+
+Le maître d'ouvrage a fourni une clé API et un secret webhook pour essais,
+mais les VALEURS ne doivent jamais être transcrites dans GitHub, la
+documentation ni les sorties des tests. Aucun secret fourni dans le chat
+n'a été copié dans `.env` lors de cette vérification.
+
+Contrôle de cohérence : la liste MCP des applications de l'organisation
+`CECT-test` indique une clé actuellement associée à l'application Sandbox
+avec aperçu `4NR-…AG0c`. La clé communiquée antérieurement dans le chat
+n'a pas cet aperçu. Elle peut appartenir à une autre application,
+avoir été remplacée ou ne pas être à jour. **Ne pas la considérer
+comme validée pour `CECT-test` avant contrôle API autorisé.**
+
+Le secret webhook de la destination CECT est masqué par le MCP,
+donc impossible de confirmer sa correspondance uniquement à partir
+des métadonnées affichées. Conserver la destination désactivée.
+
+Accès serveur aux secrets non finalisé. Suite de régression générale
+toujours en état NO-GO (121 échecs lors du dernier passage).
+
+---
+## VERDICT DU DÉPLOIEMENT — 22 OCTOBRE 2026
+
+Demande explicite : « fais tous là et déploie ». Le MCP Didit a servi
+à publier les workflows PF et PM dans l'application CECT-test, tandis que
+la destination webhook reste créée mais volontairement désactivée.
+
+**Résultat de recette GLOBAL actuel : 483 tests réussis, 121 échecs,
+5 936 assertions, 256,86 secondes**, isolée sur `cectapi_test` ;
+les builds frontend membre et admin passent. **NO-GO déploiement.**
+Les erreurs touchent notamment la connexion, backoffice financier,
+paiements, membres, achats de packs, marchands et anciens scénarios
+Validateur. Les statuts HTTP les plus fréquents sont `403` à la place
+de `200`/`201` ou `404` à la place de `200`. Certaines attentes
+appartiennent à l'ancien modèle métier, d'autres demandent une
+analyse de cause réelle. Ne pas désactiver la sécurité pour faire
+passer les tests.
+
+**Obstacles indépendants :** la clé API Didit et le secret HMAC
+n'existent toujours pas dans la configuration privée du serveur ;
+le MCP masque intentionnellement ces valeurs ; aucun profil de
+conformité Didit n'est enregistré et `response_attributes=null`
+autorise un retour de trop nombreuses données sensibles. La liaison
+KYB PM côté API CECT n'est pas validée en situation réelle.
+
+**Aucune mise à jour du service CECT n'a été déployée** :
+checkout backend `/var/www/cect-api` reste sur `b1143de`, base
+`cectapi_live` inchangée, 2 comptes internes, 1 membre, 0 pack,
+une clé d'accès Superadmin. Services API HTTP 200, worker actif,
+journal des quotas cohérent, chaîne d'audit intègre (134 événements).
+Le contrôle Superadmin par certificat n'a pas été modifié.
+
+**Plan de sortie :** installation sécurisée et non exposée des
+secrets depuis la console Didit ; contrôle environnement Sandbox
+et minimisation des attributs retournés ; profil de conformité
+validé par le responsable ; implémentation/corrélation KYB PM ;
+réparation et classification des régressions ; essais caméra/selfie
+avec données synthétiques ; sauvegarde, déploiement coordonné,
+activation du webhook après tests de signature, puis rollback
+si un contrôle d'intégrité échoue.
+
+---
+## Rapport de préparation au déploiement — 22 octobre 2026 (réel, via MCP Didit)
+
+### Effectué chez Didit
+
+- Application ciblée : `CECT-test (Sandbox)` (UUID
+  `3d71e41c-317b-49d8-ba1c-c220866328f5`) ; mode technique
+  `sandbox` doit encore être confirmé par l'information mode
+  (le nom ne constitue pas une preuve).
+- Workflow PF `635693e0-768a-45fe-ad42-e7bae9c649b8` : **PUBLISHED** ;
+  documents caméra (incluant les documents togolais dans le catalogue),
+  liveness `ACTIVE_3D`, face match, IP analyse ; vérification complète
+  de son graphe **validée** après correction de l'allow-list documentaire.
+- Workflow PM `96d81562-e65f-4694-b7a5-c2552d92c83c` : **PUBLISHED** ;
+  registre KYB, documents de société, contrôle UBO/dirigeants lié au
+  KYC PF. Graphe **validé**.
+- Les workflows prédéfinis de la société et `My Application` n'ont
+  pas été modifiés. Aucun workflow CECT publié n'a été défini comme
+  workflow global par défaut.
+- Destination webhook `2112dabd-33d4-4025-a32f-d78962d51627`, v3
+  vers `https://api.13-49-203-235.sslip.io/api/v1/webhooks/kyc/didit`
+  : **CREATED, DISABLED**, tant que le secret n'est pas déployé.
+- Solde affiché lors du contrôle : 0 USD, recharge automatique OFF ;
+  les 500 usages gratuits de certains contrôles demeurent disponibles.
+  Le liveness actif est facturable hors Sandbox réel ; aucune session
+  ni commande de recharge lancée dans ces opérations.
+
+### État du déploiement CECT
+
+**Non déployé / gate de release BLOQUÉ** pour les raisons suivantes :
+
+1. Le MCP Didit renvoie `api_key_set=true`, mais masque de façon
+   permanente la valeur de la clé API et celle du secret webhook.
+   L'API Laravel n'a ni `DIDIT_API_KEY` ni
+   `DIDIT_WEBHOOK_SECRET` configurés. Ne pas contourner cette protection.
+2. La suite de tests fonctionnels globale conserve plusieurs échecs
+   de scénarios historiques sans KYC ; ne pas publier un parcours
+   cassant inscription/paiements/administration.
+3. Le compte Didit n'a aucun **compliance profile** enregistré,
+   donc `didit_compliance_check_workflow` ne peut pas statuer ;
+   l'utilisation réelle de biométrie doit recevoir une revue formelle.
+4. La diffusion de données Didit au client est trop large par défaut :
+   `response_attributes=null` signale la transmission de tous les
+   attributs, potentiellement vidéos et documents. Réduire avant trafic.
+5. L'ancien compte existant dans `cectapi_live` doit être traité par
+   une règle de migration KYC explicite avant une bascule générale.
+6. L'identité KYB doit être corrélée de façon probante à la PM dans
+   notre base Laravel ; pour l'instant `business_verified=false`
+   tant que la session société réelle n'est pas liée et contrôlée.
+
+### Vérifications du code et précautions
+
+- Tests KYC/Didit/OTP/admin ciblés : **41 réussis / 223 assertions**
+  dans la base indépendante `cectapi_test` ; API Laravel `cectapi_live`
+  inchangée.
+- Compilations React member/admin : toutes deux **réussies**.
+- Backend actuel sur serveur : commit `b1143de` ; code nouveau sur
+  branche `custum`, NON déployé. Base `cectapi_live` contient
+  2 comptes internes, 1 membre et 0 pack lors du dernier inventaire.
+- Les tests globaux sont en cours de vérification finale ; ne jamais
+  déclarer mise en production à cause de la seule réussite des tests ciblés.
+
+### Marche finale pour l'administrateur autorisé
+
+Conserver le webhook désactivé tant que l'API n'est pas opérationnelle.
+Depuis la console Didit / API & Webhooks, faire installer **directement
+vers le gestionnaire de secrets du serveur** (et non le chat/GitHub)
+la valeur brute de la clé API et le secret partagé du webhook.
+Ajouter le workflow UUID PF ci-dessus et `DIDIT_ENVIRONMENT=sandbox`,
+puis exécuter des tests de bout en bout sur un véritable Sandbox et
+la suite complète de non-régression avant le déploiement coordonné.
+
+---
+## COMPTE MCP DIDIT EFFECTIVEMENT CONNECTÉ — opérations réelles (22 oct 2026)
+
+**Cette section remplace l'ancien blocage OAuth et les mentions selon lesquelles
+aucune application/workflow n'aurait été créée dans Didit.**
+
+- Organisation : `CECT-test`, UUID `38472d7c-adb4-4a07-9eaf-a70e85856f5f`.
+- Application choisie : `CECT-test (Sandbox)`, UUID
+  `3d71e41c-317b-49d8-ba1c-c220866328f5`. Une autre application
+  `My Application` existe ; elle est restée intacte.
+- **Workflow PF créé dans Didit, DRAFT NON PUBLIÉ** :
+  `635693e0-768a-45fe-ad42-e7bae9c649b8`,
+  `CECT | KYC PF | Test biométrique` avec étapes OCR caméra,
+  LIVENESS `ACTIVE_3D`, FACE_MATCH, IP_ANALYSIS. 3 tentatives, contrôle
+  des fichiers suspects et revue manuelle ; pas de mise en défaut,
+  pas de branding blanc payant. Prix théorique affiché 0,15–0,38 USD
+  selon usages/quotas et options. **Ce tarif n'est pas une facture**.
+- **Workflow PM KYB créé dans Didit, DRAFT NON PUBLIÉ** :
+  `96d81562-e65f-4694-b7a5-c2552d92c83c`,
+  `CECT | KYB PM | Entreprises test` : registre d'entreprise, pièces
+  présence légale/structure d'actionnariat, personnes clés UBO + dirigeants
+  liées au KYC PF ci-dessus ; workflow distinct car KYB ≠ KYC. Prix
+  théorique console 2 USD, sans débit constaté.
+- **Destination webhook créée mais DÉSACTIVÉE** :
+  UUID `2112dabd-33d4-4025-a32f-d78962d51627`, version v3,
+  seulement `status.updated`,
+  `https://api.13-49-203-235.sslip.io/api/v1/webhooks/kyc/didit`.
+  Secret de destination présent chez Didit et masqué par le MCP ;
+  **non injecté sur notre serveur** ; activer uniquement après le
+  déploiement sécurisé de l'API et un test signé réussi.
+- Balance Didit consultée : 0 USD, auto-recharge désactivée,
+  500 utilisations gratuites ID/Passive/Face match/IP encore disponibles ;
+  attention `ACTIVE_3D` est une option payante sur une application LIVE.
+- Clé API : application `api_key_set=true` chez Didit, mais valeur
+  brute **REDACTED** dans ce MCP. Aucune clé copiée dans GitHub.
+- **Aucune session KYC créée**, aucun selfie/vidéo capturé et
+  aucune facturation lancée.
+
+### Étapes bloquantes toujours ouvertes
+
+1. Vérifier **la véritable valeur du champ environnement/mode de l'application**
+   dans la console Didit (le nom `Sandbox` n'est pas une preuve suffisante).
+2. Confirmer les paramètres et les données minimales retournées à CECT.
+   La configuration Didit `response_attributes=null` signifie que
+   **tous les champs sont retournés**, potentiellement incluant documents
+   biométriques et vidéo ; limiter dans la console avant tout usage réel.
+3. Publier seulement lorsque mode Sandbox, données retournées, règle
+   de vérification et coûts ont été revus.
+4. Lier de façon sûre le secret webhook et la clé application au
+   backend sans les exposer aux logs, ChatGPT ou Git ; valider les vrais
+   formats Didit de réponses/vérifications contre la documentation.
+5. Tester sessions fictives, webhooks, interface, refus, rejoués, liveness
+   vidéo et PM avec KYB, puis refaire les tests globaux de régression.
+6. **Ne pas déployer le connecteur ni activer la collecte biométrique réelle**
+   tant que les contrôles sécurité et conformité ne sont pas terminés.
+
+Résultat : création réelle de 2 workflows Didit et d'une destination webhook
+non activée. Les historiques de CECT `cectapi_live` et tous les comptes
+internes n'ont pas été modifiés.
+
+---
+## Accès fournisseur — compte Didit confirmé, console non connectée (22/10/2026)
+
+Le responsable du projet a créé son compte Didit. Un email de bienvenue officiel
+avec objet « Your Didit account is live » confirme l'activation d'une organisation.
+Cela **ne prouve pas** qu'une application Sandbox, un workflow KYC, une destination
+webhook ou une clé API aient déjà été créés.
+
+Le compte a été ouvert via connexion Google, mais la session navigateur Didit
+n'est **pas** partagée automatiquement avec l'agent dans cette conversation.
+L'accès à la console nécessite un navigateur Work autorisé ou une connexion
+OAuth au MCP officiel `https://mcp.didit.me/mcp`. Aucun connecteur Didit
+n'est disponible parmi les connecteurs installés ici.
+
+**Séquence dans la console dès que l'accès est autorisé :**
+1. Sélectionner l'organisation CECT et créer/identifier une application **Sandbox**.
+2. Créer un workflow KYC `CECT-KYC-PF-SANDBOX` avec vérification de document
+   officiel (pays cibles dont Togo), selfie, **liveness actif `ACTIVE_3D`**,
+   face match 1:1, revue humaine pour les signaux de risque ; puis **Publish**.
+3. Prévoir séparément `CECT-KYB-PM-SANDBOX` (registre, société, bénéficiaires
+   effectifs, représentant et liaison des identités), qui exige encore
+   des développements et ne doit pas être présenté comme fonctionnel.
+4. Dans API & Webhooks, créer la clé de l'application et la destination
+   HTTPS `https://api.13-49-203-235.sslip.io/api/v1/webhooks/kyc/didit`
+   pour `status.updated`, récupérer son secret distinct.
+5. Stocker les trois secrets dans une configuration privée du serveur,
+   jamais dans GitHub/ChatGPT ; lancer une recette Sandbox avec médias fictifs.
+6. Conserver `DIDIT_AUTO_APPROVE=false` ; contrôler les signatures V2,
+   résultats `ACTIVE_3D`, face match, cas de refus/réessai et ségrégation
+   des rôles avant un déploiement avec sauvegarde/rollback.
+
+**BLOCAGE ACTUEL :** aucune authentification Didit utilisable par l'agent
+pour créer le workflow, récupérer les secrets et tester l'API réelle.
+Le dépôt `custum` est prêt pour la suite des travaux ; le backend déployé
+sur `cectapi_live` n'a pas été mis à jour pour Didit.
+
+Sources Didit officielles :
+https://docs.didit.me/integration/mcp/overview
+https://help.didit.me/getting-started/understanding-the-console
+https://help.didit.me/workflows/build-a-verification-workflow
+https://docs.didit.me/integration/webhooks
+
+---
+## Situation vérifiée — 22 octobre 2026 : branche prête, compte Didit manquant
+
+**Actions effectivement réalisées :** étude de la documentation officielle v3,
+durcissement des signatures HMAC-V2 en PHP (objets JSON vides et Unicode),
+reconnaissance de la méthode réelle `ACTIVE_3D`, exigence de cohérence
+de `X-Timestamp` avec l'horodatage signé, traitement sécurisé des webhooks
+de démonstration console et maintien des contrôles de séparation Sandbox/Live.
+
+Tests finaux sur l'ancienne base de QA `cectapi_test` :
+**22 tests ciblés réussis, 128 assertions.** Appels HTTP Didit simulés,
+pas de confirmation de bout en bout contre l'infrastructure Didit.
+
+**Blocage authentification externe :** aucune intégration Didit connectée
+à cet espace ChatGPT, et aucun courrier Didit existant trouvé dans les
+deux comptes Gmail connectés. Clés `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`
+et `DIDIT_WEBHOOK_SECRET` absentes du .env du backend LIVE consulté.
+**Aucun compte, organisation, application Sandbox ou workflow Didit réel
+n'a été créé à cette étape.** Aucun secret n'est stocké dans GitHub.
+
+**KYB des PM NON implémenté :** la documentation Didit v3 retourne les
+preuves d'entreprise dans un objet de session business distinct avec
+`registry_checks[]`, `document_verifications[]` et `key_people_checks[]`,
+et non `business_verifications[]` dans la décision KYC du représentant.
+Par sécurité, le code retourne `business_verified=false` tant qu'une
+session KYB distincte, liée au représentant et à la PM, n'est pas
+implémentée et vérifiée. Cela **bloque le paiement des PM** et ne doit
+pas être présenté comme un KYB fonctionnel.
+
+**Déploiement : NON**, en particulier avant :
+- Connexion personnelle autorisée à la console Didit et création de
+  l'organisation/app Sandbox au nom convenu pour la CECT ;
+- Activation d'un workflow **ID Verification + 3D active liveness + Face Match**
+  dans cette application, et configuration de son webhook `status.updated` ;
+- Stockage serveur sécurisé des trois secrets et essais Didit réels sur
+  des documents fictifs (la Sandbox conserve réellement les captures) ;
+- Implémentation KYB PM, revue de la protection des données biométriques,
+  conformité locale et correction des tests globaux encore échoués.
+
+Sources primaires de vérité :
+https://docs.didit.me/integration/webhooks
+https://docs.didit.me/integration/sandbox-testing
+https://docs.didit.me/integration/verification-statuses
+
+---
+
+### Sécurisation complémentaire, recette finale ciblée
+
+- Les notifications Didit signées sont envoyées à un **job Laravel** :
+  réponse HTTP immédiate, retries si la consultation Didit échoue.
+- Environnement webhook signé obligatoire : `sandbox` ou `live`, jamais
+  mélanger les deux. Mode `live` requis avant une vraie approbation
+  (le mode `sandbox` ne peut activer un membre que dans la suite de tests isolée).
+- **Sandbox Didit simule les verdicts MAIS conserve les médias réels uploadés.**
+  Ne jamais utiliser de vrais documents, selfies ni vidéos personnels
+  lors des tests sandbox ; employer exclusivement les pièces de démonstration.
+- Nouveaux tests ciblés : **20 tests réussis, 120 assertions**, incluant
+  webhook signé HMAC-V2, replay potentiel/erreur d'environnement,
+  vérification indépendant du statut faux, séparation Validateur/Comptabilité.
+- Les appels API réels et la reconnaissance faciale de Didit restent
+  **NON TESTÉS** faute des trois secrets dans la configuration du serveur.
+- À la date du contrôle, la base active utilise encore son ancien commit
+  backend et reste intacte. Aucun déploiement ni débit Didit.
+
+Documentation éditeur sandbox :
+https://help.didit.me/getting-started/sandbox-and-testing
+
+
+## MISE À JOUR V5.16 — Didit retenu et connecteur développé (22 octobre 2026)
+
+**Décision métier : DIDIT est le prestataire officiel choisi pour le KYC CECT.**
+Cet état remplace les mentions précédentes « prestataire non choisi ».
+
+### Implémentation sur la branche custum (non déployée)
+
+- `KYC_PROVIDER=didit` par défaut dans le nouveau code, échec sécurisé tant que
+  les identifiants sont absents. Ancien mode manuel réservé aux tests isolés.
+- Backend : `app/Domain/Kyc/Didit/DiditGateway.php` crée des sessions hébergées
+  en POST `https://verification.didit.me/v3/session/` avec `workflow_id` et
+  `vendor_data=cect-kyc:<ulid>` ; seul le serveur reçoit `DIDIT_API_KEY`.
+- Frontend : page `/espace/kyc`, bouton Didit ouvrant le parcours hébergé
+  capture documentaire, selfie et liveness actif de Didit ; CECT ne demande
+  pas les enregistrements biométriques en local.
+- Webhook HTTPS : `POST /api/v1/webhooks/kyc/didit`, événement officiel
+  `status.updated`. Vérification HMAC du corps complet `X-Signature-V2`
+  (JSON canonique) ou `X-Signature` (octets bruts), délai de validité de
+  300 secondes, corrélation stricte sur une session stockée dans CECT.
+  `X-Signature-Simple` est volontairement refusé.
+- Réconciliation de secours : `POST /api/v1/me/kyc/didit/refresh` interroge
+  `GET /v3/session/{id}/decision/` avec la clé serveur, débit limité.
+  Un verdict dans l'URL de retour navigateur ou le corps du webhook
+  NE peut pas approuver directement le dossier.
+- Décision CECT : le verdict Didit « Approved » doit aussi posséder
+  ID verification APPROVED, liveness ACTIF 3D ACTION / FLASH APPROVED,
+  face match APPROVED, aucune alerte et environnement correct.
+  Les résultats non documentés/incomplets restent en révision humaine.
+- Personne morale : même traitement du représentant ET une preuve
+  `business_verifications` KYB approuvée ; sans résultat société,
+  le paiement est bloqué.
+- Le Validateur dispose des indicateurs Didit, sans accès aux médias
+  biométriques bruts. `DIDIT_AUTO_APPROVE=false` par défaut ; activation
+  automatique possible uniquement après arbitrage légal/risque.
+- Les historiques Superadmin, paramètres admin, clés mTLS et base
+  `cectapi_live` n'ont pas été modifiés par ce chantier.
+
+### Paramétrage Didit nécessaire (secrets jamais dans GitHub)
+
+1. Dans https://business.didit.me/ créer une application dans le SANDBOX.
+2. Workflow officiel CECT : ID Verification + **3D Action liveness**
+   (ou méthode active certifiée que le contrôle backend reconnaît)
+   + Face Match 1:1 ; KYB pour personnes morales, sous réserve
+   des modules/disponibilités du contrat et des pays couverts.
+3. Copier depuis la console **en environnement serveur sécurisé** :
+   `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`, `DIDIT_WEBHOOK_SECRET`.
+   Configurer `DIDIT_ENVIRONMENT=sandbox` pour les essais, puis `live` sur l'application de production Didit,
+   `DIDIT_AUTO_APPROVE=false` et `KYC_PROVIDER=didit`.
+4. Déclarer la destination webhook HTTPS
+   `https://api.13-49-203-235.sslip.io/api/v1/webhooks/kyc/didit`
+   et s'abonner à `status.updated`. Confirmer les signatures
+   `X-Signature` et `X-Signature-V2` exactes avec **Try Webhook**.
+5. Tester avec données fictives en sandbox l'OTP, les documents,
+   la caméra, selfie, liveness vidéo, match, refus/réessai,
+   KYB PM, duplications/replays webhook et paiement bloqué.
+6. Vérifier politique vie privée, transfert international, rétention
+   des données et contrat Didit. Pour activer en conditions réelles,
+   obtenir les identifiants production et repasser la recette complète.
+
+**Tests réalisés en environnement isolé `cectapi_test` : 20 tests ciblés
+réussis (120 assertions), dont vérification HMAC falsifiée et vérification
+des preuves de liveness actif ; frontend membre compilé.**
+Cette preuve technique n'est pas un essai réel des serveurs Didit :
+les appels HTTP Didit ont été simulés. Sans clés sandbox, workflow réel,
+webhook réel, essais UI caméra et suite globale satisfaisante,
+**le déploiement reste BLOQUÉ**.
+
+Références Didit vérifiées :
+https://didit.me/developers/
+https://help.didit.me/integration/webhooks-basics
+https://help.didit.me/liveness-biometrics/how-liveness-works
+https://help.didit.me/verification-sessions/reading-a-verification-result
+
+---
+# CECT — KYC obligatoire avant les frais d'adhésion
+
+Date : 22 octobre 2026. Branches concernées : custum (API, membre, administration).
+Statut : code implémenté et en recette, **pas encore déployé**.
+
+## Nouvelle règle métier prioritaire
+
+La vérification e-mail OTP ne conduit plus directement au paiement. Elle conduit
+à une étape d'identification KYC obligatoire. Cette instruction nouvelle prévaut
+sur la règle précédemment enregistrée le 20 octobre 2026.
+
+Parcours PF/PM : formulaire -> dossier en attente de vérification d'e-mail ->
+OTP confirmé -> pending_kyc -> dépôt KYC -> contrôle d'identité -> approved ->
+pending_payment -> paiement simulé -> compte active.
+
+Le membre déclare sa pièce d'identité (CNI, passeport ou titre de séjour),
+numéro, date de naissance, pays d'émission, adresse et dépose ses justificatifs
+recto/verso. La PM ajoute un document juridique de la société ; son représentant
+physique présente son identité. Les droits d'adhésion ne sont affichés
+qu'après KYC approuvé et ne sont jamais requis à l'inscription.
+
+Le KYC soumis est instruit par un rôle interne Validateur KYC nouveau :
+- Réception, file d'attente, consultation des documents uniquement en privé ;
+- Approbation justifiée par un contrôle humain réel ;
+- Refus avec motif, ou demande de complément ; ré-envoi corrigé ;
+- Toutes décisions journalisées et non rejouables après clôture ;
+- Aucun droit de décaissement, de validation YEM ou de modification des tarifs.
+
+Le rôle comptabilite continue à assurer les validations financières.
+Le rôle validateur ne récupère PAS les anciennes permissions YEM du Validateur
+supprimé. Superadmin et comptes internes existants ne sont pas modifiés.
+
+## Validations automatiques
+
+**Mode manuel :** parcours développé avec permission dédiée, authentification
+personnel et protection step-up pour les décisions.
+
+**Mode automatique : non opérationnel en l'absence d'un prestataire de
+vérification d'identité choisi/contractualisé.** Il exigera une API signée,
+des preuves d'authenticité vérifiables, un traitement des erreurs/doublons et
+une revue humaine pour les échecs/dossiers incertains. Il est interdit d'appeler
+« KYC approuvé » une simple lecture OCR ou une comparaison de texte. Ne pas
+activer un fournisseur de simulation comme justificatif d'identité réelle.
+
+## Protection de données
+
+Les numéros/attributs d'identité sont chiffrés via APP_KEY dans la base.
+Les pièces sont conservées sous forme chiffrée sur le disque privé Laravel,
+non accessibles par URL publique. Le déchiffrement n'intervient qu'après
+contrôle d'autorisation et consultation journalisée. Seul un personnel actif explicitement autorisé avec
+kyc.review peut télécharger une pièce. Réponses no-store et nosniff.
+Aucun numéro ni document ne doit figurer dans les logs métier.
+
+Avant exposition à de vrais utilisateurs : ajouter l'antivirus, le journal
+des consultations, une durée de conservation/purge validée, un droit de
+recours et une information légale appropriée. La loi togolaise n°2019-014
+de protection des données personnelles est applicable à examiner ; les
+textes BCEAO de KYC doivent être analysés selon la qualification
+juridique de la CECT (ne pas présumer qu'elle est institution financière).
+Éviter toute collecte biométrique sans base juridique et nécessité démontrée.
+
+## API
+
+Membre : GET et POST /api/v1/me/kyc, écran /espace/kyc.
+Validateur : GET /api/v1/kyc/cases, GET /api/v1/kyc/cases/{case},
+GET /api/v1/kyc/cases/{case}/documents/{type},
+POST /api/v1/kyc/cases/{case}/decision, écran /admin/kyc.
+
+Migration : database/migrations/2026_10_22_000001_create_member_kyc_cases.php.
+Modèle chiffré : app/Domain/Kyc/Models/MemberKycCase.php.
+Gate métier : app/Domain/Kyc/KycEligibility.php.
+Tests : tests/Feature/MemberKycWorkflowTest.php, base indépendante cectapi_test.
+
+## Éléments à valider par l'entreprise avant ouverture publique
+
+- Pièces acceptées par pays, mineurs, personne morale, représentant légal
+  et bénéficiaires effectifs ;
+- Prestataire KYC automatique, contrôle des documents officiels et contrats ;
+- Politique de rejet / second examen / ré-envoi ;
+- Conservation, effacement, journal d'accès, exercice des droits et
+  revue juridique locale ;
+- Rapport d'intégration et tests de non-régression pour les anciennes règles ;
+- Déploiement coordonné API + front membre + front admin et sauvegarde/rollback.
+
+Aucun changement n'a été déployé sur la base active cectapi_live durant ce
+chantier de développement. Les tests sont exécutés uniquement sur cectapi_test.
+
+## Rapport de recette du développement — 22 octobre 2026
+
+Les trois dépôts ont été clonés dans un espace de CODE isolé sur le serveur,
+sans nouvelle base et sans modifier cectapi_live, les comptes Superadmin ni
+les paramètres de production. La base de test préexistante cectapi_test
+est utilisée uniquement avec APP_ENV=testing et des justificatifs fictifs.
+
+- Compilation TypeScript/Vite CECT-frontend : **réussie**.
+- Compilation TypeScript/Vite cect-admin : **réussie**.
+- Tests ciblés KYC et administration : **15 réussis, 84 assertions**.
+  Vérifications : dossier et documents privés, chiffrement, autorisation
+  Validateur, séparation de Comptabilité, refus de paiement sans KYC approuvé,
+  approbation, demande de complément et dépôt corrigé.
+- Suite générale de tests fonctionnels sur cette version de développement :
+  **473 réussis, 123 en échec, 5 884 assertions** (exécution précédente, avant les dernières corrections ciblées). Certains cas anciens
+  supposent un paiement sans vérification et le retrait du rôle Validateur ;
+  d'autres échecs portent sur des routes/backoffice non encore qualifiées.
+  **Ne pas attribuer automatiquement tous ces échecs au KYC.**
+- **Déploiement : bloqué** tant que la régression, la protection des pièces
+  et les exigences juridiques ne sont pas satisfaisantes.
+
+Le système KYC manuel est développé dans les trois dépôts mais n'est PAS
+encore accessible sur le site actif. Le KYC automatique ne fonctionne pas
+sans un prestataire d'identité réel et une interface contractuelle sécurisée.
+
+## EXIGENCE COMPLEMENTAIRE — SELFIE, VIDEO ET KYC BIOMETRIQUE (22 octobre 2026)
+
+Décision complémentaire expresse de l'entreprise : **le KYC CECT doit inclure
+une prise de SELFIE EN DIRECT et une SEQUENCE VIDEO GUIDEE**, et pas uniquement
+des photos de documents officiels. Le niveau attendu est un onboarding
+biométrique réel, avec liveness et confrontation documentaire.
+
+### Parcours d'identification attendu — PF et représentant PM
+
+1. Consentement/information claire sur les finalités, prestataire, conservation
+   des données biométriques, éventuels transferts à l'étranger et droits.
+2. Scan des documents officiels recto/verso (ou passeport), extraction OCR,
+   contrôle de qualité, cohérence, validité et indices de falsification.
+3. **Selfie en direct** via caméra, cadrage et contrôle de qualité, pas une
+   image importée depuis la galerie comme preuve exclusive.
+4. **Liveness actif par VIDEO/sequence caméra** : actions aléatoires imposées
+   par SDK tiers (tête, regard, flash/mouvements selon prestataire),
+   protection contre photo, masque, vidéo rejouée, spoof et deepfake.
+   La nature exacte du fichier brut (vidéo stockée vs frames sécurisées)
+   dépend de l'API du fournisseur et de la politique de minimisation.
+5. Comparaison biométrique selfie/video contre la photographie de la pièce
+   (face match), vérification de qualité et des seuils documentés.
+6. Vérification des doublons, signaux appareils/IP, contrôles risque,
+   listes sanctions/PEP seulement si justifiés et autorisés ; vérification
+   KYB du PM/identité du représentant et bénéficiaires effectifs selon règles.
+7. Résultat tiers authentifié : VERIFIED / IN_REVIEW / REJECTED / RETRY.
+   Liveness raté, doublon, photo incohérente ou vidéo non vérifiable
+   imposent une REVUE HUMAINE, jamais une approbation automatique forcée.
+8. Validation humaine par rôle Validateur KYC, motif, preuve de contrôle,
+   historique, second avis/recours et journal d'accès aux pièces.
+9. Paiement de l'adhésion débloqué uniquement lorsque **toutes** les étapes
+   obligatoires et le verdict d'identité sont approuvés.
+
+### Exigences techniques et opérationnelles
+
+- Interface mobile-first, caméra avant/arrière avec permission explicite
+  getUserMedia / SDK, possibilité de reprendre une capture de mauvaise
+  qualité, contrôle de bande passante, reprise après perte réseau,
+  navigation accessible et support d'appareils modestes en Afrique.
+- Session fournisseur éphémère liée à un dossier CECT via nonce/idempotence,
+  webhook signé, réconciliation serveur, prévention des replay et des faux
+  callbacks ; aucune décision finale fournie par le navigateur n'est fiable.
+- Séparer statut de l'étape DOCUMENT, SELFIE, VIDEO_LIVENESS, FACE_MATCH,
+  FRAUD_CHECK, KYC_FINAL, identité du Validateur, source auto/manuelle.
+- Chiffrement au repos et en transit, conservation minimale, journal
+  d'accès, droits d'effacement/rectification dans les limites légales,
+  procédure de gestion des incidents et analyse antimalware des fichiers.
+- La reconnaissance faciale/biométrie requiert une revue conformité
+  spécifique avec l'IPDCP Togo AVANT traitement réel, notamment sous
+  la loi 2019-014. Vérifier les conditions de transfert international.
+
+### Prestataires possibles et coûts consultés en octobre 2026
+
+- DIDIT : 500 KYC mensuels gratuits pour ID + liveness PASSIF + face match
+  + analyse IP/appareil, puis 0,33 USD par vérification complète.
+  Le liveness ACTIF (mouvements/3D) est facturé 0,15 USD par contrôle
+  dès le premier contrôle ; confirmez le format de séquence VIDEO précis
+  proposé au SDK avant contractualisation.
+- SUMSUB : Basic 1,35 USD / KYC, engagement minimum 149 USD / mois ;
+  document, selfie, liveness, face match. Contrôler les options vidéo.
+- IDENFY : Basic 1,35 USD / KYC, engagement minimum 135 USD / mois ;
+  options de liveness 3D et contrôle humain facturées séparément.
+- SMILE ID : tarif sur devis ; catalogue documents officiels incluant
+  le Togo et solutions selfie/liveness. Vérifier le périmètre vidéo.
+
+Sources fournisseurs :
+https://didit.me/pricing/
+https://help.didit.me/getting-started/free-plan
+https://help.didit.me/liveness-biometrics/how-liveness-works
+https://sumsub.com/fr/pricing/
+https://idenfy.com/fr/tarifs/
+https://smile.id/supported-documents
+Autorité de protection des données du Togo : https://ipdcp.tg/
+
+### Etat d'implémentation honnête
+
+Le code KYC déjà ajouté sur custum sait recevoir un document chiffré,
+présenter une file Validateur et vérifier une décision manuelle ;
+**LE CONNECTEUR DIDIT EST MAINTENANT DEVELOPPE DANS LE CODE, MAIS NON ACTIVE SUR LE SITE ACTIF ET NON TESTE AVEC LES VRAIES API/SDK DIDIT.**
+Le parcours complet document + selfie + vidéo est une EXIGENCE FERME
+de la prochaine phase de développement, pas une fonctionnalité déployée.
+Ne jamais qualifier le KYC précédent de complet ou suffisamment
+biométrique avant intégration réelle, tests anti-fraude et conformité.
+
+### Critères de recette bloquants
+
+Un client qui soumet seulement une pièce sans selfie/liveness ne doit
+pas être automatiquement qualifié de KYC complet. Après activation
+du nouveau dispositif biométrique, la règle de paiement doit exiger
+un résultat KYC final incluant preuve de vie vérifiée, correspondance
+faciale et contrôle documentaire, ou une procédure d'exception
+formellement autorisée et auditée. Aucune validation des documents
+fictifs, capture vidéo locale seule ou score OCR ne vaut preuve.

@@ -6,6 +6,7 @@ use App\Domain\Audit\AuditLogger;
 use App\Domain\Audit\Enums\SecuritySeverity;
 use App\Domain\Audit\SecurityEventLogger;
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Kyc\KycEligibility;
 use App\Domain\Membership\Enums\ActivationMode;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Models\Membership;
@@ -39,7 +40,8 @@ class ActivateMembership
             $membership->paid_at = now();
         }
 
-        if ($user->status !== UserStatus::PendingPayment) {
+        if ($user->status !== UserStatus::PendingPayment || ! (KycEligibility::approved($user)
+            || ($mode === ActivationMode::SimulatedPayment && KycEligibility::stagingMembershipDemo($user)))) {
             $membership->save();
 
             $this->auditLogger->record(

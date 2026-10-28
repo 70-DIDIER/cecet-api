@@ -3,6 +3,7 @@
 namespace App\Domain\Membership\Http\Controllers;
 
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Kyc\KycEligibility;
 use App\Domain\Membership\Actions\DemoActivateMembership;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Http\Resources\MembershipResource;
@@ -39,6 +40,16 @@ class MembershipController
     public function show(Request $request, MembershipFee $fees, PaymentFeeCalculator $feeCalculator, PaymentCheckout $checkout, SettingsService $settings): JsonResponse
     {
         $member = $this->member($request);
+        // A Sandbox document check may unlock a READ-ONLY tour of the former
+        // membership checkout. It is never sufficient to initiate a payment.
+        $sandboxPreview = KycEligibility::sandboxDocumentTestCompleted($member);
+        $demoCheckout = KycEligibility::stagingMembershipDemo($member);
+        abort_unless($member->status === UserStatus::Active
+            || KycEligibility::approved($member) || $sandboxPreview,
+            403, 'KYC obligatoire avant le paiement.');
+        // Always load the existing membership, including after a Sandbox
+        // document was approved. The previous preview conditional hid the
+        // pending payment and tricked the frontend into reopening checkout.
         $membership = Membership::query()->where('user_id', $member->id)->first();
 
         if ($membership !== null) {
@@ -73,14 +84,17 @@ class MembershipController
         }
 
         return response()->json(['data' => [
-            'status' => $status->value,
+            'status' => $sandboxPreview && ! $demoCheckout ? 'kyc_sandbox_preview' : $status->value,
+            'sandbox_preview' => $sandboxPreview,
+            'payment_enabled' => ! $sandboxPreview || $demoCheckout,
+            'demo_checkout' => $demoCheckout,
             'account_status' => $member->status->value,
             'fee_due' => $status === MembershipStatus::Active ? 0 : $fee['amount'],
             'fee_currency' => MembershipFee::CURRENCY,
             'payment_quote' => $quote,
             'membership' => $membership === null ? null : new MembershipResource($membership),
             'payment_attempts' => PaymentAttemptResource::collection($attempts),
-        ]]);
+        ]])->header('Cache-Control', 'private, no-store');
     }
 
     /**

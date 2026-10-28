@@ -1,0 +1,153 @@
+<?php
+
+namespace App\Domain\Kyc\Didit;
+
+use App\Domain\Kyc\Models\MemberKycCase;
+use Illuminate\Support\Facades\Http;
+
+/**
+ * Server-side only. No API key, session creation or decision is exposed to a browser.
+ * Hosted Didit flow performs ID capture, selfie, active 3D liveness and face-match,
+ * subject to the configured workflow actually including all four modules.
+ */
+final class DiditGateway
+{
+    public function configured(): bool
+    {
+        return config('kyc.provider') === 'didit'
+            && filled(config('kyc.didit.api_key'))
+            && filled(config('kyc.didit.workflow_id'))
+            && filled(config('kyc.didit.application_id'))
+            && filled(config('kyc.didit.webhook_secret'));
+    }
+
+    public function create(MemberKycCase $case, bool $isBusiness = false): array
+    {
+        abort_unless($this->configured(), 503, 'Didit n’est pas encore configuré.');
+        $workflowId = $isBusiness ? config('kyc.didit.kyb_workflow_id') : config('kyc.didit.workflow_id');
+        abort_unless(is_string($workflowId) && $workflowId !== '', 503,
+            'Le parcours KYB de l’entreprise n’est pas configuré.');
+        $payload = [
+            'workflow_id' => $workflowId,
+            'vendor_data' => 'cect-kyc:'.$case->id,
+        ];
+        // Sandbox-only outcome is selected by the server rather than a member.
+        // This never controls real identity approval or unlocks membership payments.
+        if (config('kyc.didit.environment') === 'sandbox'
+            && config('kyc.didit.document_only_test')) {
+            $payload['sandbox_scenario'] = 'approve';
+        }
+        $response = Http::withHeaders(['x-api-key' => config('kyc.didit.api_key')])
+            ->acceptJson()->timeout(12)
+            ->post(rtrim(config('kyc.didit.base_url'), '/').'/v3/session/', $payload);
+        if (! $response->successful()) {
+            report(new \RuntimeException('Didit session API HTTP '.$response->status()));
+            abort(502, 'Impossible de démarrer le contrôle d’identité.');
+        }
+        $url = $response->json('url');
+        $session = $response->json('session_id');
+        abort_unless(is_string($session) && strlen($session) >= 12 && is_string($url), 502);
+        $url = str_starts_with($url, 'https://') ? $url : 'https://'.$url;
+        $host = strtolower(parse_url($url, PHP_URL_HOST) ?: '');
+        abort_unless(in_array($host, config('kyc.didit.allowed_redirect_hosts'), true), 502,
+            'Lien de vérification invalide.');
+        return ['session_id' => $session, 'url' => $url, 'workflow_id' => $workflowId];
+    }
+
+    public function decision(string $session): array
+    {
+        abort_unless($this->configured(), 503);
+        abort_unless((bool) preg_match('/^[a-zA-Z0-9_-]{12,128}$/', $session), 400);
+        $response = Http::withHeaders(['x-api-key' => config('kyc.didit.api_key')])
+            ->acceptJson()->timeout(12)
+            ->get(rtrim(config('kyc.didit.base_url'), '/').'/v3/session/'.rawurlencode($session).'/decision/');
+        if (! $response->successful()) {
+            report(new \RuntimeException('Didit decision API HTTP '.$response->status()));
+            abort(502, 'Vérification Didit temporairement indisponible.');
+        }
+        $data = $response->json();
+        abort_unless(is_array($data) && is_string($data['status'] ?? null), 502);
+        return $data;
+    }
+
+    /**
+     * Do not trust top-level Approved without module proofs, particularly liveness
+     * and identity-photo face match. Fail closed if the provider response or workflow
+     * does not expose the required details. Keep only booleans, not biometric scores.
+     */
+    public function checks(array $decision): array
+    {
+        $payload = is_array($decision['decision'] ?? null) ? $decision['decision'] : $decision;
+        $pass = static fn (array $rows): bool => collect($rows)->contains(
+            static fn ($item) => is_array($item) && ($item['status'] ?? null) === 'Approved'
+        );
+        $docs = $pass((array) ($payload['id_verifications'] ?? []));
+        $face = $pass((array) ($payload['face_matches'] ?? []));
+        // KYB requires a separate linked business session with registry checks.
+        // Until that correlation exists, never treat a KYC session as verified KYB.
+        $business = false;
+        $liveness = collect((array) ($payload['liveness_checks'] ?? []))->contains(
+            static fn ($row) => is_array($row)
+                && ($row['status'] ?? null) === 'Approved'
+                && in_array(strtoupper(str_replace([' ', '-'], '_', (string) ($row['method'] ?? ''))),
+                    ['ACTIVE_3D'], true)
+        );
+        $warnings = array_merge(
+            (array) ($payload['warnings'] ?? []),
+            ...array_map(static fn ($list): array => array_merge([], ...array_map(
+                static fn ($row): array => (array) ($row['warnings'] ?? []), is_array($list) ? $list : []
+            )), [$payload['id_verifications'] ?? [], $payload['liveness_checks'] ?? [], $payload['face_matches'] ?? []])
+        );
+        return [
+            'document' => $docs,
+            'active_liveness' => $liveness,
+            'face_match' => $face,
+            'business_verified' => $business,
+            'warnings_present' => count($warnings) > 0,
+            'complete' => $docs && $liveness && $face && count($warnings) === 0,
+        ];
+    }
+
+    /**
+     * Prefer full-payload V2 HMAC; support original raw-body signature.
+     * We do not accept the envelope-only X-Signature-Simple.
+     */
+    public function signatureValid(string $raw, ?string $v2, ?string $v1): bool
+    {
+        $secret = config('kyc.didit.webhook_secret');
+        if (! is_string($secret) || $secret === '') return false;
+        if ($v2) {
+            try {
+                // Didit V3 canonical JSON preserves {} distinct from [].
+                // json_decode(..., true) breaks otherwise valid signed payloads.
+                $payload = json_decode($raw, false, 512, JSON_THROW_ON_ERROR);
+                if ($payload instanceof \stdClass) {
+                    $canonical = json_encode($this->canonicalize($payload),
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                    if (hash_equals(hash_hmac('sha256', $canonical, $secret), strtolower($v2))) {
+                        return true;
+                    }
+                }
+            } catch (\JsonException $e) {
+                return false;
+            }
+        }
+        // Strong raw-body fallback; never accept weak X-Signature-Simple.
+        return is_string($v1) && hash_equals(hash_hmac('sha256', $raw, $secret), strtolower($v1));
+    }
+
+    private function canonicalize(mixed $value): mixed
+    {
+        if ($value instanceof \stdClass) {
+            $properties = get_object_vars($value);
+            ksort($properties, SORT_STRING);
+            $object = new \stdClass();
+            foreach ($properties as $name => $item) {
+                $object->{$name} = $this->canonicalize($item);
+            }
+            return $object;
+        }
+        if (is_array($value)) return array_map($this->canonicalize(...), $value);
+        return $value;
+    }
+}
