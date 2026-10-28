@@ -5,8 +5,10 @@ namespace App\Models;
 use App\Domain\Identity\Enums\PersonType;
 use App\Domain\Identity\Enums\UserKind;
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Identity\Models\IdentityVerification;
 use App\Domain\Identity\Models\Organization;
 use App\Domain\Identity\Models\PernumIdentity;
+use App\Domain\Kyc\KycEligibility;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
@@ -43,6 +45,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $signed_on
  * @property UserStatus $status
  * @property Carbon|null $email_verified_at
+ * @property Carbon|null $identity_verified_at
  * @property string|null $password
  * @property Carbon|null $last_login_at
  * @property Carbon|null $suspended_at
@@ -50,7 +53,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property-read string $full_name
  * @property-read Organization|null $organization
  */
-#[Fillable(['kind', 'person_type', 'member_number', 'first_name', 'last_name', 'email', 'phone', 'city', 'preferred_payment_method', 'commitment_accepted_at', 'commitment_version', 'signed_place', 'signed_on', 'status', 'email_verified_at', 'password', 'last_login_at', 'suspended_at'])]
+#[Fillable(['kind', 'person_type', 'member_number', 'first_name', 'last_name', 'email', 'phone', 'city', 'preferred_payment_method', 'commitment_accepted_at', 'commitment_version', 'signed_place', 'signed_on', 'status', 'email_verified_at', 'identity_verified_at', 'password', 'last_login_at', 'suspended_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser, HasName
 {
@@ -68,6 +71,23 @@ class User extends Authenticatable implements FilamentUser, HasName
     public function organization(): HasOne
     {
         return $this->hasOne(Organization::class);
+    }
+
+    /**
+     * @return HasMany<IdentityVerification, $this>
+     */
+    public function identityVerifications(): HasMany
+    {
+        return $this->hasMany(IdentityVerification::class);
+    }
+
+    /**
+     * Whether the CECT approved the identity document and selfie of this member, the condition to subscribe a pack.
+     * An approved membership KYC already proves the identity: the member is not asked to verify it a second time.
+     */
+    public function hasVerifiedIdentity(): bool
+    {
+        return $this->identity_verified_at !== null || KycEligibility::approved($this);
     }
 
     /**
@@ -134,6 +154,7 @@ class User extends Authenticatable implements FilamentUser, HasName
             'person_type' => PersonType::class,
             'status' => UserStatus::class,
             'email_verified_at' => 'datetime',
+            'identity_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'suspended_at' => 'datetime',
             'commitment_accepted_at' => 'datetime',

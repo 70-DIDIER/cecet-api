@@ -21,7 +21,7 @@ return [
 
     'allowed_origins' => array_filter(explode(',', (string) env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000'))),
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => env('APP_ENV') === 'production' ? [] : ['#^https?://(localhost|127\.0\.0\.1)(:\d+)?$#'],
 
     'allowed_headers' => ['*'],
 

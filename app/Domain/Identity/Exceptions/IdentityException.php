@@ -18,6 +18,21 @@ final class IdentityException extends ApiException
         ]);
     }
 
+    public static function identityAlreadyVerified(): self
+    {
+        return new self('IDENTITY_ALREADY_VERIFIED', 'Votre identité est déjà validée.', 409);
+    }
+
+    public static function identityVerificationPending(): self
+    {
+        return new self('IDENTITY_VERIFICATION_PENDING', 'Vos documents sont en cours de vérification par la CECT.', 409);
+    }
+
+    public static function identityVerificationNotPending(): self
+    {
+        return new self('IDENTITY_VERIFICATION_NOT_PENDING', 'Cette vérification d\'identité a déjà été traitée.', 409);
+    }
+
     public static function accountDisabled(): self
     {
         return new self('ACCOUNT_DISABLED', 'Ce compte est suspendu ou fermé.', 403);

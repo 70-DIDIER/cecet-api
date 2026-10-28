@@ -8,16 +8,20 @@ use App\Domain\Catalog\Http\Controllers\PackPlanAdminController;
 use App\Domain\Exchange\Http\Controllers\MemberExchangeController;
 use App\Domain\Exchange\Http\Controllers\ValidationController;
 use App\Domain\Identity\Enums\UserKind;
+use App\Domain\Identity\Http\Controllers\IdentityVerificationAdminController;
+use App\Domain\Identity\Http\Controllers\IdentityVerificationController;
 use App\Domain\Identity\Http\Controllers\LoginController;
-use App\Domain\Identity\Http\Controllers\SuperadminSecurityController;
-use App\Domain\Kyc\Http\Controllers\KycController;
-use App\Domain\Kyc\Http\Controllers\DiditController;
 use App\Domain\Identity\Http\Controllers\OtpController;
 use App\Domain\Identity\Http\Controllers\PasswordResetController;
 use App\Domain\Identity\Http\Controllers\RegistrationController;
 use App\Domain\Identity\Http\Controllers\SessionController;
+use App\Domain\Identity\Http\Controllers\StaffAccessWindowController;
 use App\Domain\Identity\Http\Controllers\StaffActivationController;
+use App\Domain\Identity\Http\Controllers\StaffGuardianLoginController;
 use App\Domain\Identity\Http\Controllers\StepUpController;
+use App\Domain\Identity\Http\Controllers\SuperadminSecurityController;
+use App\Domain\Kyc\Http\Controllers\DiditController;
+use App\Domain\Kyc\Http\Controllers\KycController;
 use App\Domain\Membership\Http\Controllers\MemberDashboardController;
 use App\Domain\Membership\Http\Controllers\MemberDocumentController;
 use App\Domain\Membership\Http\Controllers\MembershipController;
@@ -42,8 +46,6 @@ use App\Domain\Settings\Http\Controllers\PublicConfigController;
 use App\Domain\Settings\Http\Controllers\SettingController;
 use App\Domain\Shared\Http\Controllers\HealthController;
 use App\Domain\Subscription\Http\Controllers\MemberPackController;
-use App\Domain\Identity\Http\Controllers\StaffGuardianLoginController;
-use App\Domain\Identity\Http\Controllers\StaffAccessWindowController;
 use App\Domain\Subscription\Http\Controllers\UserPackAdminController;
 use Illuminate\Support\Facades\Route;
 
@@ -146,6 +148,8 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::post('me/kyc/didit/refresh', [DiditController::class, 'refresh'])
             ->middleware('throttle:2,1')->name('me.kyc.didit.refresh');
 
+        Route::get('me/identity-verification', [IdentityVerificationController::class, 'show'])->name('me.identity-verification.show');
+        Route::post('me/identity-verification', [IdentityVerificationController::class, 'store'])->middleware('throttle:5,1')->name('me.identity-verification.store');
         Route::get('me/membership', [MembershipController::class, 'show'])->name('me.membership.show');
         Route::post('me/membership/payments', [MembershipController::class, 'startPayment'])->middleware('idempotent')->name('me.membership.payments.store');
         Route::get('me/membership/payments/{attempt}', [MembershipController::class, 'showAttempt'])->name('me.membership.payments.show');
@@ -282,6 +286,15 @@ Route::prefix('v1')->name('v1.')->group(function () {
                 ->middleware(['can:staff.manage', 'can:settings.update_critical', 'step-up', 'idempotent'])->name('staff.login-hours.update');
 
             Route::get('members/{user}/overview', MemberOverviewController::class)->middleware('can:members.view')->name('members.overview');
+
+            Route::get('identity-verifications', [IdentityVerificationAdminController::class, 'index'])->middleware('can:identity_verifications.view')->name('identity-verifications.index');
+            Route::get('identity-verifications/{verification}', [IdentityVerificationAdminController::class, 'show'])->middleware('can:identity_verifications.view')->name('identity-verifications.show');
+            Route::get('identity-verifications/{verification}/files/{file}', [IdentityVerificationAdminController::class, 'file'])
+                ->whereIn('file', ['front', 'back', 'selfie'])->middleware(['can:identity_verifications.view', 'throttle:60,1'])->name('identity-verifications.file');
+            Route::middleware(['can:identity_verifications.review', 'step-up'])->group(function () {
+                Route::post('identity-verifications/{verification}/approve', [IdentityVerificationAdminController::class, 'approve'])->name('identity-verifications.approve');
+                Route::post('identity-verifications/{verification}/reject', [IdentityVerificationAdminController::class, 'reject'])->name('identity-verifications.reject');
+            });
 
             Route::middleware(['can:staff.manage', 'step-up'])->group(function () {
                 Route::post('staff', [AccountController::class, 'storeStaff'])->middleware('idempotent')->name('staff.store');

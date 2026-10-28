@@ -31,7 +31,6 @@ it('never exposes Vendeur sale capacity as spendable YEM on the member dashboard
     expect((float) $response->json('data.yem.balance'))->toBeLessThan((float) $consumerAvailable + (float) $sellerAvailable);
 });
 
-
 it('summarises the member area: profile, YEM balance, active packs and latest movements', function () {
     $member = User::factory()->create(['city' => 'Lomé']);
     $member->pernumIdentities()->create(['pernum' => '1001043953', 'kind' => 'personal', 'status' => 'declared']);
@@ -102,4 +101,19 @@ it('gives the periods of each pack, the monthly activity and the open operations
         ->and($data['monthly_activity'][5]['month'])->toBe(now()->format('Y-m'))
         ->and($data['monthly_activity'][5]['credit'])->toBe('38.461538')
         ->and($data['operations'])->toBe([]);
+});
+
+it('keeps a freshly subscribed Pack Marchand out of the YEM balance: its quota is a redemption ceiling, its collected balance starts at zero', function () {
+    $merchant = User::factory()->legalPerson()->create();
+    $pack = subscribeAndPay($merchant, makePlan(PackFamily::Marchand, 'BRONZE', periodicTerms(['eligible_person_types' => ['legal']])));
+
+    $this->withToken(tokenFor($merchant))->getJson('/api/v1/me/dashboard')
+        ->assertOk()
+        ->assertJsonPath('data.yem.balance', '0.000000')
+        ->assertJsonPath('data.yem.reserved', '0.000000')
+        ->assertJsonPath('data.yem.total_credited', '0.000000')
+        ->assertJsonPath('data.active_packs.0.id', $pack->id)
+        ->assertJsonPath('data.active_packs.0.merchant_balance.eligible', '0.000000')
+        ->assertJsonPath('data.active_packs.0.merchant_balance.redeemed', '0.000000')
+        ->assertJsonPath('data.recent_movements', []);
 });

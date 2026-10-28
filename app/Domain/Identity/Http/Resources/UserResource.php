@@ -29,6 +29,7 @@ class UserResource extends JsonResource
             'phone' => $this->phone,
             'status' => $this->status->value,
             'email_verified_at' => $this->email_verified_at?->toIso8601ZuluString(),
+            'identity_verified_at' => $this->when(! $this->isStaff(), fn () => $this->identity_verified_at?->toIso8601ZuluString()),
             'last_login_at' => $this->last_login_at?->toIso8601ZuluString(),
             'organization' => $this->whenLoaded('organization', fn () => $this->organization === null ? null : [
                 'id' => $this->organization->id,

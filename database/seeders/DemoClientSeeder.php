@@ -280,9 +280,20 @@ class DemoClientSeeder extends Seeder
         return $member->refresh();
     }
 
+    /**
+     * Demonstration accounts stand for members whose identity the CECT already checked, the condition to subscribe a pack.
+     */
+    private function approveIdentity(User $member): void
+    {
+        if (! $member->hasVerifiedIdentity()) {
+            $member->forceFill(['identity_verified_at' => now()])->save();
+        }
+    }
+
     private function subscribe(User $member, string $code): UserPack
     {
         $plan = PackPlan::query()->where('code', $code)->firstOrFail();
+        $this->approveIdentity($member);
         $result = app(SubscribeToPack::class)->handle($member, $plan, 'CASH');
 
         if ($result['attempt'] !== null) {

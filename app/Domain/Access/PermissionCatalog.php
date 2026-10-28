@@ -27,6 +27,8 @@ final class PermissionCatalog
             'members.view' => ['description' => 'Consulter les membres et leurs fiches.'],
             'members.manage' => ['description' => 'Suspendre ou réactiver un membre.'],
             'kyc.review' => ['description' => 'Consulter les pièces KYC confidentielles et décider du contrôle d’identité.'],
+            'identity_verifications.view' => ['description' => 'Consulter les pièces d\'identité et selfies envoyés par les membres.'],
+            'identity_verifications.review' => ['description' => 'Valider ou rejeter la vérification d\'identité d\'un membre.'],
             'staff.view' => ['description' => 'Consulter les comptes internes.'],
             'staff.manage' => ['description' => 'Créer, suspendre et attribuer des rôles aux comptes internes (jamais Superadmin).'],
             'roles.view' => ['description' => 'Consulter les rôles et permissions.'],
@@ -68,7 +70,7 @@ final class PermissionCatalog
         return [
             self::SUPERADMIN => ['label' => 'Superadmin', 'permissions' => []],
             self::ADMIN => ['label' => 'Administrateur', 'permissions' => [
-                'members.view', 'members.manage', 'staff.view', 'staff.manage', 'roles.view', 'user_packs.view',
+                'members.view', 'members.manage', 'identity_verifications.view', 'identity_verifications.review', 'staff.view', 'staff.manage', 'roles.view', 'user_packs.view',
                 'settings.view', 'settings.update', 'audit.view', 'packs.view', 'packs.manage',
                 'yem_validations.view', 'payments.view', 'payouts.view', 'reports.view', 'reports.export', 'imports.manage', 'api_docs.view',
             ]],

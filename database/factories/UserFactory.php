@@ -38,6 +38,7 @@ class UserFactory extends Factory
             'phone' => '+228'.fake()->numerify('9#######'),
             'status' => UserStatus::Active,
             'email_verified_at' => now(),
+            'identity_verified_at' => now(),
             'password' => static::$password ??= Hash::make('Password123'),
             'remember_token' => Str::random(10),
         ];
@@ -59,6 +60,14 @@ class UserFactory extends Factory
             'email_verified_at' => null,
             'status' => UserStatus::PendingEmailVerification,
         ]);
+    }
+
+    /**
+     * A member whose identity document and selfie have not been approved yet.
+     */
+    public function identityUnverified(): static
+    {
+        return $this->state(fn (array $attributes) => ['identity_verified_at' => null]);
     }
 
     /**

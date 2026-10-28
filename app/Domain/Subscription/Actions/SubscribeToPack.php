@@ -2,9 +2,8 @@
 
 namespace App\Domain\Subscription\Actions;
 
-use App\Domain\Catalog\Enums\PackFamily;
-
 use App\Domain\Audit\AuditLogger;
+use App\Domain\Catalog\Enums\PackFamily;
 use App\Domain\Catalog\Models\PackPlan;
 use App\Domain\Catalog\Models\PackVersion;
 use App\Domain\Identity\Enums\UserStatus;
@@ -47,6 +46,10 @@ class SubscribeToPack
     {
         if (! $member->isMember() || $member->status !== UserStatus::Active) {
             throw SubscriptionException::memberNotActive();
+        }
+
+        if (! $member->hasVerifiedIdentity()) {
+            throw SubscriptionException::identityNotVerified();
         }
 
         $channel = $this->router->route($member, $method);

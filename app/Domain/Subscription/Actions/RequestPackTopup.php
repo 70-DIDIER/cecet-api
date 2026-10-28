@@ -52,6 +52,10 @@ class RequestPackTopup
             throw SubscriptionException::memberNotActive();
         }
 
+        if (! $member->hasVerifiedIdentity()) {
+            throw SubscriptionException::identityNotVerified();
+        }
+
         $channel = $this->router->route($member, $method);
 
         $result = DB::transaction(fn (): array => $this->prepare($member, $pack, $amount, $channel['provider'], $channel['method']));
