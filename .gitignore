@@ -32,3 +32,6 @@ Thumbs.db
 
 # Documentation Markdown
 *.md
+.env
+.env.*
+!.env.example
