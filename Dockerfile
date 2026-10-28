@@ -4,10 +4,12 @@
 # nginx + PHP-FPM + queue worker + scheduler, supervised in one container.
 
 # ---- Frontend assets (welcome page uses @vite) ----
-FROM node:22.11.0-bookworm-slim AS assets
+FROM node:22.20.0-bookworm-slim AS assets
 WORKDIR /app
 COPY package.json vite.config.js ./
-RUN npm install --no-audit --no-fund --ignore-scripts
+# npm 10 crashes resolving Vite 8 peer dependencies ("reading 'edgesOut'"); npm 11 does not.
+RUN npm install -g npm@11.6.2 \
+    && npm install --no-audit --no-fund --ignore-scripts
 COPY resources ./resources
 COPY public ./public
 RUN npm run build
