@@ -66,6 +66,35 @@ Le seeder crée un historique complet (adhésion, packs, ventes, paiements march
 - Si le compte client existe déjà, son mot de passe n'est pas modifié.
 - Ces identifiants ne doivent jamais exister en production.
 
+### Comptes de test de la base locale (relevé du 28 octobre 2026)
+
+Relevé de la base locale de développement (`APP_ENV=staging` sur poste). Les comptes du serveur de staging distant peuvent différer. Seuls les trois comptes de démonstration ci-dessus acceptent `Demo2026cect` ; les mots de passe des autres comptes ont été choisis à leur création et ne sont pas récupérables (seule l'empreinte est stockée).
+
+| Rôle / fonctions | E-mail | N° membre | Statut |
+|---|---|---|---|
+| Superadmin (démo) | `superadmin.demo@cect.example` | — | actif |
+| Comptabilité + Superadmin | `koffiguinwo@gmail.com` | — | `pending_activation` |
+| Comptabilité | `koffi.guinwogbegno@ipnetinstitute.com` | — | `pending_activation` |
+| Marchand PM (démo) — Marchand, Personnel, Consommateur, Vendeur | `marchand.demo@cect.example` | CECT-000004 | actif |
+| Marchand PM — Marchand, Personnel | `kiznetservice@outlook.com` | CECT-000009 | actif |
+| Marchand PM — Marchand | `nakoreyendoubouamejoseph@gmail.com` | CECT-000014 | actif |
+| Client PF (démo) — Consommateur, Vendeur, Personnel | `tandemodon55@gmail.com` | CECT-000003 | actif |
+| Membre PF — Consommateur, Vendeur, Personnel | `tandemodson55@gmail.com` | CECT-000002 | actif |
+| Membre PF — Consommateur | `essai.reg1@example.com` | CECT-000005 | actif |
+| Membre PF — Consommateur | `guinwogbegnodidier@gmail.com` | CECT-000007 | actif |
+| Membre PF — Consommateur, Vendeur | `koffidata@outlook.com` | CECT-000008 | actif |
+| Membre PF — Consommateur, Personnel, Vendeur | `guinwogbegnoelise@gmail.com` | CECT-000010 | actif |
+| Membre PF — Personnel, Consommateur, Vendeur | `nakjere1@gmail.com` | CECT-000011 | actif |
+| Membre PF — Consommateur, Vendeur, Personnel | `kofwo@gmail.com` | CECT-000012 | actif |
+| Membre PF — Vendeur, Consommateur | `nakyendoujos@gmail.com` | CECT-000013 | actif |
+| Membre PF — Vendeur, Consommateur, Personnel | `nakyendou@gmail.com` | CECT-000015 | actif |
+| Membre PF | `tandemodson41@gmail.com` | CECT-000001 | `pending_payment` |
+| Membre PF | `koffi.guinwogno@ipnetinstitute.com` | CECT-000016 | `pending_payment` |
+
+- Aucun compte Administrateur n'existe dans cette base.
+- Mot de passe oublié d'un membre : `POST /auth/password/forgot`, code lu dans `storage/logs/laravel.log` avec `MAIL_MAILER=log`.
+- Compte interne `pending_activation` : renvoyer l'invitation depuis le Superadmin, puis activer via `POST /auth/staff/activate`.
+
 ### Variables d'environnement utiles
 
 | Variable | Rôle |
