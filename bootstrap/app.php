@@ -1,9 +1,9 @@
 <?php
 
 use App\Domain\Identity\Http\Middleware\EnsureStaff;
+use App\Domain\Identity\Http\Middleware\EnsureStaffGuardianSession;
 use App\Domain\Identity\Http\Middleware\EnsureStepUp;
 use App\Domain\Identity\Http\Middleware\EnsureSuperadminSession;
-use App\Domain\Identity\Http\Middleware\EnsureStaffGuardianSession;
 use App\Domain\Identity\Http\Middleware\RequireSuperadminMtls;
 use App\Domain\Shared\Http\ApiErrorRenderer;
 use App\Domain\Shared\Http\Middleware\AddSecurityHeaders;
@@ -42,6 +42,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(AttachCorrelationId::class);
+
+        // Behind a hosting load balancer (Render), trust its forwarded scheme and client IP so
+        // HTTPS URLs and per-IP rate limits are correct. Unset locally: no proxy is trusted.
+        $trustedProxies = env('TRUSTED_PROXIES');
+        if (is_string($trustedProxies) && $trustedProxies !== '') {
+            $middleware->trustProxies(at: $trustedProxies === '*' ? '*' : array_map('trim', explode(',', $trustedProxies)));
+        }
 
         // The React site authenticates with HttpOnly session cookies (Sanctum SPA); other clients use bearer tokens.
         $middleware->statefulApi();
