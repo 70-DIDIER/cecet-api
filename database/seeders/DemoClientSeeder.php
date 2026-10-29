@@ -12,6 +12,8 @@ use App\Domain\Exchange\Models\ExchangeRequest;
 use App\Domain\Identity\Actions\RegisterMember;
 use App\Domain\Identity\Enums\UserKind;
 use App\Domain\Identity\Enums\UserStatus;
+use App\Domain\Kyc\KycEligibility;
+use App\Domain\Kyc\Models\MemberKycCase;
 use App\Domain\Merchant\Actions\MerchantPaymentService;
 use App\Domain\Merchant\Actions\MerchantQrService;
 use App\Domain\Merchant\Models\MerchantDirectoryProfile;
@@ -273,6 +275,7 @@ class DemoClientSeeder extends Seeder
 
     private function payMembership(User $member): User
     {
+        $this->approveIdentity($member);
         $payment = app(StartMembershipPayment::class)->handle($member, 'CASH');
         app(ManualPaymentDesk::class)->declare($member, $payment['attempt'], 'Remis au siège');
         app(ManualPaymentDesk::class)->approve($this->admin, $payment['attempt']->refresh(), $payment['attempt']->amount, 'REÇU-ADH-'.$member->member_number, null);
@@ -281,13 +284,33 @@ class DemoClientSeeder extends Seeder
     }
 
     /**
-     * Demonstration accounts stand for members whose identity the CECT already checked, the condition to subscribe a pack.
+     * Demonstration accounts stand for members whose identity the CECT already checked, the condition to pay the
+     * membership (an approved KYC case, Didit evidence included when Didit is the provider) and to subscribe a pack.
      */
     private function approveIdentity(User $member): void
     {
         if (! $member->hasVerifiedIdentity()) {
             $member->forceFill(['identity_verified_at' => now()])->save();
         }
+
+        if (KycEligibility::approved($member)) {
+            return;
+        }
+
+        MemberKycCase::query()->updateOrCreate(['user_id' => $member->id], [
+            'status' => 'approved',
+            'verification_mode' => 'didit',
+            'privacy_notice_accepted' => true,
+            'submitted_at' => now(),
+            'reviewed_by' => $this->admin->id,
+            'reviewed_at' => now(),
+            'review_reason' => 'Compte de démonstration',
+            'provider_status' => 'Approved',
+            'provider_checks' => ['complete' => true, 'business_verified' => true],
+            'provider_environment' => config('kyc.didit.environment'),
+            'provider_verified_at' => now(),
+            'provider_reviewed_at' => now(),
+        ]);
     }
 
     private function subscribe(User $member, string $code): UserPack
@@ -389,6 +412,7 @@ class DemoClientSeeder extends Seeder
         ]);
         $merchant = $registered['user'];
         $merchant->forceFill(['status' => UserStatus::PendingPayment, 'email_verified_at' => now()])->save();
+        $this->approveIdentity($merchant);
 
         $payment = app(StartMembershipPayment::class)->handle($merchant, 'CASH');
         app(ManualPaymentDesk::class)->declare($merchant, $payment['attempt'], 'Virement du jour');
