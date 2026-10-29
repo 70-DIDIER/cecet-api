@@ -14,6 +14,16 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     DB_URL="${DB_MIGRATION_URL:-$DB_URL}" php artisan migrate --force --no-interaction
 fi
 
+# Opt-in demo accounts (DemoClientSeeder, refuses APP_ENV=production). Idempotent: an existing
+# demo client is left untouched. Requires a private DEMO_PASSWORD (the code default is public).
+if [ "$RUN_DEMO_SEED" = "true" ]; then
+    if [ -z "$DEMO_PASSWORD" ]; then
+        echo "RUN_DEMO_SEED=true requires DEMO_PASSWORD." >&2
+        exit 1
+    fi
+    DB_URL="${DB_MIGRATION_URL:-$DB_URL}" php artisan db:seed --class=DemoClientSeeder --force --no-interaction
+fi
+
 php artisan storage:link --force >/dev/null 2>&1 || true
 php artisan optimize
 

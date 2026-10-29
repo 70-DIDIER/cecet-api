@@ -32,6 +32,12 @@ services:
       # Neon direct endpoint (host without -pooler), used only to run migrations at startup.
       - key: DB_MIGRATION_URL
         sync: false
+      # Demo accounts (DemoClientSeeder) seeded at startup when "true". Set DEMO_PASSWORD first;
+      # DEMO_CLIENT_EMAIL, DEMO_MERCHANT_EMAIL and DEMO_STAFF_EMAIL are optional (config/demo.php).
+      - key: RUN_DEMO_SEED
+        value: "false"
+      - key: DEMO_PASSWORD
+        sync: false
       - key: DB_SSLMODE
         value: require
       - key: SESSION_DRIVER
